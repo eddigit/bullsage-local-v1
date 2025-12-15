@@ -146,6 +146,16 @@ export default function MainLayout() {
                 {navigation.map((item) => (
                   <NavItem key={item.name} item={item} mobile />
                 ))}
+                
+                {/* Admin Navigation */}
+                {user?.is_admin && (
+                  <>
+                    <div className="my-4 border-t border-white/5" />
+                    {adminNavigation.map((item) => (
+                      <NavItem key={item.name} item={item} mobile />
+                    ))}
+                  </>
+                )}
               </nav>
             </ScrollArea>
 
