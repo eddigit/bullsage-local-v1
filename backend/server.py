@@ -1006,6 +1006,27 @@ async def admin_toggle_admin(user_id: str, is_admin: bool, admin: dict = Depends
     
     return {"message": f"Admin status {'granted' if is_admin else 'revoked'}"}
 
+@api_router.get("/admin/api-keys")
+async def get_api_keys(admin: dict = Depends(get_admin_user)):
+    """Get all configured API keys (admin only) - masked for security"""
+    def mask_key(key: str) -> dict:
+        if not key:
+            return {"masked": "Non configurée", "full": "", "configured": False}
+        if len(key) > 8:
+            masked = key[:4] + "*" * (len(key) - 8) + key[-4:]
+        else:
+            masked = "*" * len(key)
+        return {"masked": masked, "full": key, "configured": True}
+    
+    return {
+        "coingecko": {"masked": "Gratuit (pas de clé)", "full": "", "configured": True, "name": "CoinGecko", "usage": "Données crypto"},
+        "alpha_vantage": {**mask_key(ALPHA_VANTAGE_API_KEY), "name": "Alpha Vantage", "usage": "Forex, Actions, Indicateurs"},
+        "finnhub": {**mask_key(FINNHUB_API_KEY), "name": "Finnhub", "usage": "News, Sentiment, Calendrier éco"},
+        "fred": {**mask_key(FRED_API_KEY), "name": "FRED", "usage": "Données macro (Fed, Inflation, PIB)"},
+        "marketaux": {**mask_key(MARKETAUX_API_KEY), "name": "Marketaux", "usage": "News sentiment avancé"},
+        "emergent_llm": {**mask_key(EMERGENT_LLM_KEY), "name": "Emergent LLM", "usage": "IA GPT-5.1"}
+    }
+
 # ============== STARTUP EVENTS ==============
 
 @app.on_event("startup")
