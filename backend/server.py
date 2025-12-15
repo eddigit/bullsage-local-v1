@@ -279,9 +279,76 @@ async def get_me(current_user: dict = Depends(get_current_user)):
 
 # ============== MARKET DATA ROUTES ==============
 
+# Simple in-memory cache for crypto data
+_crypto_cache = {
+    "data": None,
+    "timestamp": None,
+    "ttl": 60  # Cache for 60 seconds
+}
+
+# Fallback crypto data when API is rate limited
+FALLBACK_CRYPTO_DATA = [
+    {"id": "bitcoin", "symbol": "btc", "name": "Bitcoin", "image": "https://coin-images.coingecko.com/coins/images/1/large/bitcoin.png", "current_price": 0, "market_cap": 0, "market_cap_rank": 1, "price_change_percentage_24h": 0, "high_24h": 0, "low_24h": 0, "sparkline_in_7d": {"price": []}},
+    {"id": "ethereum", "symbol": "eth", "name": "Ethereum", "image": "https://coin-images.coingecko.com/coins/images/279/large/ethereum.png", "current_price": 0, "market_cap": 0, "market_cap_rank": 2, "price_change_percentage_24h": 0, "high_24h": 0, "low_24h": 0, "sparkline_in_7d": {"price": []}},
+    {"id": "tether", "symbol": "usdt", "name": "Tether", "image": "https://coin-images.coingecko.com/coins/images/325/large/Tether.png", "current_price": 1, "market_cap": 0, "market_cap_rank": 3, "price_change_percentage_24h": 0, "high_24h": 1, "low_24h": 1, "sparkline_in_7d": {"price": []}},
+    {"id": "binancecoin", "symbol": "bnb", "name": "BNB", "image": "https://coin-images.coingecko.com/coins/images/825/large/bnb-icon2_2x.png", "current_price": 0, "market_cap": 0, "market_cap_rank": 4, "price_change_percentage_24h": 0, "high_24h": 0, "low_24h": 0, "sparkline_in_7d": {"price": []}},
+    {"id": "solana", "symbol": "sol", "name": "Solana", "image": "https://coin-images.coingecko.com/coins/images/4128/large/solana.png", "current_price": 0, "market_cap": 0, "market_cap_rank": 5, "price_change_percentage_24h": 0, "high_24h": 0, "low_24h": 0, "sparkline_in_7d": {"price": []}},
+    {"id": "ripple", "symbol": "xrp", "name": "XRP", "image": "https://coin-images.coingecko.com/coins/images/44/large/xrp-symbol-white-128.png", "current_price": 0, "market_cap": 0, "market_cap_rank": 6, "price_change_percentage_24h": 0, "high_24h": 0, "low_24h": 0, "sparkline_in_7d": {"price": []}},
+    {"id": "usd-coin", "symbol": "usdc", "name": "USDC", "image": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png", "current_price": 1, "market_cap": 0, "market_cap_rank": 7, "price_change_percentage_24h": 0, "high_24h": 1, "low_24h": 1, "sparkline_in_7d": {"price": []}},
+    {"id": "cardano", "symbol": "ada", "name": "Cardano", "image": "https://coin-images.coingecko.com/coins/images/975/large/cardano.png", "current_price": 0, "market_cap": 0, "market_cap_rank": 8, "price_change_percentage_24h": 0, "high_24h": 0, "low_24h": 0, "sparkline_in_7d": {"price": []}},
+    {"id": "dogecoin", "symbol": "doge", "name": "Dogecoin", "image": "https://coin-images.coingecko.com/coins/images/5/large/dogecoin.png", "current_price": 0, "market_cap": 0, "market_cap_rank": 9, "price_change_percentage_24h": 0, "high_24h": 0, "low_24h": 0, "sparkline_in_7d": {"price": []}},
+    {"id": "avalanche-2", "symbol": "avax", "name": "Avalanche", "image": "https://coin-images.coingecko.com/coins/images/12559/large/Avalanche_Circle_RedWhite_Trans.png", "current_price": 0, "market_cap": 0, "market_cap_rank": 10, "price_change_percentage_24h": 0, "high_24h": 0, "low_24h": 0, "sparkline_in_7d": {"price": []}},
+    {"id": "polkadot", "symbol": "dot", "name": "Polkadot", "image": "https://coin-images.coingecko.com/coins/images/12171/large/polkadot.png", "current_price": 0, "market_cap": 0, "market_cap_rank": 11, "price_change_percentage_24h": 0, "high_24h": 0, "low_24h": 0, "sparkline_in_7d": {"price": []}},
+    {"id": "chainlink", "symbol": "link", "name": "Chainlink", "image": "https://coin-images.coingecko.com/coins/images/877/large/chainlink-new-logo.png", "current_price": 0, "market_cap": 0, "market_cap_rank": 12, "price_change_percentage_24h": 0, "high_24h": 0, "low_24h": 0, "sparkline_in_7d": {"price": []}},
+    {"id": "polygon", "symbol": "matic", "name": "Polygon", "image": "https://coin-images.coingecko.com/coins/images/4713/large/polygon.png", "current_price": 0, "market_cap": 0, "market_cap_rank": 13, "price_change_percentage_24h": 0, "high_24h": 0, "low_24h": 0, "sparkline_in_7d": {"price": []}},
+    {"id": "litecoin", "symbol": "ltc", "name": "Litecoin", "image": "https://coin-images.coingecko.com/coins/images/2/large/litecoin.png", "current_price": 0, "market_cap": 0, "market_cap_rank": 14, "price_change_percentage_24h": 0, "high_24h": 0, "low_24h": 0, "sparkline_in_7d": {"price": []}},
+    {"id": "shiba-inu", "symbol": "shib", "name": "Shiba Inu", "image": "https://coin-images.coingecko.com/coins/images/11939/large/shiba.png", "current_price": 0, "market_cap": 0, "market_cap_rank": 15, "price_change_percentage_24h": 0, "high_24h": 0, "low_24h": 0, "sparkline_in_7d": {"price": []}},
+]
+
+async def fetch_crypto_with_simple_api():
+    """Fetch basic price data using CoinGecko simple/price endpoint (less rate limited)"""
+    coin_ids = ",".join([c["id"] for c in FALLBACK_CRYPTO_DATA])
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{COINGECKO_API_URL}/simple/price",
+                params={
+                    "ids": coin_ids,
+                    "vs_currencies": "usd",
+                    "include_24hr_change": "true",
+                    "include_24hr_vol": "true"
+                },
+                timeout=15.0
+            )
+            if response.status_code == 200:
+                prices = response.json()
+                # Update fallback data with real prices
+                updated_data = []
+                for coin in FALLBACK_CRYPTO_DATA:
+                    coin_data = coin.copy()
+                    if coin["id"] in prices:
+                        coin_data["current_price"] = prices[coin["id"]].get("usd", 0)
+                        coin_data["price_change_percentage_24h"] = prices[coin["id"]].get("usd_24h_change", 0)
+                    updated_data.append(coin_data)
+                return updated_data
+    except Exception as e:
+        logger.error(f"Simple price API error: {e}")
+    return None
+
 @api_router.get("/market/crypto")
 async def get_crypto_markets(current_user: dict = Depends(get_current_user)):
-    """Get top cryptocurrencies from CoinGecko"""
+    """Get top cryptocurrencies from CoinGecko with caching and fallback"""
+    global _crypto_cache
+    
+    # Check cache first
+    now = datetime.now(timezone.utc)
+    if _crypto_cache["data"] and _crypto_cache["timestamp"]:
+        age = (now - _crypto_cache["timestamp"]).total_seconds()
+        if age < _crypto_cache["ttl"]:
+            logger.info("Returning cached crypto data")
+            return _crypto_cache["data"]
+    
+    # Try main API
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(
@@ -297,13 +364,31 @@ async def get_crypto_markets(current_user: dict = Depends(get_current_user)):
                 timeout=30.0
             )
             if response.status_code == 200:
-                return response.json()
+                data = response.json()
+                # Update cache
+                _crypto_cache["data"] = data
+                _crypto_cache["timestamp"] = now
+                return data
+            elif response.status_code == 429:
+                logger.warning("CoinGecko rate limited, trying simple API...")
+                # Try simple price API as fallback
+                simple_data = await fetch_crypto_with_simple_api()
+                if simple_data:
+                    _crypto_cache["data"] = simple_data
+                    _crypto_cache["timestamp"] = now
+                    return simple_data
+                # Return cached or fallback
+                if _crypto_cache["data"]:
+                    logger.info("Returning stale cached data due to rate limit")
+                    return _crypto_cache["data"]
+                logger.warning("Returning fallback crypto data")
+                return FALLBACK_CRYPTO_DATA
             else:
                 logger.error(f"CoinGecko API error: {response.status_code}")
-                return []
+                return _crypto_cache["data"] if _crypto_cache["data"] else FALLBACK_CRYPTO_DATA
     except Exception as e:
         logger.error(f"Error fetching crypto markets: {e}")
-        return []
+        return _crypto_cache["data"] if _crypto_cache["data"] else FALLBACK_CRYPTO_DATA
 
 @api_router.get("/market/crypto/{coin_id}")
 async def get_crypto_detail(coin_id: str, current_user: dict = Depends(get_current_user)):
