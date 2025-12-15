@@ -360,38 +360,48 @@ export default function DashboardPage() {
       <Card className="glass border-white/5">
         <CardHeader>
           <CardTitle className="text-lg">Aperçu du Marché (BTC)</CardTitle>
-          <CardDescription>Performance sur 7 jours</CardDescription>
+          <CardDescription>Performance sur 7 jours - Données réelles CoinGecko</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="h-[200px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis 
-                  dataKey="day" 
-                  axisLine={false} 
-                  tickLine={false}
-                  tick={{ fill: '#71717a', fontSize: 12 }}
-                />
-                <YAxis 
-                  hide 
-                  domain={['dataMin', 'dataMax']}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Area
-                  type="monotone"
-                  dataKey="price"
-                  stroke="#10B981"
-                  strokeWidth={2}
-                  fill="url(#colorPrice)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            {chartLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis 
+                    dataKey="day" 
+                    axisLine={false} 
+                    tickLine={false}
+                    tick={{ fill: '#71717a', fontSize: 12 }}
+                  />
+                  <YAxis 
+                    hide 
+                    domain={['dataMin', 'dataMax']}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Area
+                    type="monotone"
+                    dataKey="price"
+                    stroke="#10B981"
+                    strokeWidth={2}
+                    fill="url(#colorPrice)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                Impossible de charger les données du graphique
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
