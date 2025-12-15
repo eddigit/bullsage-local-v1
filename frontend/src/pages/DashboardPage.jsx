@@ -61,8 +61,10 @@ export default function DashboardPage() {
   const [markets, setMarkets] = useState([]);
   const [trending, setTrending] = useState([]);
   const [portfolio, setPortfolio] = useState(null);
+  const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [chartLoading, setChartLoading] = useState(true);
 
   const fetchData = async () => {
     try {
@@ -82,8 +84,35 @@ export default function DashboardPage() {
     }
   };
 
+  // Fetch real chart data from CoinGecko
+  const fetchChartData = async () => {
+    setChartLoading(true);
+    try {
+      const response = await axios.get(`${API}/market/crypto/bitcoin/chart?days=7`);
+      if (response.data && response.data.prices) {
+        const formattedData = response.data.prices.map((item, index) => {
+          const date = new Date(item[0]);
+          return {
+            day: date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' }),
+            price: item[1],
+            timestamp: item[0]
+          };
+        });
+        // Sample every few points to avoid too many data points
+        const sampledData = formattedData.filter((_, i) => i % Math.ceil(formattedData.length / 20) === 0);
+        setChartData(sampledData);
+      }
+    } catch (error) {
+      console.error("Error fetching chart data:", error);
+      setChartData([]);
+    } finally {
+      setChartLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchData();
+    fetchChartData();
     const interval = setInterval(fetchData, 60000); // Refresh every minute
     return () => clearInterval(interval);
   }, []);
