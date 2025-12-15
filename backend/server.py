@@ -803,65 +803,6 @@ def analyze_market_conditions(data: dict) -> dict:
             analysis["warnings"].append(f"Événements économiques importants à venir: {events_str}")
     
     return analysis
-                    data["fear_greed"] = fng["data"][0]
-        except Exception as e:
-            logger.error(f"Error fetching Fear & Greed: {e}")
-
-        # 3. Market News from Finnhub
-        try:
-            response = await client.get(
-                "https://finnhub.io/api/v1/news",
-                params={"category": "crypto", "token": FINNHUB_API_KEY},
-                timeout=15.0
-            )
-            if response.status_code == 200:
-                news = response.json()
-                data["news"] = news[:5] if news else []
-        except Exception as e:
-            logger.error(f"Error fetching news: {e}")
-
-        # 4. Macro data from FRED
-        try:
-            # VIX
-            response = await client.get(
-                "https://api.stlouisfed.org/fred/series/observations",
-                params={
-                    "series_id": "VIXCLS",
-                    "api_key": FRED_API_KEY,
-                    "file_type": "json",
-                    "sort_order": "desc",
-                    "limit": 1
-                },
-                timeout=10.0
-            )
-            if response.status_code == 200:
-                vix_data = response.json()
-                if vix_data.get("observations"):
-                    data["macro"]["vix"] = vix_data["observations"][0].get("value")
-        except Exception as e:
-            logger.error(f"Error fetching VIX: {e}")
-
-        try:
-            # Fed Rate
-            response = await client.get(
-                "https://api.stlouisfed.org/fred/series/observations",
-                params={
-                    "series_id": "FEDFUNDS",
-                    "api_key": FRED_API_KEY,
-                    "file_type": "json",
-                    "sort_order": "desc",
-                    "limit": 1
-                },
-                timeout=10.0
-            )
-            if response.status_code == 200:
-                fed_data = response.json()
-                if fed_data.get("observations"):
-                    data["macro"]["fed_rate"] = fed_data["observations"][0].get("value")
-        except Exception as e:
-            logger.error(f"Error fetching Fed rate: {e}")
-
-    return data
 
 @api_router.post("/assistant/chat", response_model=ChatResponse)
 async def chat_with_bull(request: ChatRequest, current_user: dict = Depends(get_current_user)):
@@ -872,7 +813,10 @@ async def chat_with_bull(request: ChatRequest, current_user: dict = Depends(get_
         user_name = current_user.get("name", "Trader")
         
         # FETCH ALL REAL-TIME DATA
-        market_data = await fetch_realtime_market_data()
+        market_data = await fetch_comprehensive_market_data()
+        
+        # Analyze market conditions
+        market_analysis = analyze_market_conditions(market_data)
         
         # Build comprehensive market context
         market_context = f"""
@@ -885,12 +829,16 @@ async def chat_with_bull(request: ChatRequest, current_user: dict = Depends(get_
             change_1h = coin.get("price_change_percentage_1h_in_currency", 0) or 0
             change_24h = coin.get("price_change_percentage_24h", 0) or 0
             change_7d = coin.get("price_change_percentage_7d_in_currency", 0) or 0
+            change_30d = coin.get("price_change_percentage_30d_in_currency", 0) or 0
             high_24h = coin.get("high_24h", 0)
             low_24h = coin.get("low_24h", 0)
+            ath = coin.get("ath", 0)
+            ath_change = coin.get("ath_change_percentage", 0) or 0
             market_context += f"""
 - {coin['name']} ({coin['symbol'].upper()}): ${price:,.2f}
-  • 1h: {change_1h:+.2f}% | 24h: {change_24h:+.2f}% | 7j: {change_7d:+.2f}%
-  • High 24h: ${high_24h:,.2f} | Low 24h: ${low_24h:,.2f}"""
+  • 1h: {change_1h:+.2f}% | 24h: {change_24h:+.2f}% | 7j: {change_7d:+.2f}% | 30j: {change_30d:+.2f}%
+  • High 24h: ${high_24h:,.2f} | Low 24h: ${low_24h:,.2f}
+  • ATH: ${ath:,.2f} ({ath_change:+.1f}% du ATH)"""
 
         # Fear & Greed Index
         if market_data["fear_greed"]:
