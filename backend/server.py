@@ -669,6 +669,153 @@ async def get_news_sentiment(symbols: str = "BTCUSD,ETHUSD", current_user: dict 
         logger.error(f"Error fetching news sentiment: {e}")
         return {"data": []}
 
+# ============== TRADING SIGNALS ROUTES ==============
+
+@api_router.post("/signals", response_model=TradingSignal)
+async def create_signal(signal: SignalCreate, current_user: dict = Depends(get_current_user)):
+    """Create a new trading signal"""
+    signal_id = str(uuid.uuid4())
+    signal_doc = {
+        "id": signal_id,
+        "user_id": current_user["id"],
+        "symbol": signal.symbol,
+        "symbol_name": signal.symbol_name,
+        "signal_type": signal.signal_type,
+        "entry_price": signal.entry_price,
+        "stop_loss": signal.stop_loss,
+        "take_profit_1": signal.take_profit_1,
+        "take_profit_2": signal.take_profit_2,
+        "timeframe": signal.timeframe,
+        "confidence": signal.confidence,
+        "reason": signal.reason,
+        "price_at_signal": signal.price_at_signal,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "status": "active",
+        "result_pnl": None
+    }
+    await db.signals.insert_one(signal_doc)
+    return TradingSignal(**signal_doc)
+
+@api_router.get("/signals")
+async def get_signals(limit: int = 50, status: str = None, current_user: dict = Depends(get_current_user)):
+    """Get user's trading signals"""
+    query = {"user_id": current_user["id"]}
+    if status:
+        query["status"] = status
+    
+    signals = await db.signals.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    return signals
+
+@api_router.get("/signals/stats")
+async def get_signal_stats(current_user: dict = Depends(get_current_user)):
+    """Get trading signal statistics"""
+    signals = await db.signals.find({"user_id": current_user["id"]}, {"_id": 0}).to_list(1000)
+    
+    total = len(signals)
+    if total == 0:
+        return {
+            "total_signals": 0,
+            "active": 0,
+            "hit_tp1": 0,
+            "hit_tp2": 0,
+            "hit_sl": 0,
+            "expired": 0,
+            "win_rate": 0,
+            "by_symbol": {},
+            "by_timeframe": {}
+        }
+    
+    active = len([s for s in signals if s["status"] == "active"])
+    hit_tp1 = len([s for s in signals if s["status"] == "hit_tp1"])
+    hit_tp2 = len([s for s in signals if s["status"] == "hit_tp2"])
+    hit_sl = len([s for s in signals if s["status"] == "hit_sl"])
+    expired = len([s for s in signals if s["status"] == "expired"])
+    
+    completed = hit_tp1 + hit_tp2 + hit_sl
+    wins = hit_tp1 + hit_tp2
+    win_rate = (wins / completed * 100) if completed > 0 else 0
+    
+    # Stats by symbol
+    by_symbol = {}
+    for s in signals:
+        sym = s["symbol"]
+        if sym not in by_symbol:
+            by_symbol[sym] = {"total": 0, "wins": 0}
+        by_symbol[sym]["total"] += 1
+        if s["status"] in ["hit_tp1", "hit_tp2"]:
+            by_symbol[sym]["wins"] += 1
+    
+    # Stats by timeframe
+    by_timeframe = {}
+    for s in signals:
+        tf = s["timeframe"]
+        if tf not in by_timeframe:
+            by_timeframe[tf] = {"total": 0, "wins": 0}
+        by_timeframe[tf]["total"] += 1
+        if s["status"] in ["hit_tp1", "hit_tp2"]:
+            by_timeframe[tf]["wins"] += 1
+    
+    return {
+        "total_signals": total,
+        "active": active,
+        "hit_tp1": hit_tp1,
+        "hit_tp2": hit_tp2,
+        "hit_sl": hit_sl,
+        "expired": expired,
+        "win_rate": round(win_rate, 1),
+        "by_symbol": by_symbol,
+        "by_timeframe": by_timeframe
+    }
+
+@api_router.put("/signals/{signal_id}/status")
+async def update_signal_status(signal_id: str, status: str, result_pnl: float = None, current_user: dict = Depends(get_current_user)):
+    """Update signal status (hit_tp1, hit_tp2, hit_sl, expired)"""
+    valid_statuses = ["active", "hit_tp1", "hit_tp2", "hit_sl", "expired"]
+    if status not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
+    
+    update_data = {"status": status}
+    if result_pnl is not None:
+        update_data["result_pnl"] = result_pnl
+    
+    result = await db.signals.update_one(
+        {"id": signal_id, "user_id": current_user["id"]},
+        {"$set": update_data}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Signal not found")
+    
+    return {"message": "Signal updated", "status": status}
+
+@api_router.delete("/signals/{signal_id}")
+async def delete_signal(signal_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a signal"""
+    result = await db.signals.delete_one({"id": signal_id, "user_id": current_user["id"]})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Signal not found")
+    return {"message": "Signal deleted"}
+
+# ============== MARKET INTELLIGENCE ENDPOINT ==============
+
+@api_router.get("/market/intelligence")
+async def get_market_intelligence(current_user: dict = Depends(get_current_user)):
+    """Get comprehensive market intelligence dashboard data"""
+    data = await fetch_comprehensive_market_data()
+    analysis = analyze_market_conditions(data)
+    
+    return {
+        "timestamp": data["timestamp"],
+        "crypto_prices": data["crypto"],
+        "fear_greed": {
+            "current": data["fear_greed"],
+            "history": data["fear_greed_history"]
+        },
+        "macro": data["macro"],
+        "economic_calendar": data["economic_calendar"],
+        "news": data["news"][:10],
+        "analysis": analysis
+    }
+
 # ============== AI ASSISTANT ROUTES ==============
 
 async def fetch_comprehensive_market_data(coin_ids: str = "bitcoin,ethereum,solana,cardano,ripple"):
