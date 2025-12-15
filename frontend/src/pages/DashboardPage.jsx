@@ -125,8 +125,8 @@ export default function DashboardPage() {
 
   const handleRefresh = () => {
     setRefreshing(true);
+    setChartLoading(true);
     fetchData();
-    fetchChartData();
     toast.success("Données actualisées");
   };
 
