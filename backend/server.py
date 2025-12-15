@@ -222,7 +222,8 @@ async def login(credentials: UserLogin):
         trading_level=user.get("trading_level", "beginner"),
         created_at=user["created_at"],
         paper_balance=user.get("paper_balance", 10000.0),
-        watchlist=user.get("watchlist", [])
+        watchlist=user.get("watchlist", []),
+        is_admin=user.get("is_admin", False)
     )
     
     return TokenResponse(access_token=token, user=user_response)
@@ -236,7 +237,8 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         trading_level=current_user.get("trading_level", "beginner"),
         created_at=current_user["created_at"],
         paper_balance=current_user.get("paper_balance", 10000.0),
-        watchlist=current_user.get("watchlist", [])
+        watchlist=current_user.get("watchlist", []),
+        is_admin=current_user.get("is_admin", False)
     )
 
 # ============== MARKET DATA ROUTES ==============
