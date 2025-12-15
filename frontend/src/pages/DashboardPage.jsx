@@ -120,6 +120,7 @@ export default function DashboardPage() {
   const handleRefresh = () => {
     setRefreshing(true);
     fetchData();
+    fetchChartData();
     toast.success("Données actualisées");
   };
 
@@ -144,15 +145,6 @@ export default function DashboardPage() {
 
   const portfolioValue = calculatePortfolioValue();
   const portfolioChange = ((portfolioValue - 10000) / 10000) * 100;
-
-  // Generate mock chart data
-  const chartData = markets.slice(0, 1).map(coin => {
-    // Create 7 day mock data
-    return Array.from({ length: 7 }, (_, i) => ({
-      day: `J-${6-i}`,
-      price: coin.current_price * (0.95 + Math.random() * 0.1)
-    }));
-  })[0] || [];
 
   if (loading) {
     return (
