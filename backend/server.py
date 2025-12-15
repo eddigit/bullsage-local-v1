@@ -636,6 +636,104 @@ async def root():
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
 
+# ============== ADMIN ROUTES ==============
+
+async def get_admin_user(current_user: dict = Depends(get_current_user)):
+    """Verify the user is an admin"""
+    if not current_user.get("is_admin", False):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return current_user
+
+@api_router.get("/admin/users")
+async def admin_get_users(admin: dict = Depends(get_admin_user)):
+    """Get all users (admin only)"""
+    users = await db.users.find({}, {"_id": 0, "password": 0}).to_list(1000)
+    return users
+
+@api_router.get("/admin/stats")
+async def admin_get_stats(admin: dict = Depends(get_admin_user)):
+    """Get platform statistics (admin only)"""
+    users_count = await db.users.count_documents({})
+    trades_count = await db.paper_trades.count_documents({})
+    strategies_count = await db.strategies.count_documents({})
+    alerts_count = await db.alerts.count_documents({})
+    chats_count = await db.chat_history.count_documents({})
+    
+    return {
+        "users": users_count,
+        "paper_trades": trades_count,
+        "strategies": strategies_count,
+        "alerts": alerts_count,
+        "ai_chats": chats_count,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+@api_router.delete("/admin/users/{user_id}")
+async def admin_delete_user(user_id: str, admin: dict = Depends(get_admin_user)):
+    """Delete a user (admin only)"""
+    if user_id == admin["id"]:
+        raise HTTPException(status_code=400, detail="Cannot delete yourself")
+    
+    result = await db.users.delete_one({"id": user_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Clean up user data
+    await db.paper_trades.delete_many({"user_id": user_id})
+    await db.strategies.delete_many({"user_id": user_id})
+    await db.alerts.delete_many({"user_id": user_id})
+    await db.chat_history.delete_many({"user_id": user_id})
+    
+    return {"message": "User deleted successfully"}
+
+@api_router.put("/admin/users/{user_id}/admin")
+async def admin_toggle_admin(user_id: str, is_admin: bool, admin: dict = Depends(get_admin_user)):
+    """Toggle admin status for a user (admin only)"""
+    if user_id == admin["id"]:
+        raise HTTPException(status_code=400, detail="Cannot modify your own admin status")
+    
+    result = await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"is_admin": is_admin}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {"message": f"Admin status {'granted' if is_admin else 'revoked'}"}
+
+# ============== STARTUP EVENTS ==============
+
+@app.on_event("startup")
+async def create_admin_user():
+    """Create default admin user on startup"""
+    admin_email = "coachdigitalparis@gmail.com"
+    admin_password = "$$Reussite888!!"
+    
+    existing_admin = await db.users.find_one({"email": admin_email})
+    if not existing_admin:
+        admin_id = str(uuid.uuid4())
+        admin_doc = {
+            "id": admin_id,
+            "email": admin_email,
+            "password": hash_password(admin_password),
+            "name": "Admin Coach Digital",
+            "trading_level": "advanced",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "paper_balance": 10000.0,
+            "watchlist": ["bitcoin", "ethereum", "solana", "cardano", "polkadot"],
+            "portfolio": {},
+            "is_admin": True
+        }
+        await db.users.insert_one(admin_doc)
+        logger.info(f"Admin user created: {admin_email}")
+    else:
+        # Ensure existing user has admin status
+        await db.users.update_one(
+            {"email": admin_email},
+            {"$set": {"is_admin": True}}
+        )
+        logger.info(f"Admin status confirmed for: {admin_email}")
+
 # Include the router in the main app
 app.include_router(api_router)
 
