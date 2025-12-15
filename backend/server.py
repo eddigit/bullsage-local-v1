@@ -64,6 +64,7 @@ class UserResponse(BaseModel):
     created_at: str
     paper_balance: float = 10000.0
     watchlist: List[str] = []
+    is_admin: bool = False
 
 class TokenResponse(BaseModel):
     access_token: str
