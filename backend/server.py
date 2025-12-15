@@ -863,32 +863,88 @@ async def chat_with_bull(request: ChatRequest, current_user: dict = Depends(get_
         if market_data["macro"]:
             market_context += f"""
 
-🏦 DONNÉES MACRO (FRED):
-- VIX (Volatilité): {market_data['macro'].get('vix', 'N/A')}"""
-            vix = market_data['macro'].get('vix')
-            if vix:
+🏦 DONNÉES MACRO:"""
+            if market_data["macro"].get("vix"):
+                vix_val = market_data["macro"]["vix"].get("value", "N/A")
+                market_context += f"""
+- VIX (Volatilité): {vix_val}"""
                 try:
-                    vix_val = float(vix)
-                    if vix_val < 15:
-                        market_context += " (Faible volatilité - marché calme)"
-                    elif vix_val < 25:
-                        market_context += " (Volatilité normale)"
+                    vix_num = float(vix_val)
+                    if vix_num < 15:
+                        market_context += " (Faible - marché calme, bon pour prendre des positions)"
+                    elif vix_num < 25:
+                        market_context += " (Normal)"
                     else:
-                        market_context += " (Haute volatilité - ATTENTION)"
+                        market_context += " (ÉLEVÉ - PRUDENCE, forte incertitude)"
                 except:
                     pass
+            
+            if market_data["macro"].get("fed_rate"):
+                market_context += f"""
+- Taux Fed: {market_data["macro"]["fed_rate"].get("value", "N/A")}%"""
+            
+            if market_data["macro"].get("dxy"):
+                market_context += f"""
+- Dollar Index (DXY): {market_data["macro"]["dxy"].get("value", "N/A")} (Dollar fort = crypto faible généralement)"""
+
+        # Fear & Greed History (trend)
+        if market_data.get("fear_greed_history") and len(market_data["fear_greed_history"]) > 1:
+            current_fg = int(market_data["fear_greed_history"][0].get("value", 50))
+            week_ago_fg = int(market_data["fear_greed_history"][-1].get("value", 50))
+            fg_change = current_fg - week_ago_fg
             market_context += f"""
-- Taux Fed: {market_data['macro'].get('fed_rate', 'N/A')}%"""
+- Fear & Greed Tendance 7j: {week_ago_fg} → {current_fg} ({fg_change:+d} points)"""
+
+        # Economic Calendar
+        if market_data.get("economic_calendar"):
+            market_context += """
+
+📅 CALENDRIER ÉCONOMIQUE (événements importants à venir):"""
+            for event in market_data["economic_calendar"][:5]:
+                event_name = event.get("event", "")[:50]
+                event_date = event.get("date", "")
+                impact = event.get("impact", "").upper()
+                market_context += f"""
+- [{impact}] {event_date}: {event_name}"""
 
         # News headlines
         if market_data["news"]:
             market_context += """
 
 📰 DERNIÈRES NEWS CRYPTO:"""
-            for news in market_data["news"][:3]:
-                headline = news.get("headline", "")[:100]
+            for news in market_data["news"][:5]:
+                headline = news.get("headline", "")[:80]
+                source = news.get("source", "")
                 market_context += f"""
-- {headline}"""
+- {headline} ({source})"""
+
+        # AI-generated analysis summary
+        market_context += f"""
+
+🤖 ANALYSE AUTOMATIQUE DU MARCHÉ:
+- Sentiment global: {market_analysis['overall_sentiment'].upper()}
+- Niveau de risque: {market_analysis['risk_level'].upper()}"""
+        
+        if market_analysis["key_factors"]:
+            market_context += """
+- Facteurs clés:"""
+            for factor in market_analysis["key_factors"]:
+                market_context += f"""
+  • {factor}"""
+        
+        if market_analysis["warnings"]:
+            market_context += """
+- ⚠️ ALERTES:"""
+            for warning in market_analysis["warnings"]:
+                market_context += f"""
+  • {warning}"""
+        
+        if market_analysis["opportunities"]:
+            market_context += """
+- 💡 OPPORTUNITÉS:"""
+            for opp in market_analysis["opportunities"]:
+                market_context += f"""
+  • {opp}"""
 
         market_context += """
 
