@@ -36,6 +36,10 @@ const navigation = [
   { name: "Paramètres", href: "/settings", icon: Settings },
 ];
 
+const adminNavigation = [
+  { name: "Administration", href: "/admin", icon: Shield, admin: true },
+];
+
 export default function MainLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
