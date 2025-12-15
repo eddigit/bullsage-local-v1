@@ -15,6 +15,8 @@ import AlertsPage from "./pages/AlertsPage";
 import SettingsPage from "./pages/SettingsPage";
 import AdminPage from "./pages/AdminPage";
 import ApiKeysPage from "./pages/ApiKeysPage";
+import MarketIntelligencePage from "./pages/MarketIntelligencePage";
+import SignalsPage from "./pages/SignalsPage";
 
 // Layout
 import MainLayout from "./layouts/MainLayout";
