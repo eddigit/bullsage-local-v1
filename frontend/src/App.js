@@ -170,6 +170,8 @@ function App() {
               <Route path="strategies" element={<StrategiesPage />} />
               <Route path="alerts" element={<AlertsPage />} />
               <Route path="settings" element={<SettingsPage />} />
+              <Route path="intelligence" element={<MarketIntelligencePage />} />
+              <Route path="signals" element={<SignalsPage />} />
               <Route path="admin" element={<AdminPage />} />
               <Route path="admin/api-keys" element={<ApiKeysPage />} />
             </Route>
