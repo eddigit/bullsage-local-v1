@@ -322,7 +322,7 @@ export default function SignalsPage() {
                     <div>
                       <p className="font-medium">{result.symbol}</p>
                       <p className="text-xs text-muted-foreground">
-                        Entrée: ${result.entry_price?.toLocaleString()} → Actuel: ${result.current_price?.toLocaleString()}
+                        Entrée: {formatPrice(result.entry_price)} → Actuel: {formatPrice(result.current_price)}
                       </p>
                     </div>
                   </div>
