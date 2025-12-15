@@ -31,8 +31,10 @@ import {
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  { name: "Intelligence", href: "/intelligence", icon: Brain, highlight: true },
+  { name: "Mes Signaux", href: "/signals", icon: Signal },
   { name: "Marchés", href: "/markets", icon: TrendingUp },
-  { name: "Assistant IA", href: "/assistant", icon: MessageCircle, highlight: true },
+  { name: "Assistant IA", href: "/assistant", icon: MessageCircle },
   { name: "Paper Trading", href: "/paper-trading", icon: Wallet },
   { name: "Stratégies", href: "/strategies", icon: Target },
   { name: "Alertes", href: "/alerts", icon: Bell },
