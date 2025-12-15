@@ -361,7 +361,8 @@ class BullSageAPITester:
         if self.failed_tests:
             self.log("\n❌ FAILED TESTS:")
             for test in self.failed_tests:
-                self.log(f"  - {test['test']}: {test.get('error', f'Expected {test.get(\"expected\")}, got {test.get(\"actual\")}')}")
+                error_msg = test.get('error', f"Expected {test.get('expected')}, got {test.get('actual')}")
+                self.log(f"  - {test['test']}: {error_msg}")
         
         return len(self.failed_tests) == 0
 
