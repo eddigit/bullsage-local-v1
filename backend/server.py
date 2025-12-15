@@ -639,27 +639,30 @@ async def get_news_sentiment(symbols: str = "BTCUSD,ETHUSD", current_user: dict 
 
 # ============== AI ASSISTANT ROUTES ==============
 
-async def fetch_realtime_market_data():
-    """Fetch all real-time market data for AI context"""
+async def fetch_comprehensive_market_data(coin_ids: str = "bitcoin,ethereum,solana,cardano,ripple"):
+    """Fetch ALL available market data for AI context"""
     data = {
         "crypto": [],
         "fear_greed": None,
+        "fear_greed_history": [],
         "news": [],
+        "news_sentiment": {},
         "macro": {},
+        "economic_calendar": [],
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
     
     async with httpx.AsyncClient() as client:
-        # 1. Crypto prices from CoinGecko
+        # 1. Crypto prices from CoinGecko (with more data)
         try:
             response = await client.get(
                 f"{COINGECKO_API_URL}/coins/markets",
                 params={
                     "vs_currency": "usd",
-                    "ids": "bitcoin,ethereum,solana,cardano,ripple",
+                    "ids": coin_ids,
                     "order": "market_cap_desc",
-                    "sparkline": False,
-                    "price_change_percentage": "1h,24h,7d"
+                    "sparkline": True,
+                    "price_change_percentage": "1h,24h,7d,30d"
                 },
                 timeout=15.0
             )
@@ -668,16 +671,138 @@ async def fetch_realtime_market_data():
         except Exception as e:
             logger.error(f"Error fetching crypto: {e}")
 
-        # 2. Fear & Greed Index
+        # 2. Fear & Greed Index (current + history)
         try:
             response = await client.get(
                 "https://api.alternative.me/fng/",
-                params={"limit": 1},
+                params={"limit": 7},
                 timeout=10.0
             )
             if response.status_code == 200:
                 fng = response.json()
                 if fng.get("data"):
+                    data["fear_greed"] = fng["data"][0]
+                    data["fear_greed_history"] = fng["data"]
+        except Exception as e:
+            logger.error(f"Error fetching Fear & Greed: {e}")
+
+        # 3. Market News from Finnhub (crypto focus)
+        try:
+            response = await client.get(
+                "https://finnhub.io/api/v1/news",
+                params={"category": "crypto", "token": FINNHUB_API_KEY},
+                timeout=15.0
+            )
+            if response.status_code == 200:
+                news = response.json()
+                data["news"] = news[:10] if news else []
+        except Exception as e:
+            logger.error(f"Error fetching news: {e}")
+
+        # 4. Economic Calendar (next 7 days important events)
+        try:
+            today = datetime.now(timezone.utc)
+            from_date = today.strftime("%Y-%m-%d")
+            to_date = (today + timedelta(days=7)).strftime("%Y-%m-%d")
+            
+            response = await client.get(
+                "https://finnhub.io/api/v1/calendar/economic",
+                params={"from": from_date, "to": to_date, "token": FINNHUB_API_KEY},
+                timeout=15.0
+            )
+            if response.status_code == 200:
+                cal = response.json()
+                # Filter for important events (US focus)
+                important_events = [e for e in cal.get("economicCalendar", []) 
+                                   if e.get("country") == "US" and e.get("impact") in ["high", "medium"]]
+                data["economic_calendar"] = important_events[:10]
+        except Exception as e:
+            logger.error(f"Error fetching economic calendar: {e}")
+
+        # 5. Macro data from FRED
+        macro_series = {
+            "vix": "VIXCLS",
+            "fed_rate": "FEDFUNDS",
+            "dxy": "DTWEXBGS",  # Dollar Index
+        }
+        
+        for key, series_id in macro_series.items():
+            try:
+                response = await client.get(
+                    "https://api.stlouisfed.org/fred/series/observations",
+                    params={
+                        "series_id": series_id,
+                        "api_key": FRED_API_KEY,
+                        "file_type": "json",
+                        "sort_order": "desc",
+                        "limit": 1
+                    },
+                    timeout=10.0
+                )
+                if response.status_code == 200:
+                    fred_data = response.json()
+                    if fred_data.get("observations"):
+                        data["macro"][key] = {
+                            "value": fred_data["observations"][0].get("value"),
+                            "date": fred_data["observations"][0].get("date")
+                        }
+            except Exception as e:
+                logger.error(f"Error fetching {series_id}: {e}")
+
+    return data
+
+def analyze_market_conditions(data: dict) -> dict:
+    """Analyze market conditions and generate insights"""
+    analysis = {
+        "overall_sentiment": "neutral",
+        "risk_level": "medium",
+        "key_factors": [],
+        "opportunities": [],
+        "warnings": []
+    }
+    
+    # Fear & Greed analysis
+    if data.get("fear_greed"):
+        fg_value = int(data["fear_greed"].get("value", 50))
+        if fg_value <= 20:
+            analysis["overall_sentiment"] = "extreme_fear"
+            analysis["key_factors"].append(f"Fear & Greed à {fg_value} = EXTREME FEAR - Opportunité d'achat potentielle")
+            analysis["opportunities"].append("Marché en panique - historiquement bon timing pour accumuler")
+        elif fg_value <= 40:
+            analysis["overall_sentiment"] = "fear"
+            analysis["key_factors"].append(f"Fear & Greed à {fg_value} = FEAR - Prudence mais opportunités possibles")
+        elif fg_value >= 80:
+            analysis["overall_sentiment"] = "extreme_greed"
+            analysis["key_factors"].append(f"Fear & Greed à {fg_value} = EXTREME GREED - Risque de correction élevé")
+            analysis["warnings"].append("Marché euphorique - risque de correction majeure")
+        elif fg_value >= 60:
+            analysis["overall_sentiment"] = "greed"
+            analysis["key_factors"].append(f"Fear & Greed à {fg_value} = GREED - Vigilance sur les prises de profit")
+    
+    # VIX analysis
+    if data.get("macro", {}).get("vix"):
+        try:
+            vix = float(data["macro"]["vix"]["value"])
+            if vix < 15:
+                analysis["key_factors"].append(f"VIX à {vix:.1f} = Faible volatilité - Marché calme")
+                analysis["risk_level"] = "low"
+            elif vix > 25:
+                analysis["key_factors"].append(f"VIX à {vix:.1f} = Haute volatilité - ATTENTION")
+                analysis["risk_level"] = "high"
+                analysis["warnings"].append("VIX élevé = incertitude sur les marchés")
+            else:
+                analysis["key_factors"].append(f"VIX à {vix:.1f} = Volatilité normale")
+        except:
+            pass
+    
+    # Economic events
+    if data.get("economic_calendar"):
+        high_impact = [e for e in data["economic_calendar"] if e.get("impact") == "high"]
+        if high_impact:
+            events_str = ", ".join([e.get("event", "")[:30] for e in high_impact[:3]])
+            analysis["warnings"].append(f"Événements économiques importants à venir: {events_str}")
+    
+    return analysis
                     data["fear_greed"] = fng["data"][0]
         except Exception as e:
             logger.error(f"Error fetching Fear & Greed: {e}")
