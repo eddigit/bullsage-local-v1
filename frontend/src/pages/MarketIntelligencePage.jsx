@@ -15,7 +15,11 @@ import {
   Loader2,
   Globe,
   DollarSign,
-  Activity
+  Activity,
+  ChevronUp,
+  ChevronDown,
+  Minus,
+  Gauge
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -47,13 +51,13 @@ const getSentimentColor = (sentiment) => {
   }
 };
 
-const getSentimentEmoji = (value) => {
+const getSentimentIcon = (value) => {
   const v = parseInt(value);
-  if (v <= 20) return "😱";
-  if (v <= 40) return "😟";
-  if (v <= 60) return "😐";
-  if (v <= 80) return "😊";
-  return "🤑";
+  if (v <= 20) return { icon: "TrendingDown", color: "text-rose-500", label: "Extreme Fear" };
+  if (v <= 40) return { icon: "ChevronDown", color: "text-orange-500", label: "Fear" };
+  if (v <= 60) return { icon: "Minus", color: "text-yellow-500", label: "Neutral" };
+  if (v <= 80) return { icon: "ChevronUp", color: "text-lime-500", label: "Greed" };
+  return { icon: "TrendingUp", color: "text-emerald-500", label: "Extreme Greed" };
 };
 
 export default function MarketIntelligencePage() {
@@ -154,8 +158,14 @@ export default function MarketIntelligencePage() {
             {/* Fear & Greed */}
             <div className="text-center">
               <p className="text-sm text-muted-foreground mb-2">Fear & Greed Index</p>
-              <div className="flex items-center justify-center gap-2">
-                <span className="text-3xl">{getSentimentEmoji(fgValue)}</span>
+              <div className="flex items-center justify-center gap-3">
+                <div className={`p-2 rounded-full bg-white/5 ${getSentimentIcon(fgValue).color}`}>
+                  {fgValue <= 20 ? <TrendingDown className="w-6 h-6" /> :
+                   fgValue <= 40 ? <ChevronDown className="w-6 h-6" /> :
+                   fgValue <= 60 ? <Minus className="w-6 h-6" /> :
+                   fgValue <= 80 ? <ChevronUp className="w-6 h-6" /> :
+                   <TrendingUp className="w-6 h-6" />}
+                </div>
                 <span className="text-3xl font-bold font-mono">{fgValue}</span>
               </div>
               <Progress 
@@ -317,7 +327,7 @@ export default function MarketIntelligencePage() {
               {data?.fear_greed?.history?.length > 0 && (
                 <div className="p-4 rounded-lg bg-white/5">
                   <p className="font-medium mb-3 flex items-center gap-2">
-                    <span className="text-2xl">😱</span>
+                    <Gauge className="w-5 h-5 text-violet-500" />
                     Fear & Greed - 7 derniers jours
                   </p>
                   <div className="flex items-center justify-between gap-1">

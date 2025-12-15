@@ -11,7 +11,8 @@ import {
   ChevronRight,
   GraduationCap,
   TrendingUp,
-  Zap
+  Zap,
+  AlertTriangle
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -241,10 +242,13 @@ export default function SettingsPage() {
             <span>BULL SAGE Team</span>
           </div>
           <Separator className="bg-white/5" />
-          <p className="text-xs text-muted-foreground pt-2">
-            ⚠️ BULL SAGE est un outil éducatif. Le trading comporte des risques. 
-            Ne tradez jamais plus que ce que vous pouvez vous permettre de perdre.
-          </p>
+          <div className="flex items-start gap-2 pt-2 text-muted-foreground">
+            <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+            <p className="text-xs">
+              BULL SAGE est un outil éducatif. Le trading comporte des risques. 
+              Ne tradez jamais plus que ce que vous pouvez vous permettre de perdre.
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>

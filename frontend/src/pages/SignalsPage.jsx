@@ -68,11 +68,25 @@ const getStatusColor = (status) => {
 const getStatusLabel = (status) => {
   switch (status) {
     case "active": return "Actif";
-    case "hit_tp1": return "TP1 Atteint ✓";
-    case "hit_tp2": return "TP2 Atteint ✓✓";
-    case "hit_sl": return "SL Touché ✗";
+    case "hit_tp1": return "TP1 Atteint";
+    case "hit_tp2": return "TP2 Atteint";
+    case "hit_sl": return "SL Touché";
     case "expired": return "Expiré";
     default: return status;
+  }
+};
+
+const getStatusIcon = (status) => {
+  switch (status) {
+    case "hit_tp1":
+    case "hit_tp2":
+      return <CheckCircle className="w-3 h-3 mr-1" />;
+    case "hit_sl":
+      return <XCircle className="w-3 h-3 mr-1" />;
+    case "active":
+      return <AlertCircle className="w-3 h-3 mr-1" />;
+    default:
+      return null;
   }
 };
 
@@ -275,7 +289,8 @@ export default function SignalsPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge className={getStatusColor(signal.status)}>
+                        <Badge className={`flex items-center ${getStatusColor(signal.status)}`}>
+                          {getStatusIcon(signal.status)}
                           {getStatusLabel(signal.status)}
                         </Badge>
                         <AlertDialog>

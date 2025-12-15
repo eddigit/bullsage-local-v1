@@ -186,7 +186,7 @@ High 24h: $${coin.high_24h}
 Low 24h: $${coin.low_24h}
 
 DONNE MOI EN FORMAT STRUCTURÉ:
-1. SIGNAL: 🟢 ACHAT ou 🔴 VENTE ou 🟡 ATTENDRE
+1. SIGNAL: [ACHAT] ou [VENTE] ou [ATTENDRE]
 2. ENTRÉE: prix exact recommandé
 3. STOP-LOSS: prix exact
 4. TP1: premier objectif
@@ -203,8 +203,8 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
       try {
         const text = response.data.response;
         let signalType = "WAIT";
-        if (text.includes("🟢") || text.toLowerCase().includes("achat")) signalType = "BUY";
-        else if (text.includes("🔴") || text.toLowerCase().includes("vente")) signalType = "SELL";
+        if (text.toLowerCase().includes("achat") || text.includes("[ACHAT]")) signalType = "BUY";
+        else if (text.toLowerCase().includes("vente") || text.includes("[VENTE]")) signalType = "SELL";
         
         // Extract prices using regex
         const extractPrice = (pattern) => {
@@ -374,7 +374,7 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
                 ) : parseInt(fearGreed?.value) >= 75 ? (
                   <TrendingUp className="w-5 h-5 text-emerald-500" />
                 ) : (
-                  <Activity className="w-5 h-5 text-yellow-500" />
+                  <TrendingUp className="w-5 h-5 text-yellow-500" />
                 )}
               </div>
             </div>
