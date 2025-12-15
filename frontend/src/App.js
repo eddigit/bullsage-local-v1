@@ -13,6 +13,7 @@ import PaperTradingPage from "./pages/PaperTradingPage";
 import StrategiesPage from "./pages/StrategiesPage";
 import AlertsPage from "./pages/AlertsPage";
 import SettingsPage from "./pages/SettingsPage";
+import AdminPage from "./pages/AdminPage";
 
 // Layout
 import MainLayout from "./layouts/MainLayout";
