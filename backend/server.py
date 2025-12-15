@@ -201,7 +201,8 @@ async def register(user_data: UserCreate):
         trading_level=user_data.trading_level,
         created_at=user_doc["created_at"],
         paper_balance=user_doc["paper_balance"],
-        watchlist=user_doc["watchlist"]
+        watchlist=user_doc["watchlist"],
+        is_admin=False
     )
     
     return TokenResponse(access_token=token, user=user_response)
