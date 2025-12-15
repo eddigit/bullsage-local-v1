@@ -795,6 +795,149 @@ async def delete_signal(signal_id: str, current_user: dict = Depends(get_current
         raise HTTPException(status_code=404, detail="Signal not found")
     return {"message": "Signal deleted"}
 
+@api_router.post("/signals/evaluate")
+async def evaluate_signals(current_user: dict = Depends(get_current_user)):
+    """
+    Automatically evaluate active signals against current market prices.
+    Checks if TP1, TP2, or SL have been hit and updates status/PnL accordingly.
+    """
+    # Get all active signals for this user
+    active_signals = await db.signals.find(
+        {"user_id": current_user["id"], "status": "active"},
+        {"_id": 0}
+    ).to_list(100)
+    
+    if not active_signals:
+        return {"message": "No active signals to evaluate", "updated": 0, "results": []}
+    
+    # Get unique symbols
+    symbols = list(set([s["symbol"] for s in active_signals]))
+    symbols_str = ",".join(symbols)
+    
+    # Fetch current prices from CoinGecko
+    current_prices = {}
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(
+                f"{COINGECKO_API_URL}/simple/price",
+                params={"ids": symbols_str, "vs_currencies": "usd"},
+                timeout=15.0
+            )
+            if response.status_code == 200:
+                price_data = response.json()
+                for symbol, data in price_data.items():
+                    current_prices[symbol] = data.get("usd", 0)
+        except Exception as e:
+            logger.error(f"Error fetching prices for evaluation: {e}")
+            raise HTTPException(status_code=500, detail="Could not fetch current prices")
+    
+    results = []
+    updated_count = 0
+    
+    for signal in active_signals:
+        symbol = signal["symbol"]
+        current_price = current_prices.get(symbol)
+        
+        if not current_price:
+            results.append({
+                "signal_id": signal["id"],
+                "symbol": symbol,
+                "status": "error",
+                "message": "Could not fetch current price"
+            })
+            continue
+        
+        entry_price = signal["entry_price"]
+        stop_loss = signal["stop_loss"]
+        tp1 = signal["take_profit_1"]
+        tp2 = signal.get("take_profit_2")
+        signal_type = signal["signal_type"]
+        
+        new_status = None
+        pnl_percent = 0
+        
+        # Calculate based on signal type (BUY or SELL)
+        if signal_type == "BUY":
+            # For BUY signals: price going up is good
+            if current_price <= stop_loss:
+                new_status = "hit_sl"
+                pnl_percent = ((stop_loss - entry_price) / entry_price) * 100
+            elif tp2 and current_price >= tp2:
+                new_status = "hit_tp2"
+                pnl_percent = ((tp2 - entry_price) / entry_price) * 100
+            elif current_price >= tp1:
+                new_status = "hit_tp1"
+                pnl_percent = ((tp1 - entry_price) / entry_price) * 100
+        elif signal_type == "SELL":
+            # For SELL signals: price going down is good
+            if current_price >= stop_loss:
+                new_status = "hit_sl"
+                pnl_percent = ((entry_price - stop_loss) / entry_price) * 100
+            elif tp2 and current_price <= tp2:
+                new_status = "hit_tp2"
+                pnl_percent = ((entry_price - tp2) / entry_price) * 100
+            elif current_price <= tp1:
+                new_status = "hit_tp1"
+                pnl_percent = ((entry_price - tp1) / entry_price) * 100
+        
+        # Check for expiration (signals older than 7 days for daily, 1 day for 1h/4h)
+        created_at = datetime.fromisoformat(signal["created_at"].replace("Z", "+00:00"))
+        now = datetime.now(timezone.utc)
+        age_hours = (now - created_at).total_seconds() / 3600
+        
+        if signal["timeframe"] == "daily" and age_hours > 168:  # 7 days
+            if not new_status:
+                new_status = "expired"
+                pnl_percent = ((current_price - entry_price) / entry_price) * 100 if signal_type == "BUY" else ((entry_price - current_price) / entry_price) * 100
+        elif signal["timeframe"] in ["1h", "4h"] and age_hours > 24:  # 1 day
+            if not new_status:
+                new_status = "expired"
+                pnl_percent = ((current_price - entry_price) / entry_price) * 100 if signal_type == "BUY" else ((entry_price - current_price) / entry_price) * 100
+        
+        if new_status:
+            # Update the signal in database
+            await db.signals.update_one(
+                {"id": signal["id"]},
+                {"$set": {
+                    "status": new_status,
+                    "result_pnl": round(pnl_percent, 2),
+                    "evaluated_at": datetime.now(timezone.utc).isoformat(),
+                    "price_at_evaluation": current_price
+                }}
+            )
+            updated_count += 1
+            results.append({
+                "signal_id": signal["id"],
+                "symbol": signal["symbol_name"],
+                "signal_type": signal_type,
+                "old_status": "active",
+                "new_status": new_status,
+                "entry_price": entry_price,
+                "current_price": current_price,
+                "pnl_percent": round(pnl_percent, 2)
+            })
+        else:
+            # Signal still active
+            unrealized_pnl = ((current_price - entry_price) / entry_price) * 100 if signal_type == "BUY" else ((entry_price - current_price) / entry_price) * 100
+            results.append({
+                "signal_id": signal["id"],
+                "symbol": signal["symbol_name"],
+                "signal_type": signal_type,
+                "status": "active",
+                "entry_price": entry_price,
+                "current_price": current_price,
+                "unrealized_pnl": round(unrealized_pnl, 2),
+                "tp1_distance": round(((tp1 - current_price) / current_price) * 100, 2) if signal_type == "BUY" else round(((current_price - tp1) / current_price) * 100, 2),
+                "sl_distance": round(((current_price - stop_loss) / current_price) * 100, 2) if signal_type == "BUY" else round(((stop_loss - current_price) / current_price) * 100, 2)
+            })
+    
+    return {
+        "message": f"Evaluated {len(active_signals)} signals, updated {updated_count}",
+        "total_evaluated": len(active_signals),
+        "updated": updated_count,
+        "results": results
+    }
+
 # ============== MARKET INTELLIGENCE ENDPOINT ==============
 
 @api_router.get("/market/intelligence")
