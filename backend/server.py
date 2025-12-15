@@ -337,6 +337,329 @@ async def get_trending(current_user: dict = Depends(get_current_user)):
         logger.error(f"Error fetching trending: {e}")
         return {"coins": []}
 
+# ============== FEAR & GREED INDEX (NO API KEY REQUIRED) ==============
+
+@api_router.get("/market/fear-greed")
+async def get_fear_greed(current_user: dict = Depends(get_current_user)):
+    """Get Crypto Fear & Greed Index from Alternative.me"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://api.alternative.me/fng/",
+                params={"limit": 30},
+                timeout=30.0
+            )
+            if response.status_code == 200:
+                return response.json()
+            return {"data": []}
+    except Exception as e:
+        logger.error(f"Error fetching Fear & Greed: {e}")
+        return {"data": []}
+
+# ============== FINNHUB ROUTES (NEWS, SENTIMENT, CALENDAR) ==============
+
+@api_router.get("/market/news")
+async def get_market_news(category: str = "general", current_user: dict = Depends(get_current_user)):
+    """Get market news from Finnhub"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://finnhub.io/api/v1/news",
+                params={"category": category, "token": FINNHUB_API_KEY},
+                timeout=30.0
+            )
+            if response.status_code == 200:
+                return response.json()[:20]  # Limit to 20 news
+            return []
+    except Exception as e:
+        logger.error(f"Error fetching news: {e}")
+        return []
+
+@api_router.get("/market/news/{symbol}")
+async def get_symbol_news(symbol: str, current_user: dict = Depends(get_current_user)):
+    """Get news for a specific symbol from Finnhub"""
+    try:
+        today = datetime.now(timezone.utc)
+        from_date = (today - timedelta(days=7)).strftime("%Y-%m-%d")
+        to_date = today.strftime("%Y-%m-%d")
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://finnhub.io/api/v1/company-news",
+                params={
+                    "symbol": symbol.upper(),
+                    "from": from_date,
+                    "to": to_date,
+                    "token": FINNHUB_API_KEY
+                },
+                timeout=30.0
+            )
+            if response.status_code == 200:
+                return response.json()[:15]
+            return []
+    except Exception as e:
+        logger.error(f"Error fetching symbol news: {e}")
+        return []
+
+@api_router.get("/market/sentiment/{symbol}")
+async def get_sentiment(symbol: str, current_user: dict = Depends(get_current_user)):
+    """Get sentiment data for a symbol from Finnhub"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://finnhub.io/api/v1/news-sentiment",
+                params={"symbol": symbol.upper(), "token": FINNHUB_API_KEY},
+                timeout=30.0
+            )
+            if response.status_code == 200:
+                return response.json()
+            return {}
+    except Exception as e:
+        logger.error(f"Error fetching sentiment: {e}")
+        return {}
+
+@api_router.get("/market/economic-calendar")
+async def get_economic_calendar(current_user: dict = Depends(get_current_user)):
+    """Get economic calendar events from Finnhub"""
+    try:
+        today = datetime.now(timezone.utc)
+        from_date = today.strftime("%Y-%m-%d")
+        to_date = (today + timedelta(days=14)).strftime("%Y-%m-%d")
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://finnhub.io/api/v1/calendar/economic",
+                params={"from": from_date, "to": to_date, "token": FINNHUB_API_KEY},
+                timeout=30.0
+            )
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("economicCalendar", [])[:30]
+            return []
+    except Exception as e:
+        logger.error(f"Error fetching economic calendar: {e}")
+        return []
+
+# ============== ALPHA VANTAGE ROUTES (FOREX, STOCKS, INDICATORS) ==============
+
+@api_router.get("/market/forex/{from_currency}/{to_currency}")
+async def get_forex_rate(from_currency: str, to_currency: str, current_user: dict = Depends(get_current_user)):
+    """Get real-time forex exchange rate from Alpha Vantage"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://www.alphavantage.co/query",
+                params={
+                    "function": "CURRENCY_EXCHANGE_RATE",
+                    "from_currency": from_currency.upper(),
+                    "to_currency": to_currency.upper(),
+                    "apikey": ALPHA_VANTAGE_API_KEY
+                },
+                timeout=30.0
+            )
+            if response.status_code == 200:
+                return response.json()
+            return {}
+    except Exception as e:
+        logger.error(f"Error fetching forex rate: {e}")
+        return {}
+
+@api_router.get("/market/forex-daily/{from_symbol}/{to_symbol}")
+async def get_forex_daily(from_symbol: str, to_symbol: str, current_user: dict = Depends(get_current_user)):
+    """Get daily forex data from Alpha Vantage"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://www.alphavantage.co/query",
+                params={
+                    "function": "FX_DAILY",
+                    "from_symbol": from_symbol.upper(),
+                    "to_symbol": to_symbol.upper(),
+                    "apikey": ALPHA_VANTAGE_API_KEY
+                },
+                timeout=30.0
+            )
+            if response.status_code == 200:
+                return response.json()
+            return {}
+    except Exception as e:
+        logger.error(f"Error fetching forex daily: {e}")
+        return {}
+
+@api_router.get("/market/stock/{symbol}")
+async def get_stock_quote(symbol: str, current_user: dict = Depends(get_current_user)):
+    """Get stock quote from Alpha Vantage"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://www.alphavantage.co/query",
+                params={
+                    "function": "GLOBAL_QUOTE",
+                    "symbol": symbol.upper(),
+                    "apikey": ALPHA_VANTAGE_API_KEY
+                },
+                timeout=30.0
+            )
+            if response.status_code == 200:
+                return response.json()
+            return {}
+    except Exception as e:
+        logger.error(f"Error fetching stock quote: {e}")
+        return {}
+
+@api_router.get("/market/indicators/{symbol}/{indicator}")
+async def get_technical_indicator(symbol: str, indicator: str, interval: str = "daily", current_user: dict = Depends(get_current_user)):
+    """Get technical indicators (RSI, MACD, etc.) from Alpha Vantage"""
+    try:
+        params = {
+            "function": indicator.upper(),
+            "symbol": symbol.upper(),
+            "interval": interval,
+            "apikey": ALPHA_VANTAGE_API_KEY
+        }
+        
+        # Add specific params for each indicator
+        if indicator.upper() == "RSI":
+            params["time_period"] = 14
+            params["series_type"] = "close"
+        elif indicator.upper() == "MACD":
+            params["series_type"] = "close"
+        elif indicator.upper() in ["SMA", "EMA"]:
+            params["time_period"] = 20
+            params["series_type"] = "close"
+        elif indicator.upper() == "BBANDS":
+            params["time_period"] = 20
+            params["series_type"] = "close"
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://www.alphavantage.co/query",
+                params=params,
+                timeout=30.0
+            )
+            if response.status_code == 200:
+                return response.json()
+            return {}
+    except Exception as e:
+        logger.error(f"Error fetching indicator: {e}")
+        return {}
+
+# ============== FRED ROUTES (ECONOMIC DATA) ==============
+
+@api_router.get("/market/fred/{series_id}")
+async def get_fred_data(series_id: str, current_user: dict = Depends(get_current_user)):
+    """Get economic data from FRED (Federal Reserve)"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://api.stlouisfed.org/fred/series/observations",
+                params={
+                    "series_id": series_id.upper(),
+                    "api_key": FRED_API_KEY,
+                    "file_type": "json",
+                    "sort_order": "desc",
+                    "limit": 30
+                },
+                timeout=30.0
+            )
+            if response.status_code == 200:
+                return response.json()
+            return {"observations": []}
+    except Exception as e:
+        logger.error(f"Error fetching FRED data: {e}")
+        return {"observations": []}
+
+@api_router.get("/market/macro-overview")
+async def get_macro_overview(current_user: dict = Depends(get_current_user)):
+    """Get key macro economic indicators"""
+    try:
+        series_ids = {
+            "fed_rate": "FEDFUNDS",
+            "inflation": "CPIAUCSL", 
+            "unemployment": "UNRATE",
+            "gdp": "GDP",
+            "vix": "VIXCLS"
+        }
+        
+        results = {}
+        async with httpx.AsyncClient() as client:
+            for key, series_id in series_ids.items():
+                try:
+                    response = await client.get(
+                        "https://api.stlouisfed.org/fred/series/observations",
+                        params={
+                            "series_id": series_id,
+                            "api_key": FRED_API_KEY,
+                            "file_type": "json",
+                            "sort_order": "desc",
+                            "limit": 1
+                        },
+                        timeout=15.0
+                    )
+                    if response.status_code == 200:
+                        data = response.json()
+                        if data.get("observations"):
+                            results[key] = {
+                                "value": data["observations"][0].get("value"),
+                                "date": data["observations"][0].get("date"),
+                                "series_id": series_id
+                            }
+                except Exception as e:
+                    logger.error(f"Error fetching {series_id}: {e}")
+                    continue
+        
+        return results
+    except Exception as e:
+        logger.error(f"Error fetching macro overview: {e}")
+        return {}
+
+# ============== MARKETAUX ROUTES (NEWS SENTIMENT) ==============
+
+@api_router.get("/market/news-sentiment")
+async def get_news_sentiment(symbols: str = "BTCUSD,ETHUSD", current_user: dict = Depends(get_current_user)):
+    """Get news with sentiment analysis from Marketaux"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://api.marketaux.com/v1/news/all",
+                params={
+                    "symbols": symbols,
+                    "filter_entities": "true",
+                    "language": "en",
+                    "api_token": MARKETAUX_API_KEY
+                },
+                timeout=30.0
+            )
+            if response.status_code == 200:
+                return response.json()
+            return {"data": []}
+    except Exception as e:
+        logger.error(f"Error fetching news sentiment: {e}")
+        return {"data": []}
+
+# ============== ADMIN API KEYS MANAGEMENT ==============
+
+@api_router.get("/admin/api-keys")
+async def get_api_keys(admin: dict = Depends(get_admin_user)):
+    """Get all configured API keys (admin only) - masked for security"""
+    def mask_key(key: str) -> dict:
+        if not key:
+            return {"masked": "Non configurée", "full": "", "configured": False}
+        if len(key) > 8:
+            masked = key[:4] + "*" * (len(key) - 8) + key[-4:]
+        else:
+            masked = "*" * len(key)
+        return {"masked": masked, "full": key, "configured": True}
+    
+    return {
+        "coingecko": {"masked": "Gratuit (pas de clé)", "full": "", "configured": True, "name": "CoinGecko", "usage": "Données crypto"},
+        "alpha_vantage": {**mask_key(ALPHA_VANTAGE_API_KEY), "name": "Alpha Vantage", "usage": "Forex, Actions, Indicateurs"},
+        "finnhub": {**mask_key(FINNHUB_API_KEY), "name": "Finnhub", "usage": "News, Sentiment, Calendrier éco"},
+        "fred": {**mask_key(FRED_API_KEY), "name": "FRED", "usage": "Données macro (Fed, Inflation, PIB)"},
+        "marketaux": {**mask_key(MARKETAUX_API_KEY), "name": "Marketaux", "usage": "News sentiment avancé"},
+        "emergent_llm": {**mask_key(EMERGENT_LLM_KEY), "name": "Emergent LLM", "usage": "IA GPT-5.1"}
+    }
+
 # ============== AI ASSISTANT ROUTES ==============
 
 @api_router.post("/assistant/chat", response_model=ChatResponse)
