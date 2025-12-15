@@ -44,9 +44,11 @@ export default function LoginPage() {
       <div className="relative z-10 w-full max-w-md">
         {/* Logo */}
         <div className="flex items-center justify-center gap-3 mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center glow-primary">
-            <TrendingUp className="w-8 h-8 text-black" />
-          </div>
+          <img 
+            src="/logo.png" 
+            alt="BULL SAGE" 
+            className="w-14 h-14 rounded-2xl object-contain"
+          />
           <div>
             <h1 className="text-3xl font-bold font-manrope tracking-tight">BULL SAGE</h1>
             <p className="text-sm text-muted-foreground">Votre assistant trading intelligent</p>
