@@ -200,10 +200,27 @@ export default function MainLayout() {
         </aside>
 
         {/* Main Content */}
-        <main className="md:ml-64 min-h-screen pt-16 md:pt-0">
-          <div className="p-4 md:p-6">
+        <main className="md:ml-64 min-h-screen pt-16 md:pt-0 flex flex-col">
+          <div className="p-4 md:p-6 flex-1">
             <Outlet />
           </div>
+          
+          {/* Footer */}
+          <footer className="md:ml-0 py-4 px-6 border-t border-white/5">
+            <div className="flex flex-col md:flex-row items-center justify-center gap-2 text-xs text-muted-foreground">
+              <span>© {new Date().getFullYear()} BULL SAGE v1.0.0</span>
+              <span className="hidden md:inline">•</span>
+              <span>
+                Propulsé par{" "}
+                <a 
+                  href="mailto:coachdigitalparis@gmail.com" 
+                  className="text-primary hover:underline font-medium"
+                >
+                  GILLES KORZEC
+                </a>
+              </span>
+            </div>
+          </footer>
         </main>
       </div>
     </TooltipProvider>
