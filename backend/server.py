@@ -304,8 +304,7 @@ async def get_crypto_chart(coin_id: str, days: int = 7, current_user: dict = Dep
                 f"{COINGECKO_API_URL}/coins/{coin_id}/market_chart",
                 params={
                     "vs_currency": "usd",
-                    "days": days,
-                    "interval": "daily" if days > 30 else "hourly"
+                    "days": days
                 },
                 timeout=30.0
             )
