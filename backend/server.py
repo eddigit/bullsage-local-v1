@@ -311,12 +311,14 @@ async def get_crypto_chart(coin_id: str, days: int = 7, current_user: dict = Dep
             if response.status_code == 200:
                 return response.json()
             else:
-                raise HTTPException(status_code=404, detail="Chart data not found")
+                logger.warning(f"CoinGecko chart API returned {response.status_code}")
+                # Return empty but valid structure
+                return {"prices": [], "market_caps": [], "total_volumes": []}
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error fetching chart data: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch chart data")
+        return {"prices": [], "market_caps": [], "total_volumes": []}
 
 @api_router.get("/market/trending")
 async def get_trending(current_user: dict = Depends(get_current_user)):
