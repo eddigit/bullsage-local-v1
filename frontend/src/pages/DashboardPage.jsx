@@ -7,46 +7,74 @@ import {
   TrendingUp,
   TrendingDown,
   Wallet,
-  MessageCircle,
   ArrowUpRight,
   ArrowDownRight,
   Zap,
   Eye,
   RefreshCw,
   Sparkles,
-  Loader2
+  Loader2,
+  Plus,
+  Star,
+  StarOff,
+  Clock,
+  Target,
+  Search,
+  X,
+  ChevronDown
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { ScrollArea } from "../components/ui/scroll-area";
+import { Input } from "../components/ui/input";
 import {
-  LineChart,
-  Line,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "../components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
+import {
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   Tooltip,
-  ResponsiveContainer,
-  Area,
-  AreaChart
+  ResponsiveContainer
 } from "recharts";
 
 const formatPrice = (price) => {
+  if (!price) return "$0.00";
   if (price >= 1000) return `$${price.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
   if (price >= 1) return `$${price.toFixed(2)}`;
   return `$${price.toFixed(6)}`;
 };
 
 const formatPercent = (value) => {
+  if (!value && value !== 0) return "0.00%";
   const formatted = Math.abs(value).toFixed(2);
   return value >= 0 ? `+${formatted}%` : `-${formatted}%`;
 };
 
-const CustomTooltip = ({ active, payload, label }) => {
+const TIMEFRAMES = [
+  { value: "1h", label: "1 Heure", description: "Scalping / Day trading" },
+  { value: "4h", label: "4 Heures", description: "Intraday" },
+  { value: "daily", label: "Journalier", description: "Swing trading" },
+];
+
+const CustomTooltip = ({ active, payload }) => {
   if (active && payload && payload.length) {
     return (
       <div className="glass rounded-lg px-3 py-2 text-sm">
-        <p className="text-muted-foreground">{label}</p>
         <p className="font-mono font-medium text-primary">
           ${payload[0].value?.toLocaleString()}
         </p>
@@ -57,24 +85,35 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const [markets, setMarkets] = useState([]);
-  const [trending, setTrending] = useState([]);
+  const [fearGreed, setFearGreed] = useState(null);
   const [portfolio, setPortfolio] = useState(null);
-  const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [chartLoading, setChartLoading] = useState(true);
+  
+  // Analysis state
+  const [selectedCoin, setSelectedCoin] = useState(null);
+  const [selectedTimeframe, setSelectedTimeframe] = useState("4h");
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState(null);
+  const [analysisDialogOpen, setAnalysisDialogOpen] = useState(false);
+  
+  // Add to watchlist state
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const fetchData = async () => {
     try {
-      const [marketsRes, trendingRes, portfolioRes] = await Promise.all([
+      const [marketsRes, fgRes, portfolioRes] = await Promise.all([
         axios.get(`${API}/market/crypto`),
-        axios.get(`${API}/market/trending`),
+        axios.get(`${API}/market/fear-greed`),
         axios.get(`${API}/paper-trading/portfolio`)
       ]);
       setMarkets(marketsRes.data || []);
-      setTrending(trendingRes.data?.coins || []);
+      if (fgRes.data?.data?.[0]) {
+        setFearGreed(fgRes.data.data[0]);
+      }
       setPortfolio(portfolioRes.data);
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -84,48 +123,12 @@ export default function DashboardPage() {
     }
   };
 
-  // Fetch real chart data from sparkline (included in markets data)
-  const getChartDataFromSparkline = () => {
-    if (markets.length > 0 && markets[0].sparkline_in_7d?.price) {
-      const prices = markets[0].sparkline_in_7d.price;
-      const now = Date.now();
-      const interval = (7 * 24 * 60 * 60 * 1000) / prices.length;
-      
-      // Sample every few points to get ~20 data points
-      const sampledData = prices
-        .filter((_, i) => i % Math.ceil(prices.length / 20) === 0)
-        .map((price, index) => {
-          const timestamp = now - (7 * 24 * 60 * 60 * 1000) + (index * interval * Math.ceil(prices.length / 20));
-          const date = new Date(timestamp);
-          return {
-            day: date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' }),
-            price: price,
-            timestamp: timestamp
-          };
-        });
-      return sampledData;
-    }
-    return [];
-  };
-
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 60000); // Refresh every minute
-    return () => clearInterval(interval);
   }, []);
-
-  // Update chart data when markets change
-  useEffect(() => {
-    if (markets.length > 0) {
-      const sparklineData = getChartDataFromSparkline();
-      setChartData(sparklineData);
-      setChartLoading(false);
-    }
-  }, [markets]);
 
   const handleRefresh = () => {
     setRefreshing(true);
-    setChartLoading(true);
     fetchData();
     toast.success("Données actualisées");
   };
@@ -135,10 +138,74 @@ export default function DashboardPage() {
     user?.watchlist?.includes(coin.id)
   );
 
+  // Filter available coins for adding
+  const availableCoins = markets.filter(coin => 
+    !user?.watchlist?.includes(coin.id) &&
+    (searchQuery === "" || 
+     coin.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+     coin.symbol.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  // Add to watchlist
+  const addToWatchlist = async (coinId) => {
+    try {
+      const response = await axios.post(`${API}/watchlist/${coinId}`);
+      updateUser({ watchlist: response.data.watchlist });
+      toast.success("Ajouté à votre watchlist");
+    } catch (error) {
+      toast.error("Erreur lors de l'ajout");
+    }
+  };
+
+  // Remove from watchlist
+  const removeFromWatchlist = async (coinId) => {
+    try {
+      const response = await axios.delete(`${API}/watchlist/${coinId}`);
+      updateUser({ watchlist: response.data.watchlist });
+      toast.success("Retiré de la watchlist");
+    } catch (error) {
+      toast.error("Erreur lors de la suppression");
+    }
+  };
+
+  // Analyze coin with AI
+  const analyzeCoin = async (coin) => {
+    setSelectedCoin(coin);
+    setAnalysisDialogOpen(true);
+    setAnalyzing(true);
+    setAnalysisResult(null);
+
+    try {
+      const response = await axios.post(`${API}/assistant/chat`, {
+        message: `ANALYSE TRADING RAPIDE pour ${coin.name} (${coin.symbol.toUpperCase()}/USD).
+
+Timeframe: ${selectedTimeframe}
+Prix actuel: $${coin.current_price}
+Variation 24h: ${coin.price_change_percentage_24h?.toFixed(2)}%
+
+DONNE MOI:
+1. Signal: 🟢 ACHAT ou 🔴 VENTE ou 🟡 ATTENDRE
+2. Point d'entrée recommandé
+3. Stop-Loss (SL)
+4. Take-Profit (TP1 et TP2)
+5. Niveau de confiance (Faible/Moyen/Élevé)
+6. Raison principale en 1 phrase
+
+Format CONCIS et DIRECT.`
+      });
+      
+      setAnalysisResult(response.data.response);
+    } catch (error) {
+      toast.error("Erreur lors de l'analyse");
+      setAnalysisResult("Erreur lors de l'analyse. Veuillez réessayer.");
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
   // Calculate portfolio value
   const calculatePortfolioValue = () => {
     if (!portfolio || !markets.length) return portfolio?.balance || 10000;
-    
     let totalValue = portfolio.balance;
     Object.entries(portfolio.portfolio || {}).forEach(([symbol, holding]) => {
       const coin = markets.find(c => c.id === symbol);
@@ -152,18 +219,21 @@ export default function DashboardPage() {
   const portfolioValue = calculatePortfolioValue();
   const portfolioChange = ((portfolioValue - 10000) / 10000) * 100;
 
+  // Get sparkline data for chart
+  const getSparklineData = (coin) => {
+    if (!coin?.sparkline_in_7d?.price) return [];
+    const prices = coin.sparkline_in_7d.price;
+    return prices.filter((_, i) => i % Math.ceil(prices.length / 20) === 0).map((price, i) => ({
+      price
+    }));
+  };
+
   if (loading) {
     return (
-      <div className="space-y-6 animate-pulse">
-        <div className="h-8 w-48 bg-white/5 rounded" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="h-32 bg-white/5 rounded-xl" />
-          ))}
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="h-80 bg-white/5 rounded-xl" />
-          <div className="h-80 bg-white/5 rounded-xl" />
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-12 h-12 animate-spin text-primary" />
+          <p className="text-muted-foreground">Chargement des données marché...</p>
         </div>
       </div>
     );
@@ -178,271 +248,411 @@ export default function DashboardPage() {
             Bonjour, {user?.name?.split(" ")[0]} 👋
           </h1>
           <p className="text-muted-foreground">
-            Voici votre aperçu des marchés aujourd'hui
+            Sélectionnez une crypto et cliquez sur <span className="text-primary font-medium">Analyser</span> pour obtenir un signal de trading
           </p>
         </div>
-        <Button
-          variant="outline"
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="border-white/10 hover:bg-white/5"
-          data-testid="refresh-btn"
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
-          Actualiser
-        </Button>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Portfolio Value */}
-        <Card className="glass border-white/5 card-hover">
-          <CardContent className="pt-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Portfolio Virtuel</p>
-                <p className="text-2xl font-bold font-mono mt-1" data-testid="portfolio-value">
-                  {formatPrice(portfolioValue)}
-                </p>
-                <div className={`flex items-center gap-1 mt-1 ${portfolioChange >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
-                  {portfolioChange >= 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
-                  <span className="text-sm font-mono">{formatPercent(portfolioChange)}</span>
-                </div>
-              </div>
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Wallet className="w-5 h-5 text-primary" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Market Status */}
-        <Card className="glass border-white/5 card-hover">
-          <CardContent className="pt-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Marché Global</p>
-                <p className="text-2xl font-bold font-mono mt-1">
-                  {markets[0]?.current_price ? formatPrice(markets[0].current_price) : "$-"}
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  BTC Dominance
-                </p>
-              </div>
-              <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-orange-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* AI Assistant Quick Access */}
-        <Link to="/assistant">
-          <Card className="glass border-violet-500/20 card-hover cursor-pointer group h-full">
-            <CardContent className="pt-6 h-full">
-              <div className="flex items-start justify-between h-full">
-                <div>
-                  <p className="text-sm text-violet-400">Assistant IA</p>
-                  <p className="text-lg font-bold mt-1">BULL SAGE</p>
-                  <p className="text-sm text-muted-foreground mt-1 group-hover:text-violet-400 transition-colors">
-                    Demander une analyse →
-                  </p>
-                </div>
-                <div className="w-10 h-10 rounded-lg bg-violet-500/10 flex items-center justify-center group-hover:bg-violet-500/20 transition-colors">
-                  <Sparkles className="w-5 h-5 text-violet-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Watchlist */}
-        <Card className="glass border-white/5">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Eye className="w-5 h-5 text-primary" />
-                  Ma Watchlist
-                </CardTitle>
-                <CardDescription>Vos actifs surveillés</CardDescription>
-              </div>
-              <Link to="/markets">
-                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
-                  Voir tout
-                </Button>
-              </Link>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[280px]">
-              {watchlistCoins.length > 0 ? (
-                <div className="space-y-2">
-                  {watchlistCoins.map((coin) => (
-                    <div
-                      key={coin.id}
-                      className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
-                      data-testid={`watchlist-${coin.id}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <img src={coin.image} alt={coin.name} className="w-8 h-8 rounded-full" />
-                        <div>
-                          <p className="font-medium">{coin.name}</p>
-                          <p className="text-xs text-muted-foreground uppercase">{coin.symbol}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-mono font-medium">{formatPrice(coin.current_price)}</p>
-                        <p className={`text-sm font-mono ${coin.price_change_percentage_24h >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
-                          {formatPercent(coin.price_change_percentage_24h)}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center py-8">
-                  <Eye className="w-12 h-12 text-muted-foreground/30 mb-3" />
-                  <p className="text-muted-foreground">Aucun actif dans votre watchlist</p>
-                  <Link to="/markets">
-                    <Button variant="link" className="text-primary mt-2">
-                      Ajouter des actifs
-                    </Button>
-                  </Link>
-                </div>
-              )}
-            </ScrollArea>
-          </CardContent>
-        </Card>
-
-        {/* Trending */}
-        <Card className="glass border-white/5">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Zap className="w-5 h-5 text-yellow-500" />
-                  Tendances
-                </CardTitle>
-                <CardDescription>Les cryptos les plus recherchées</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[280px]">
-              <div className="space-y-2">
-                {trending.slice(0, 7).map((item, index) => (
-                  <div
-                    key={item.item?.id || index}
-                    className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
-                    data-testid={`trending-${index}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold">
-                        {index + 1}
-                      </div>
-                      {item.item?.thumb && (
-                        <img src={item.item.thumb} alt={item.item.name} className="w-8 h-8 rounded-full" />
-                      )}
-                      <div>
-                        <p className="font-medium">{item.item?.name || "Unknown"}</p>
-                        <p className="text-xs text-muted-foreground uppercase">{item.item?.symbol}</p>
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="bg-white/5">
-                      #{item.item?.market_cap_rank || "-"}
-                    </Badge>
+        <div className="flex gap-2">
+          <Select value={selectedTimeframe} onValueChange={setSelectedTimeframe}>
+            <SelectTrigger className="w-40 bg-black/20 border-white/10">
+              <Clock className="w-4 h-4 mr-2" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="glass border-white/10">
+              {TIMEFRAMES.map(tf => (
+                <SelectItem key={tf.value} value={tf.value}>
+                  <div>
+                    <span className="font-medium">{tf.label}</span>
+                    <span className="text-xs text-muted-foreground ml-2">({tf.description})</span>
                   </div>
-                ))}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="border-white/10 hover:bg-white/5"
+            data-testid="refresh-btn"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
+      </div>
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {/* Portfolio */}
+        <Card className="glass border-white/5">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">Portfolio Virtuel</p>
+                <p className="text-xl font-bold font-mono">{formatPrice(portfolioValue)}</p>
+                <p className={`text-xs font-mono ${portfolioChange >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                  {formatPercent(portfolioChange)}
+                </p>
               </div>
-            </ScrollArea>
+              <Wallet className="w-8 h-8 text-primary/50" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Fear & Greed */}
+        <Card className="glass border-white/5">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">Fear & Greed</p>
+                <p className="text-xl font-bold font-mono">{fearGreed?.value || "-"}</p>
+                <p className={`text-xs ${
+                  parseInt(fearGreed?.value) <= 25 ? "text-rose-500" :
+                  parseInt(fearGreed?.value) >= 75 ? "text-emerald-500" : "text-yellow-500"
+                }`}>
+                  {fearGreed?.value_classification || "-"}
+                </p>
+              </div>
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                parseInt(fearGreed?.value) <= 25 ? "bg-rose-500/20" :
+                parseInt(fearGreed?.value) >= 75 ? "bg-emerald-500/20" : "bg-yellow-500/20"
+              }`}>
+                {parseInt(fearGreed?.value) <= 25 ? "😱" : parseInt(fearGreed?.value) >= 75 ? "🤑" : "😐"}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* BTC Quick */}
+        <Card className="glass border-white/5">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">Bitcoin</p>
+                <p className="text-xl font-bold font-mono">
+                  {formatPrice(markets.find(c => c.id === "bitcoin")?.current_price)}
+                </p>
+                <p className={`text-xs font-mono ${
+                  (markets.find(c => c.id === "bitcoin")?.price_change_percentage_24h || 0) >= 0 
+                    ? "text-emerald-500" : "text-rose-500"
+                }`}>
+                  {formatPercent(markets.find(c => c.id === "bitcoin")?.price_change_percentage_24h)}
+                </p>
+              </div>
+              <img src={markets.find(c => c.id === "bitcoin")?.image} alt="BTC" className="w-8 h-8" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Watchlist count */}
+        <Card className="glass border-white/5">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">Ma Watchlist</p>
+                <p className="text-xl font-bold font-mono">{watchlistCoins.length}</p>
+                <p className="text-xs text-muted-foreground">cryptos suivies</p>
+              </div>
+              <Star className="w-8 h-8 text-yellow-500/50" />
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Market Overview Chart */}
+      {/* Main Watchlist Section */}
       <Card className="glass border-white/5">
-        <CardHeader>
-          <CardTitle className="text-lg">Aperçu du Marché (BTC)</CardTitle>
-          <CardDescription>Performance sur 7 jours - Données réelles CoinGecko</CardDescription>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-xl flex items-center gap-2">
+                <Star className="w-5 h-5 text-yellow-500" />
+                Ma Watchlist Trading
+              </CardTitle>
+              <CardDescription>
+                Cliquez sur <span className="text-primary">Analyser</span> pour obtenir un signal IA en timeframe {TIMEFRAMES.find(t => t.value === selectedTimeframe)?.label}
+              </CardDescription>
+            </div>
+            
+            {/* Add to Watchlist Button */}
+            <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-primary hover:bg-primary/90 text-black" data-testid="add-watchlist-btn">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Ajouter
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="glass border-white/10 max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Ajouter à ma Watchlist</DialogTitle>
+                  <DialogDescription>
+                    Sélectionnez les cryptos que vous souhaitez suivre
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Rechercher une crypto..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10 bg-black/20 border-white/10"
+                    />
+                  </div>
+                  <ScrollArea className="h-[300px]">
+                    <div className="space-y-2">
+                      {availableCoins.slice(0, 20).map(coin => (
+                        <div
+                          key={coin.id}
+                          className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+                          onClick={() => {
+                            addToWatchlist(coin.id);
+                          }}
+                        >
+                          <div className="flex items-center gap-3">
+                            <img src={coin.image} alt={coin.name} className="w-8 h-8 rounded-full" />
+                            <div>
+                              <p className="font-medium">{coin.name}</p>
+                              <p className="text-xs text-muted-foreground uppercase">{coin.symbol}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <p className="font-mono text-sm">{formatPrice(coin.current_price)}</p>
+                              <p className={`text-xs font-mono ${coin.price_change_percentage_24h >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                                {formatPercent(coin.price_change_percentage_24h)}
+                              </p>
+                            </div>
+                            <Plus className="w-5 h-5 text-primary" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="h-[200px]">
-            {chartLoading ? (
-              <div className="flex items-center justify-center h-full">
-                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : chartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData}>
-                  <defs>
-                    <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis 
-                    dataKey="day" 
-                    axisLine={false} 
-                    tickLine={false}
-                    tick={{ fill: '#71717a', fontSize: 12 }}
-                  />
-                  <YAxis 
-                    hide 
-                    domain={['dataMin', 'dataMax']}
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Area
-                    type="monotone"
-                    dataKey="price"
-                    stroke="#10B981"
-                    strokeWidth={2}
-                    fill="url(#colorPrice)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
-                Impossible de charger les données du graphique
-              </div>
-            )}
-          </div>
+          {watchlistCoins.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {watchlistCoins.map((coin) => {
+                const sparklineData = getSparklineData(coin);
+                const isPositive = coin.price_change_percentage_24h >= 0;
+                
+                return (
+                  <Card 
+                    key={coin.id} 
+                    className="glass border-white/10 overflow-hidden group hover:border-primary/30 transition-all"
+                    data-testid={`watchlist-card-${coin.id}`}
+                  >
+                    <CardContent className="p-4">
+                      {/* Header */}
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <img src={coin.image} alt={coin.name} className="w-10 h-10 rounded-full" />
+                          <div>
+                            <p className="font-bold">{coin.name}</p>
+                            <p className="text-xs text-muted-foreground uppercase">{coin.symbol}/USD</p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeFromWatchlist(coin.id)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity hover:bg-rose-500/10 hover:text-rose-500"
+                          data-testid={`remove-${coin.id}`}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+
+                      {/* Price & Change */}
+                      <div className="flex items-end justify-between mb-3">
+                        <div>
+                          <p className="text-2xl font-bold font-mono">{formatPrice(coin.current_price)}</p>
+                          <div className={`flex items-center gap-1 ${isPositive ? "text-emerald-500" : "text-rose-500"}`}>
+                            {isPositive ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
+                            <span className="font-mono text-sm">{formatPercent(coin.price_change_percentage_24h)}</span>
+                            <span className="text-xs text-muted-foreground">24h</span>
+                          </div>
+                        </div>
+                        
+                        {/* Mini Chart */}
+                        {sparklineData.length > 0 && (
+                          <div className="w-20 h-12">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <AreaChart data={sparklineData}>
+                                <defs>
+                                  <linearGradient id={`gradient-${coin.id}`} x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor={isPositive ? "#10B981" : "#F43F5E"} stopOpacity={0.3} />
+                                    <stop offset="95%" stopColor={isPositive ? "#10B981" : "#F43F5E"} stopOpacity={0} />
+                                  </linearGradient>
+                                </defs>
+                                <Area
+                                  type="monotone"
+                                  dataKey="price"
+                                  stroke={isPositive ? "#10B981" : "#F43F5E"}
+                                  strokeWidth={1.5}
+                                  fill={`url(#gradient-${coin.id})`}
+                                />
+                              </AreaChart>
+                            </ResponsiveContainer>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* High/Low */}
+                      <div className="flex items-center justify-between text-xs text-muted-foreground mb-4">
+                        <span>Low: <span className="font-mono text-rose-400">{formatPrice(coin.low_24h)}</span></span>
+                        <span>High: <span className="font-mono text-emerald-400">{formatPrice(coin.high_24h)}</span></span>
+                      </div>
+
+                      {/* Analyze Button */}
+                      <Button
+                        onClick={() => analyzeCoin(coin)}
+                        className="w-full bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white font-bold"
+                        data-testid={`analyze-${coin.id}`}
+                      >
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        Analyser ({TIMEFRAMES.find(t => t.value === selectedTimeframe)?.label})
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-16">
+              <Star className="w-16 h-16 text-muted-foreground/30 mb-4" />
+              <h3 className="text-lg font-medium mb-2">Votre watchlist est vide</h3>
+              <p className="text-muted-foreground text-center max-w-md mb-4">
+                Ajoutez des cryptomonnaies pour les suivre et obtenir des analyses de trading personnalisées.
+              </p>
+              <Button onClick={() => setAddDialogOpen(true)} className="bg-primary hover:bg-primary/90 text-black">
+                <Plus className="w-4 h-4 mr-2" />
+                Ajouter des cryptos
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
+      {/* Analysis Dialog */}
+      <Dialog open={analysisDialogOpen} onOpenChange={setAnalysisDialogOpen}>
+        <DialogContent className="glass border-white/10 max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              {selectedCoin && (
+                <>
+                  <img src={selectedCoin.image} alt={selectedCoin.name} className="w-8 h-8 rounded-full" />
+                  <span>Analyse {selectedCoin.name}</span>
+                  <Badge variant="secondary" className="ml-2">
+                    {TIMEFRAMES.find(t => t.value === selectedTimeframe)?.label}
+                  </Badge>
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              Signal de trading généré par l'IA BULL SAGE
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="mt-4">
+            {analyzing ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <Loader2 className="w-12 h-12 animate-spin text-violet-500 mb-4" />
+                <p className="text-muted-foreground">Analyse en cours...</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Récupération des données temps réel et génération du signal
+                </p>
+              </div>
+            ) : analysisResult ? (
+              <div className="prose prose-sm prose-invert max-w-none">
+                <div className="p-4 rounded-lg bg-black/20 border border-white/10 whitespace-pre-wrap">
+                  {analysisResult}
+                </div>
+                
+                {/* Quick Info */}
+                {selectedCoin && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+                    <div className="p-3 rounded-lg bg-white/5">
+                      <p className="text-xs text-muted-foreground">Prix actuel</p>
+                      <p className="font-mono font-bold">{formatPrice(selectedCoin.current_price)}</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-white/5">
+                      <p className="text-xs text-muted-foreground">24h Change</p>
+                      <p className={`font-mono font-bold ${selectedCoin.price_change_percentage_24h >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                        {formatPercent(selectedCoin.price_change_percentage_24h)}
+                      </p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-white/5">
+                      <p className="text-xs text-muted-foreground">24h Low</p>
+                      <p className="font-mono font-bold text-rose-400">{formatPrice(selectedCoin.low_24h)}</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-white/5">
+                      <p className="text-xs text-muted-foreground">24h High</p>
+                      <p className="font-mono font-bold text-emerald-400">{formatPrice(selectedCoin.high_24h)}</p>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex gap-2 mt-4">
+                  <Button
+                    onClick={() => analyzeCoin(selectedCoin)}
+                    variant="outline"
+                    className="flex-1 border-white/10"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Nouvelle analyse
+                  </Button>
+                  <Link to="/assistant" className="flex-1">
+                    <Button className="w-full bg-violet-500 hover:bg-violet-600">
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Discussion détaillée
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Quick Actions */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Link to="/markets">
+          <Card className="glass border-white/5 card-hover cursor-pointer">
+            <CardContent className="pt-6 text-center">
+              <TrendingUp className="w-8 h-8 mx-auto text-blue-500 mb-2" />
+              <p className="font-medium">Tous les Marchés</p>
+              <p className="text-xs text-muted-foreground">50+ cryptos</p>
+            </CardContent>
+          </Card>
+        </Link>
         <Link to="/paper-trading">
           <Card className="glass border-white/5 card-hover cursor-pointer">
             <CardContent className="pt-6 text-center">
               <Wallet className="w-8 h-8 mx-auto text-primary mb-2" />
               <p className="font-medium">Paper Trading</p>
+              <p className="text-xs text-muted-foreground">S'entraîner</p>
             </CardContent>
           </Card>
         </Link>
         <Link to="/strategies">
           <Card className="glass border-white/5 card-hover cursor-pointer">
             <CardContent className="pt-6 text-center">
-              <TrendingUp className="w-8 h-8 mx-auto text-blue-500 mb-2" />
+              <Target className="w-8 h-8 mx-auto text-yellow-500 mb-2" />
               <p className="font-medium">Stratégies</p>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link to="/alerts">
-          <Card className="glass border-white/5 card-hover cursor-pointer">
-            <CardContent className="pt-6 text-center">
-              <Zap className="w-8 h-8 mx-auto text-yellow-500 mb-2" />
-              <p className="font-medium">Alertes</p>
+              <p className="text-xs text-muted-foreground">Mes règles</p>
             </CardContent>
           </Card>
         </Link>
         <Link to="/assistant">
           <Card className="glass border-violet-500/20 card-hover cursor-pointer">
             <CardContent className="pt-6 text-center">
-              <MessageCircle className="w-8 h-8 mx-auto text-violet-400 mb-2" />
+              <Sparkles className="w-8 h-8 mx-auto text-violet-400 mb-2" />
               <p className="font-medium">Assistant IA</p>
+              <p className="text-xs text-muted-foreground">Chat complet</p>
             </CardContent>
           </Card>
         </Link>
