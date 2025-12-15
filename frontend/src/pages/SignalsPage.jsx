@@ -14,7 +14,10 @@ import {
   Trash2,
   RefreshCw,
   Loader2,
-  BarChart3
+  BarChart3,
+  Zap,
+  ArrowUpRight,
+  ArrowDownRight
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -103,6 +106,8 @@ export default function SignalsPage() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [evaluating, setEvaluating] = useState(false);
+  const [evaluationResults, setEvaluationResults] = useState(null);
   const [filter, setFilter] = useState("all");
 
   const fetchData = async () => {
@@ -130,6 +135,27 @@ export default function SignalsPage() {
     setRefreshing(true);
     fetchData();
     toast.success("Données actualisées");
+  };
+
+  const handleEvaluate = async () => {
+    setEvaluating(true);
+    setEvaluationResults(null);
+    try {
+      const response = await axios.post(`${API}/signals/evaluate`);
+      setEvaluationResults(response.data);
+      
+      if (response.data.updated > 0) {
+        toast.success(`${response.data.updated} signal(s) mis à jour automatiquement`);
+        fetchData(); // Refresh to show new statuses
+      } else {
+        toast.info("Aucun signal n'a atteint ses objectifs ou stop-loss");
+      }
+    } catch (error) {
+      console.error("Error evaluating signals:", error);
+      toast.error("Erreur lors de l'évaluation des signaux");
+    } finally {
+      setEvaluating(false);
+    }
   };
 
   const handleUpdateStatus = async (signalId, newStatus) => {
@@ -184,15 +210,26 @@ export default function SignalsPage() {
             <p className="text-sm text-muted-foreground">Historique et performance de vos signaux de trading</p>
           </div>
         </div>
-        <Button
-          variant="outline"
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="border-white/10 hover:bg-white/5"
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
-          Actualiser
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={handleEvaluate}
+            disabled={evaluating || stats?.active === 0}
+            className="bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white"
+            data-testid="evaluate-btn"
+          >
+            <Zap className={`w-4 h-4 mr-2 ${evaluating ? "animate-pulse" : ""}`} />
+            {evaluating ? "Évaluation..." : "Évaluer les signaux"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="border-white/10 hover:bg-white/5"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
+            Actualiser
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
