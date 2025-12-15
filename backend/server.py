@@ -255,7 +255,7 @@ async def get_crypto_markets(current_user: dict = Depends(get_current_user)):
                     "order": "market_cap_desc",
                     "per_page": 50,
                     "page": 1,
-                    "sparkline": False,
+                    "sparkline": True,
                     "price_change_percentage": "24h,7d"
                 },
                 timeout=30.0
