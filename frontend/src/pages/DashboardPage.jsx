@@ -182,19 +182,72 @@ export default function DashboardPage() {
 Timeframe: ${selectedTimeframe}
 Prix actuel: $${coin.current_price}
 Variation 24h: ${coin.price_change_percentage_24h?.toFixed(2)}%
+High 24h: $${coin.high_24h}
+Low 24h: $${coin.low_24h}
 
-DONNE MOI:
-1. Signal: 🟢 ACHAT ou 🔴 VENTE ou 🟡 ATTENDRE
-2. Point d'entrée recommandé
-3. Stop-Loss (SL)
-4. Take-Profit (TP1 et TP2)
-5. Niveau de confiance (Faible/Moyen/Élevé)
-6. Raison principale en 1 phrase
+DONNE MOI EN FORMAT STRUCTURÉ:
+1. SIGNAL: 🟢 ACHAT ou 🔴 VENTE ou 🟡 ATTENDRE
+2. ENTRÉE: prix exact recommandé
+3. STOP-LOSS: prix exact
+4. TP1: premier objectif
+5. TP2: deuxième objectif
+6. CONFIANCE: Faible/Moyen/Élevé
+7. RAISON: explication en 1 phrase
 
-Format CONCIS et DIRECT.`
+Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
       });
       
       setAnalysisResult(response.data.response);
+      
+      // Try to parse and save the signal
+      try {
+        const text = response.data.response;
+        let signalType = "WAIT";
+        if (text.includes("🟢") || text.toLowerCase().includes("achat")) signalType = "BUY";
+        else if (text.includes("🔴") || text.toLowerCase().includes("vente")) signalType = "SELL";
+        
+        // Extract prices using regex
+        const extractPrice = (pattern) => {
+          const match = text.match(pattern);
+          if (match) {
+            const priceStr = match[1].replace(/[,$\s]/g, '');
+            return parseFloat(priceStr);
+          }
+          return null;
+        };
+        
+        const entryPrice = extractPrice(/entr[ée]e?\s*:?\s*\$?([\d,]+\.?\d*)/i) || coin.current_price;
+        const stopLoss = extractPrice(/stop[- ]?loss\s*:?\s*\$?([\d,]+\.?\d*)/i) || coin.current_price * 0.95;
+        const tp1 = extractPrice(/tp1\s*:?\s*\$?([\d,]+\.?\d*)/i) || coin.current_price * 1.05;
+        const tp2 = extractPrice(/tp2\s*:?\s*\$?([\d,]+\.?\d*)/i) || coin.current_price * 1.10;
+        
+        let confidence = "medium";
+        if (text.toLowerCase().includes("élevé") || text.toLowerCase().includes("high")) confidence = "high";
+        else if (text.toLowerCase().includes("faible") || text.toLowerCase().includes("low")) confidence = "low";
+        
+        // Extract reason
+        const reasonMatch = text.match(/raison\s*:?\s*(.+?)(?:\n|$)/i);
+        const reason = reasonMatch ? reasonMatch[1].trim().substring(0, 100) : "Analyse IA";
+        
+        // Save the signal
+        await axios.post(`${API}/signals`, {
+          symbol: coin.id,
+          symbol_name: coin.name,
+          signal_type: signalType,
+          entry_price: entryPrice,
+          stop_loss: stopLoss,
+          take_profit_1: tp1,
+          take_profit_2: tp2,
+          timeframe: selectedTimeframe,
+          confidence: confidence,
+          reason: reason,
+          price_at_signal: coin.current_price
+        });
+        
+        toast.success("Signal sauvegardé dans l'historique");
+      } catch (parseError) {
+        console.log("Could not auto-save signal:", parseError);
+      }
     } catch (error) {
       toast.error("Erreur lors de l'analyse");
       setAnalysisResult("Erreur lors de l'analyse. Veuillez réessayer.");
