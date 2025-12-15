@@ -63,13 +63,17 @@ export default function MainLayout() {
             : "text-muted-foreground hover:text-foreground hover:bg-white/5"
           }
           ${item.highlight && !isActive ? "text-violet-400 hover:text-violet-300" : ""}
+          ${item.admin && !isActive ? "text-violet-400 hover:text-violet-300" : ""}
         `}
         data-testid={`nav-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
       >
-        <item.icon className={`w-5 h-5 ${item.highlight && !isActive ? "text-violet-400" : ""}`} />
+        <item.icon className={`w-5 h-5 ${(item.highlight || item.admin) && !isActive ? "text-violet-400" : ""}`} />
         <span className="font-medium">{item.name}</span>
         {item.highlight && (
           <Zap className="w-4 h-4 ml-auto text-violet-400" />
+        )}
+        {item.admin && (
+          <Shield className="w-4 h-4 ml-auto text-violet-400" />
         )}
       </NavLink>
     );
