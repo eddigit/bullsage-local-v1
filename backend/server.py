@@ -128,6 +128,38 @@ class StrategyCreate(BaseModel):
     exit_rules: str
     risk_percentage: float = 2.0
 
+class TradingSignal(BaseModel):
+    id: str
+    user_id: str
+    symbol: str
+    symbol_name: str
+    signal_type: str  # BUY, SELL, WAIT
+    entry_price: float
+    stop_loss: float
+    take_profit_1: float
+    take_profit_2: Optional[float] = None
+    timeframe: str
+    confidence: str  # low, medium, high
+    reason: str
+    price_at_signal: float
+    created_at: str
+    status: str = "active"  # active, hit_tp1, hit_tp2, hit_sl, expired
+    result_pnl: Optional[float] = None
+
+class SignalCreate(BaseModel):
+    symbol: str
+    symbol_name: str
+    signal_type: str
+    entry_price: float
+    stop_loss: float
+    take_profit_1: float
+    take_profit_2: Optional[float] = None
+    timeframe: str
+    confidence: str
+    reason: str
+    price_at_signal: float
+
+
 class StrategyResponse(BaseModel):
     id: str
     user_id: str
