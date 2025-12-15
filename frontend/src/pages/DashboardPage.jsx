@@ -366,10 +366,16 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
                 </p>
               </div>
               <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                parseInt(fearGreed?.value) <= 25 ? "bg-rose-500/20" :
-                parseInt(fearGreed?.value) >= 75 ? "bg-emerald-500/20" : "bg-yellow-500/20"
+                parseInt(fearGreed?.value) <= 25 ? "bg-rose-500/10" :
+                parseInt(fearGreed?.value) >= 75 ? "bg-emerald-500/10" : "bg-yellow-500/10"
               }`}>
-                {parseInt(fearGreed?.value) <= 25 ? "😱" : parseInt(fearGreed?.value) >= 75 ? "🤑" : "😐"}
+                {parseInt(fearGreed?.value) <= 25 ? (
+                  <TrendingDown className="w-5 h-5 text-rose-500" />
+                ) : parseInt(fearGreed?.value) >= 75 ? (
+                  <TrendingUp className="w-5 h-5 text-emerald-500" />
+                ) : (
+                  <Activity className="w-5 h-5 text-yellow-500" />
+                )}
               </div>
             </div>
           </CardContent>
