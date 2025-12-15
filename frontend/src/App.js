@@ -169,6 +169,7 @@ function App() {
               <Route path="alerts" element={<AlertsPage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="admin" element={<AdminPage />} />
+              <Route path="admin/api-keys" element={<ApiKeysPage />} />
             </Route>
           </Routes>
         </BrowserRouter>
