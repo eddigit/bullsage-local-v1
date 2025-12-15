@@ -274,6 +274,85 @@ export default function SignalsPage() {
         </div>
       )}
 
+      {/* Evaluation Results */}
+      {evaluationResults && evaluationResults.results.length > 0 && (
+        <Card className="glass border-violet-500/20">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Zap className="w-5 h-5 text-violet-500" />
+                Résultats de l'évaluation
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setEvaluationResults(null)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                Fermer
+              </Button>
+            </div>
+            <CardDescription>{evaluationResults.message}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {evaluationResults.results.map((result, idx) => (
+                <div
+                  key={idx}
+                  className={`p-3 rounded-lg flex items-center justify-between ${
+                    result.new_status === "hit_tp1" || result.new_status === "hit_tp2"
+                      ? "bg-emerald-500/10 border border-emerald-500/20"
+                      : result.new_status === "hit_sl"
+                      ? "bg-rose-500/10 border border-rose-500/20"
+                      : result.status === "active"
+                      ? "bg-white/5"
+                      : "bg-yellow-500/10 border border-yellow-500/20"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      result.signal_type === "BUY" ? "bg-emerald-500/20" : "bg-rose-500/20"
+                    }`}>
+                      {result.signal_type === "BUY" ? (
+                        <ArrowUpRight className="w-4 h-4 text-emerald-500" />
+                      ) : (
+                        <ArrowDownRight className="w-4 h-4 text-rose-500" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-medium">{result.symbol}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Entrée: ${result.entry_price?.toLocaleString()} → Actuel: ${result.current_price?.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    {result.new_status ? (
+                      <>
+                        <Badge className={getStatusColor(result.new_status)}>
+                          {getStatusIcon(result.new_status)}
+                          {getStatusLabel(result.new_status)}
+                        </Badge>
+                        <p className={`text-sm font-mono mt-1 ${result.pnl_percent >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                          {result.pnl_percent >= 0 ? "+" : ""}{result.pnl_percent}%
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-xs text-muted-foreground">P&L non réalisé</p>
+                        <p className={`text-sm font-mono ${result.unrealized_pnl >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                          {result.unrealized_pnl >= 0 ? "+" : ""}{result.unrealized_pnl}%
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Filters */}
       <div className="flex items-center gap-4">
         <Select value={filter} onValueChange={setFilter}>
