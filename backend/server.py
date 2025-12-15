@@ -639,50 +639,220 @@ async def get_news_sentiment(symbols: str = "BTCUSD,ETHUSD", current_user: dict 
 
 # ============== AI ASSISTANT ROUTES ==============
 
+async def fetch_realtime_market_data():
+    """Fetch all real-time market data for AI context"""
+    data = {
+        "crypto": [],
+        "fear_greed": None,
+        "news": [],
+        "macro": {},
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+    
+    async with httpx.AsyncClient() as client:
+        # 1. Crypto prices from CoinGecko
+        try:
+            response = await client.get(
+                f"{COINGECKO_API_URL}/coins/markets",
+                params={
+                    "vs_currency": "usd",
+                    "ids": "bitcoin,ethereum,solana,cardano,ripple",
+                    "order": "market_cap_desc",
+                    "sparkline": False,
+                    "price_change_percentage": "1h,24h,7d"
+                },
+                timeout=15.0
+            )
+            if response.status_code == 200:
+                data["crypto"] = response.json()
+        except Exception as e:
+            logger.error(f"Error fetching crypto: {e}")
+
+        # 2. Fear & Greed Index
+        try:
+            response = await client.get(
+                "https://api.alternative.me/fng/",
+                params={"limit": 1},
+                timeout=10.0
+            )
+            if response.status_code == 200:
+                fng = response.json()
+                if fng.get("data"):
+                    data["fear_greed"] = fng["data"][0]
+        except Exception as e:
+            logger.error(f"Error fetching Fear & Greed: {e}")
+
+        # 3. Market News from Finnhub
+        try:
+            response = await client.get(
+                "https://finnhub.io/api/v1/news",
+                params={"category": "crypto", "token": FINNHUB_API_KEY},
+                timeout=15.0
+            )
+            if response.status_code == 200:
+                news = response.json()
+                data["news"] = news[:5] if news else []
+        except Exception as e:
+            logger.error(f"Error fetching news: {e}")
+
+        # 4. Macro data from FRED
+        try:
+            # VIX
+            response = await client.get(
+                "https://api.stlouisfed.org/fred/series/observations",
+                params={
+                    "series_id": "VIXCLS",
+                    "api_key": FRED_API_KEY,
+                    "file_type": "json",
+                    "sort_order": "desc",
+                    "limit": 1
+                },
+                timeout=10.0
+            )
+            if response.status_code == 200:
+                vix_data = response.json()
+                if vix_data.get("observations"):
+                    data["macro"]["vix"] = vix_data["observations"][0].get("value")
+        except Exception as e:
+            logger.error(f"Error fetching VIX: {e}")
+
+        try:
+            # Fed Rate
+            response = await client.get(
+                "https://api.stlouisfed.org/fred/series/observations",
+                params={
+                    "series_id": "FEDFUNDS",
+                    "api_key": FRED_API_KEY,
+                    "file_type": "json",
+                    "sort_order": "desc",
+                    "limit": 1
+                },
+                timeout=10.0
+            )
+            if response.status_code == 200:
+                fed_data = response.json()
+                if fed_data.get("observations"):
+                    data["macro"]["fed_rate"] = fed_data["observations"][0].get("value")
+        except Exception as e:
+            logger.error(f"Error fetching Fed rate: {e}")
+
+    return data
+
 @api_router.post("/assistant/chat", response_model=ChatResponse)
 async def chat_with_bull(request: ChatRequest, current_user: dict = Depends(get_current_user)):
-    """Chat with BULL SAGE AI Assistant"""
+    """Chat with BULL SAGE AI Assistant - with real-time market data"""
     try:
         # Get user's trading level for personalized responses
         trading_level = current_user.get("trading_level", "beginner")
         user_name = current_user.get("name", "Trader")
         
-        # Get recent market context if provided
-        market_context = ""
-        if request.context:
-            if "watchlist_data" in request.context:
-                coins = request.context["watchlist_data"][:5]
-                market_context = "\n\nDonnées de marché actuelles:\n"
-                for coin in coins:
-                    market_context += f"- {coin.get('name', 'N/A')}: ${coin.get('current_price', 0):,.2f} ({coin.get('price_change_percentage_24h', 0):+.2f}% 24h)\n"
+        # FETCH ALL REAL-TIME DATA
+        market_data = await fetch_realtime_market_data()
         
-        system_message = f"""Tu es BULL SAGE, un assistant de trading intelligent et bienveillant. Tu accompagnes {user_name}, un trader de niveau {trading_level}.
+        # Build comprehensive market context
+        market_context = f"""
+=== DONNÉES MARCHÉ TEMPS RÉEL ({market_data['timestamp'][:19].replace('T', ' ')} UTC) ===
 
-TON RÔLE:
-- Analyser les marchés crypto, forex et indices
-- Donner des conseils de trading adaptés au niveau de l'utilisateur
-- Identifier les opportunités d'achat/vente basées sur l'analyse technique et fondamentale
-- Éduquer sur les stratégies de trading
-- Gérer le risque et protéger le capital
+📊 PRIX CRYPTO ACTUELS:"""
+        
+        for coin in market_data["crypto"]:
+            price = coin.get("current_price", 0)
+            change_1h = coin.get("price_change_percentage_1h_in_currency", 0) or 0
+            change_24h = coin.get("price_change_percentage_24h", 0) or 0
+            change_7d = coin.get("price_change_percentage_7d_in_currency", 0) or 0
+            high_24h = coin.get("high_24h", 0)
+            low_24h = coin.get("low_24h", 0)
+            market_context += f"""
+- {coin['name']} ({coin['symbol'].upper()}): ${price:,.2f}
+  • 1h: {change_1h:+.2f}% | 24h: {change_24h:+.2f}% | 7j: {change_7d:+.2f}%
+  • High 24h: ${high_24h:,.2f} | Low 24h: ${low_24h:,.2f}"""
 
-STYLE DE COMMUNICATION:
-- Pour débutant: Explications simples, évite le jargon, éducatif
-- Pour intermédiaire: Plus technique, explique les indicateurs
-- Pour avancé: Analyse approfondie, stratégies complexes
+        # Fear & Greed Index
+        if market_data["fear_greed"]:
+            fg = market_data["fear_greed"]
+            market_context += f"""
 
-RÈGLES IMPORTANTES:
-- Toujours rappeler que le trading comporte des risques
-- Ne jamais garantir des profits
-- Recommander la gestion du risque (ne jamais risquer plus de 1-2% par trade)
-- Être précis sur les niveaux d'entrée, stop-loss et take-profit
-- Utiliser des données de marché réelles quand disponibles
+😱 FEAR & GREED INDEX: {fg.get('value', 'N/A')} ({fg.get('value_classification', 'N/A')})
+  • Interprétation: """
+            fg_value = int(fg.get('value', 50))
+            if fg_value <= 25:
+                market_context += "EXTREME FEAR - Signal potentiel d'ACHAT (marché sous-évalué)"
+            elif fg_value <= 45:
+                market_context += "FEAR - Prudence, possible opportunité d'achat"
+            elif fg_value <= 55:
+                market_context += "NEUTRAL - Marché indécis"
+            elif fg_value <= 75:
+                market_context += "GREED - Prudence, risque de correction"
+            else:
+                market_context += "EXTREME GREED - Signal de VENTE potentiel (marché suracheté)"
+
+        # Macro data
+        if market_data["macro"]:
+            market_context += f"""
+
+🏦 DONNÉES MACRO (FRED):
+- VIX (Volatilité): {market_data['macro'].get('vix', 'N/A')}"""
+            vix = market_data['macro'].get('vix')
+            if vix:
+                try:
+                    vix_val = float(vix)
+                    if vix_val < 15:
+                        market_context += " (Faible volatilité - marché calme)"
+                    elif vix_val < 25:
+                        market_context += " (Volatilité normale)"
+                    else:
+                        market_context += " (Haute volatilité - ATTENTION)"
+                except:
+                    pass
+            market_context += f"""
+- Taux Fed: {market_data['macro'].get('fed_rate', 'N/A')}%"""
+
+        # News headlines
+        if market_data["news"]:
+            market_context += """
+
+📰 DERNIÈRES NEWS CRYPTO:"""
+            for news in market_data["news"][:3]:
+                headline = news.get("headline", "")[:100]
+                market_context += f"""
+- {headline}"""
+
+        market_context += """
+
+=== FIN DES DONNÉES TEMPS RÉEL ==="""
+
+        system_message = f"""Tu es BULL SAGE, un assistant de trading IA PROFESSIONNEL. Tu accompagnes {user_name}, un trader de niveau {trading_level}.
+
+🎯 TON OBJECTIF PRINCIPAL: Donner des conseils de trading PRÉCIS et ACTIONNABLES basés sur les données TEMPS RÉEL ci-dessous.
+
 {market_context}
 
-Réponds en français de manière concise et actionnable."""
+📋 FORMAT DE RÉPONSE OBLIGATOIRE pour les demandes d'analyse/trading:
+
+1. **SITUATION ACTUELLE** (prix, tendance, sentiment)
+2. **ANALYSE TECHNIQUE** (supports, résistances, indicateurs clés)
+3. **RECOMMANDATION CLAIRE**:
+   - 🟢 ACHAT ou 🔴 VENTE ou 🟡 ATTENDRE
+   - Point d'entrée précis
+   - Stop-Loss (SL)
+   - Take-Profit 1 (TP1) et Take-Profit 2 (TP2)
+   - Risque/Récompense ratio
+4. **TIMING** (immédiat, attendre pullback, etc.)
+5. **GESTION DU RISQUE** (% du capital recommandé)
+
+⚠️ RÈGLES CRITIQUES:
+- TOUJOURS utiliser les données temps réel fournies ci-dessus
+- JAMAIS dire que tu n'as pas accès aux prix - TU AS TOUS LES PRIX
+- Donner des niveaux de prix PRÉCIS (pas de fourchettes vagues)
+- Adapter la complexité au niveau {trading_level}
+- Rappeler que le trading comporte des risques
+- Ne jamais risquer plus de 1-2% par trade
+
+🗣️ Réponds TOUJOURS en français, de manière directe et actionnable."""
 
         chat = LlmChat(
             api_key=EMERGENT_LLM_KEY,
-            session_id=f"bullsage_{current_user['id']}_{datetime.now().strftime('%Y%m%d')}",
+            session_id=f"bullsage_{current_user['id']}_{datetime.now().strftime('%Y%m%d%H')}",
             system_message=system_message
         )
         chat.with_model("openai", "gpt-5.1")
@@ -695,7 +865,11 @@ Réponds en français de manière concise et actionnable."""
             "user_id": current_user["id"],
             "message": request.message,
             "response": response,
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "market_data_snapshot": {
+                "btc_price": market_data["crypto"][0].get("current_price") if market_data["crypto"] else None,
+                "fear_greed": market_data["fear_greed"].get("value") if market_data["fear_greed"] else None
+            }
         }
         await db.chat_history.insert_one(chat_doc)
         
