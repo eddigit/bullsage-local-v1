@@ -101,3 +101,45 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+## Test Session: 2025-12-15 20:05
+### Implementation Summary:
+1. **P0 COMPLETED: Emoji Replacement**
+   - Replaced all emojis with modern lucide-react icons
+   - Files modified: DashboardPage.jsx, MarketIntelligencePage.jsx, SettingsPage.jsx, SignalsPage.jsx
+   - Fear & Greed emoji (😱) replaced with TrendingDown/ChevronUp icons
+   - Warning emoji (⚠️) replaced with AlertTriangle icon
+   - Status labels (✓, ✗) now use CheckCircle/XCircle icons
+
+2. **P1 IN PROGRESS: Signal Performance Tracking**
+   - Added `/api/signals/evaluate` endpoint in backend
+   - Endpoint fetches current prices from CoinGecko
+   - Compares prices against TP1, TP2, SL for BUY/SELL signals
+   - Calculates PnL percentage
+   - Auto-expires signals based on timeframe (1h/4h: 24h, daily: 7 days)
+   - Added "Évaluer les signaux" button in SignalsPage.jsx
+   - Added evaluation results display panel
+
+### Credentials for Testing:
+- Email: coachdigitalparis@gmail.com
+- Password: $$Reussite888!!
+
+### Tasks to Test:
+1. **Emoji Replacement (P0)**: 
+   - Check Dashboard page - Fear & Greed should show icon not emoji
+   - Check Intelligence page - Fear & Greed history should show Gauge icon
+   - Check Settings page - Warning should show AlertTriangle icon
+   - Check Signals page - Status badges should have icons
+
+2. **Signal Evaluation (P1)**:
+   - Navigate to Signals page
+   - Click "Évaluer les signaux" button
+   - Should show evaluation results panel
+   - Check unrealized PnL calculation
+
+### test_plan:
+  needs_retesting: true
+  test_priority: "high_first"
+
+### agent_communication:
+  - agent: "main"
+  - message: "Completed P0 (emoji replacement) and P1 (signal evaluation). Ready for testing."
