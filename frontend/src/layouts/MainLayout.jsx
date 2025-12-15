@@ -128,9 +128,11 @@ export default function MainLayout() {
             {/* Logo */}
             <div className="h-16 flex items-center justify-between px-4 border-b border-white/5">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center glow-primary">
-                  <TrendingUp className="w-6 h-6 text-black" />
-                </div>
+                <img 
+                  src="/logo.png" 
+                  alt="BULL SAGE" 
+                  className="w-10 h-10 rounded-xl object-contain"
+                />
                 <div>
                   <h1 className="font-bold text-lg font-manrope tracking-tight">BULL SAGE</h1>
                   <p className="text-xs text-muted-foreground">Trading Assistant</p>
