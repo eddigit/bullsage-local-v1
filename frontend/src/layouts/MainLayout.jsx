@@ -39,6 +39,7 @@ const navigation = [
 
 const adminNavigation = [
   { name: "Administration", href: "/admin", icon: Shield, admin: true },
+  { name: "Clés API", href: "/admin/api-keys", icon: Key, admin: true },
 ];
 
 export default function MainLayout() {
