@@ -14,7 +14,8 @@ import {
   X,
   ChevronRight,
   Zap,
-  Shield
+  Shield,
+  Key
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { ScrollArea } from "../components/ui/scroll-area";
