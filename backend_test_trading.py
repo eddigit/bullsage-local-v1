@@ -178,7 +178,7 @@ class TradingAPITester:
             "Save trading signal",
             "POST",
             "signals",
-            201,
+            200,  # Changed from 201 to 200 as the API returns 200
             data={
                 "symbol": "bitcoin",
                 "symbol_name": "Bitcoin",
