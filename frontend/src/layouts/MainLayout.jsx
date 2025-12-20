@@ -315,7 +315,7 @@ export default function MainLayout() {
       <Sheet open={moreMenuOpen} onOpenChange={setMoreMenuOpen}>
         <SheetContent side="bottom" className="bg-background/95 backdrop-blur-xl border-t border-white/10 rounded-t-3xl pb-8">
           <SheetHeader className="pb-4">
-            <SheetTitle className="text-left">Plus d'options</SheetTitle>
+            <SheetTitle className="text-left">Plus d&apos;options</SheetTitle>
           </SheetHeader>
           
           <div className="grid grid-cols-4 gap-4 mb-6">
