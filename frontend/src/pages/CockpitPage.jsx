@@ -156,11 +156,9 @@ export default function CockpitPage() {
       setLoading(false);
     };
     init();
-    
-    // Check alerts every 30 seconds
-    const interval = setInterval(checkAlerts, 30000);
-    return () => clearInterval(interval);
-  }, [checkAlerts]);
+    // Note: Auto-check disabled to prevent API rate limiting
+    // User can manually check alerts with the "Vérifier" button
+  }, []);
 
   const handleCreateAlert = async () => {
     if (!newAlert.symbol || !newAlert.value) {
