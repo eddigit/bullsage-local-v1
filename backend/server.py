@@ -2074,19 +2074,26 @@ def analyze_candlestick_patterns(prices: List[float]) -> Dict[str, Any]:
     
     return {"pattern": pattern, "signal": signal}
 
-def generate_trading_recommendation(indicators: Dict) -> Dict[str, Any]:
-    """Generate trading recommendation based on all indicators"""
+def generate_trading_recommendation(indicators: Dict, current_price: float = None, market_data: Dict = None) -> Dict[str, Any]:
+    """Generate professional trading recommendation based on all indicators with entry/exit levels"""
     score = 0
     reasons = []
+    risk_factors = []
     
-    # RSI Analysis
+    # RSI Analysis (Weight: 2)
     rsi = indicators.get("rsi", 50)
-    if rsi < 30:
+    if rsi < 25:
+        score += 3
+        reasons.append(f"🔥 RSI extrême ({rsi}) - Forte survente, rebond probable")
+    elif rsi < 30:
         score += 2
         reasons.append(f"RSI en survente ({rsi}) - Signal d'achat")
     elif rsi < 40:
         score += 1
         reasons.append(f"RSI bas ({rsi}) - Potentiel de rebond")
+    elif rsi > 75:
+        score -= 3
+        reasons.append(f"🔥 RSI extrême ({rsi}) - Fort surachat, correction probable")
     elif rsi > 70:
         score -= 2
         reasons.append(f"RSI en surachat ({rsi}) - Signal de vente")
@@ -2094,66 +2101,155 @@ def generate_trading_recommendation(indicators: Dict) -> Dict[str, Any]:
         score -= 1
         reasons.append(f"RSI élevé ({rsi}) - Prudence")
     
-    # MACD Analysis
+    # RSI Divergence (bonus points)
+    if 30 < rsi < 40:
+        score += 0.5
+        reasons.append("RSI en zone d'accumulation")
+    
+    # MACD Analysis (Weight: 1.5)
     macd = indicators.get("macd", {})
+    histogram = macd.get("histogram", 0)
     if macd.get("trend") == "bullish":
-        score += 1
-        reasons.append("MACD haussier - Momentum positif")
+        score += 1.5
+        if histogram > 0:
+            reasons.append(f"MACD haussier avec histogramme positif (+{histogram:.4f})")
+        else:
+            reasons.append("MACD haussier - Momentum en construction")
     elif macd.get("trend") == "bearish":
-        score -= 1
-        reasons.append("MACD baissier - Momentum négatif")
+        score -= 1.5
+        if histogram < 0:
+            reasons.append(f"MACD baissier avec histogramme négatif ({histogram:.4f})")
+        else:
+            reasons.append("MACD baissier - Pression vendeuse")
     
-    # Bollinger Analysis
+    # Bollinger Analysis (Weight: 2)
     bb = indicators.get("bollinger", {})
-    if bb.get("position") == "oversold":
-        score += 2
-        reasons.append("Prix sur bande inférieure Bollinger - Survente")
-    elif bb.get("position") == "overbought":
-        score -= 2
-        reasons.append("Prix sur bande supérieure Bollinger - Surachat")
+    bb_position = bb.get("position", "middle")
+    if bb_position == "oversold":
+        score += 2.5
+        reasons.append("💰 Prix sur bande inférieure Bollinger - Zone d'achat optimale")
+    elif bb_position == "lower_half":
+        score += 1
+        reasons.append("Prix dans la moitié inférieure des Bollinger")
+    elif bb_position == "overbought":
+        score -= 2.5
+        reasons.append("⚠️ Prix sur bande supérieure Bollinger - Zone de prise de profits")
+        risk_factors.append("Prix en extension sur les Bollinger")
+    elif bb_position == "upper_half":
+        score -= 1
+        reasons.append("Prix dans la moitié supérieure des Bollinger")
     
-    # MA Trend
+    # MA Trend Analysis (Weight: 2)
     ma = indicators.get("moving_averages", {})
     trend = ma.get("trend", "neutral")
     if trend == "strong_bullish":
-        score += 2
-        reasons.append("Tendance fortement haussière (MA20 > MA50 > MA200)")
+        score += 2.5
+        reasons.append("🚀 Tendance fortement haussière (Golden Cross: MA20 > MA50 > MA200)")
     elif trend == "bullish":
-        score += 1
-        reasons.append("Tendance haussière")
+        score += 1.5
+        reasons.append("Tendance haussière confirmée")
     elif trend == "strong_bearish":
-        score -= 2
-        reasons.append("Tendance fortement baissière (MA20 < MA50 < MA200)")
+        score -= 2.5
+        reasons.append("⛔ Tendance fortement baissière (Death Cross: MA20 < MA50 < MA200)")
+        risk_factors.append("Marché en tendance baissière confirmée")
     elif trend == "bearish":
-        score -= 1
+        score -= 1.5
         reasons.append("Tendance baissière")
     
-    # Candlestick patterns
-    candles = indicators.get("candlesticks", {})
-    if candles.get("signal") == "bullish" or candles.get("signal") == "bullish_reversal":
-        score += 1
-        reasons.append(f"Pattern chandelier: {candles.get('pattern')} - Haussier")
-    elif candles.get("signal") == "bearish" or candles.get("signal") == "bearish_reversal":
-        score -= 1
-        reasons.append(f"Pattern chandelier: {candles.get('pattern')} - Baissier")
+    # Support/Resistance Proximity
+    sr = indicators.get("support_resistance", {})
+    support = sr.get("support", 0)
+    resistance = sr.get("resistance", 0)
+    current = sr.get("current", current_price or 0)
     
-    # Generate recommendation
-    if score >= 4:
+    if current and support and resistance:
+        range_size = resistance - support
+        if range_size > 0:
+            position_in_range = (current - support) / range_size
+            if position_in_range < 0.2:  # Near support
+                score += 1.5
+                reasons.append(f"🎯 Prix proche du support ({support:.2f}) - Zone d'achat")
+            elif position_in_range > 0.8:  # Near resistance
+                score -= 1
+                reasons.append(f"Prix proche de la résistance ({resistance:.2f})")
+                risk_factors.append("Risque de rejet sur résistance")
+    
+    # Candlestick patterns (Weight: 1)
+    candles = indicators.get("candlesticks", {})
+    candle_signal = candles.get("signal", "neutral")
+    candle_pattern = candles.get("pattern", "")
+    if candle_signal in ["bullish", "bullish_reversal"]:
+        score += 1.5
+        pattern_name = candle_pattern.replace("_", " ").title()
+        reasons.append(f"📊 Pattern: {pattern_name} - Signal haussier")
+    elif candle_signal in ["bearish", "bearish_reversal"]:
+        score -= 1.5
+        pattern_name = candle_pattern.replace("_", " ").title()
+        reasons.append(f"📊 Pattern: {pattern_name} - Signal baissier")
+    
+    # Volume analysis from market data
+    if market_data:
+        vol_change = market_data.get("total_volume_change_24h", 0)
+        if vol_change > 50:
+            score += 0.5
+            reasons.append(f"📈 Volume en hausse de {vol_change:.0f}% - Intérêt croissant")
+        elif vol_change < -30:
+            risk_factors.append("Volume en baisse - Prudence sur la force du mouvement")
+    
+    # Generate entry/exit levels
+    entry_price = current_price or sr.get("current", 0)
+    
+    # Calculate Stop Loss and Take Profits based on support/resistance and volatility
+    if score >= 2:  # Buy signal
+        stop_loss = min(support * 0.98, entry_price * 0.95) if support else entry_price * 0.95
+        take_profit_1 = entry_price * 1.05  # 5% gain
+        take_profit_2 = min(resistance * 0.98, entry_price * 1.12) if resistance else entry_price * 1.12
+    elif score <= -2:  # Sell signal
+        stop_loss = max(resistance * 1.02, entry_price * 1.05) if resistance else entry_price * 1.05
+        take_profit_1 = entry_price * 0.95  # 5% gain on short
+        take_profit_2 = max(support * 1.02, entry_price * 0.88) if support else entry_price * 0.88
+    else:
+        stop_loss = entry_price * 0.95
+        take_profit_1 = entry_price * 1.05
+        take_profit_2 = entry_price * 1.10
+    
+    # Risk/Reward calculation
+    if score >= 2:
+        risk = abs(entry_price - stop_loss)
+        reward = abs(take_profit_1 - entry_price)
+        risk_reward = reward / risk if risk > 0 else 0
+    elif score <= -2:
+        risk = abs(stop_loss - entry_price)
+        reward = abs(entry_price - take_profit_1)
+        risk_reward = reward / risk if risk > 0 else 0
+    else:
+        risk_reward = 0
+    
+    # Generate final recommendation
+    if score >= 5:
         action = "STRONG_BUY"
         confidence = "high"
-        message = "🟢 ACHAT FORT recommandé"
+        message = "🟢🟢 ACHAT FORT - Excellente opportunité!"
+    elif score >= 3:
+        action = "BUY"
+        confidence = "high"
+        message = "🟢 ACHAT recommandé - Signal fort"
     elif score >= 2:
         action = "BUY"
         confidence = "medium"
-        message = "🟢 ACHAT recommandé"
-    elif score <= -4:
+        message = "🟢 ACHAT possible - Signal modéré"
+    elif score <= -5:
         action = "STRONG_SELL"
         confidence = "high"
-        message = "🔴 VENTE FORTE recommandée"
+        message = "🔴🔴 VENTE FORTE - Signal de sortie!"
+    elif score <= -3:
+        action = "SELL"
+        confidence = "high"
+        message = "🔴 VENTE recommandée - Signal fort"
     elif score <= -2:
         action = "SELL"
         confidence = "medium"
-        message = "🔴 VENTE recommandée"
+        message = "🔴 VENTE possible - Signal modéré"
     else:
         action = "WAIT"
         confidence = "low"
@@ -2163,8 +2259,16 @@ def generate_trading_recommendation(indicators: Dict) -> Dict[str, Any]:
         "action": action,
         "confidence": confidence,
         "message": message,
-        "score": score,
-        "reasons": reasons
+        "score": round(score, 1),
+        "reasons": reasons,
+        "risk_factors": risk_factors,
+        "levels": {
+            "entry": round(entry_price, 6) if entry_price < 1 else round(entry_price, 2),
+            "stop_loss": round(stop_loss, 6) if stop_loss < 1 else round(stop_loss, 2),
+            "take_profit_1": round(take_profit_1, 6) if take_profit_1 < 1 else round(take_profit_1, 2),
+            "take_profit_2": round(take_profit_2, 6) if take_profit_2 < 1 else round(take_profit_2, 2)
+        },
+        "risk_reward_ratio": round(risk_reward, 2)
     }
 
 class TradingAnalysisRequest(BaseModel):
