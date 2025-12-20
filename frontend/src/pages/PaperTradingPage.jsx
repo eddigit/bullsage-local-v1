@@ -510,6 +510,142 @@ export default function PaperTradingPage() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="stats">
+          <div className="space-y-4">
+            {/* Performance Overview */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card className="glass border-white/5">
+                <CardContent className="pt-4 pb-4 text-center">
+                  <p className="text-xs text-muted-foreground">Trades Total</p>
+                  <p className="text-2xl font-bold font-mono">{tradingStats?.total_trades || 0}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {tradingStats?.buy_trades || 0} achats / {tradingStats?.sell_trades || 0} ventes
+                  </p>
+                </CardContent>
+              </Card>
+              
+              <Card className="glass border-white/5">
+                <CardContent className="pt-4 pb-4 text-center">
+                  <p className="text-xs text-muted-foreground">Volume Total</p>
+                  <p className="text-2xl font-bold font-mono">{formatPrice(tradingStats?.total_volume || 0)}</p>
+                </CardContent>
+              </Card>
+              
+              <Card className={`glass border-2 ${(tradingStats?.total_pnl || 0) >= 0 ? "border-emerald-500/30" : "border-rose-500/30"}`}>
+                <CardContent className="pt-4 pb-4 text-center">
+                  <p className="text-xs text-muted-foreground">P&L Total</p>
+                  <p className={`text-2xl font-bold font-mono ${(tradingStats?.total_pnl || 0) >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                    {(tradingStats?.total_pnl || 0) >= 0 ? "+" : ""}{formatPrice(tradingStats?.total_pnl || 0)}
+                  </p>
+                  <p className={`text-xs font-mono ${(tradingStats?.total_pnl_percent || 0) >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                    {(tradingStats?.total_pnl_percent || 0) >= 0 ? "+" : ""}{(tradingStats?.total_pnl_percent || 0).toFixed(2)}%
+                  </p>
+                </CardContent>
+              </Card>
+              
+              <Card className="glass border-white/5">
+                <CardContent className="pt-4 pb-4 text-center">
+                  <p className="text-xs text-muted-foreground">Valeur Portfolio</p>
+                  <p className="text-2xl font-bold font-mono">{formatPrice(tradingStats?.portfolio_value || 10000)}</p>
+                </CardContent>
+              </Card>
+            </div>
+            
+            {/* Best/Worst & Most Traded */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="glass border-white/5">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <ArrowUpRight className="w-4 h-4 text-emerald-500" />
+                    Meilleur Trade
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {tradingStats?.best_trade ? (
+                    <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                      <p className="font-medium">{tradingStats.best_trade.symbol}</p>
+                      <p className="text-lg font-mono text-emerald-500">
+                        +{formatPrice(tradingStats.best_trade.pnl)} ({tradingStats.best_trade.pnl_percent}%)
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Aucun trade réalisé</p>
+                  )}
+                </CardContent>
+              </Card>
+              
+              <Card className="glass border-white/5">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <ArrowDownRight className="w-4 h-4 text-rose-500" />
+                    Pire Trade
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {tradingStats?.worst_trade ? (
+                    <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20">
+                      <p className="font-medium">{tradingStats.worst_trade.symbol}</p>
+                      <p className="text-lg font-mono text-rose-500">
+                        {formatPrice(tradingStats.worst_trade.pnl)} ({tradingStats.worst_trade.pnl_percent}%)
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Aucun trade réalisé</p>
+                  )}
+                </CardContent>
+              </Card>
+              
+              <Card className="glass border-white/5">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-primary" />
+                    Crypto Favorite
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {tradingStats?.most_traded ? (
+                    <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
+                      <p className="font-medium capitalize">{tradingStats.most_traded.replace("-", " ")}</p>
+                      <p className="text-sm text-muted-foreground">La plus tradée</p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Aucun trade</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+            
+            {/* Recent Activity */}
+            <Card className="glass border-white/5">
+              <CardHeader>
+                <CardTitle className="text-lg">Activité Récente</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {tradingStats?.trading_history?.length > 0 ? (
+                  <div className="space-y-2">
+                    {tradingStats.trading_history.map((trade, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-white/5">
+                        <div className="flex items-center gap-3">
+                          <Badge className={trade.type === "buy" ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"}>
+                            {trade.type === "buy" ? "ACHAT" : "VENTE"}
+                          </Badge>
+                          <span className="font-medium capitalize">{trade.symbol.replace("-", " ")}</span>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-mono">{formatPrice(trade.value)}</p>
+                          <p className="text-xs text-muted-foreground">{trade.timestamp}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center text-muted-foreground py-8">Aucune activité récente</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
         <TabsContent value="history">
           <Card className="glass border-white/5">
             <CardHeader>
