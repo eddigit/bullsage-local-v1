@@ -408,6 +408,10 @@ export default function PaperTradingPage() {
             <Wallet className="w-4 h-4 mr-2" />
             Portfolio
           </TabsTrigger>
+          <TabsTrigger value="stats" className="data-[state=active]:bg-primary data-[state=active]:text-black">
+            <PieChart className="w-4 h-4 mr-2" />
+            Stats
+          </TabsTrigger>
           <TabsTrigger value="history" className="data-[state=active]:bg-primary data-[state=active]:text-black">
             <History className="w-4 h-4 mr-2" />
             Historique
