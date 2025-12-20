@@ -3268,13 +3268,13 @@ async def complete_lesson(lesson_id: str, current_user: dict = Depends(get_curre
     """Mark a lesson as complete and earn XP"""
     # Find the lesson
     lesson = None
-    found_module = None
     for m in ALL_ACADEMY_MODULES:
         for les in m["lessons"]:
             if les["id"] == lesson_id:
                 lesson = les
-                found_module = m
                 break
+        if lesson:
+            break
     
     if not lesson:
         raise HTTPException(status_code=404, detail="Lesson not found")
