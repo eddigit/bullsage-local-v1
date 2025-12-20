@@ -498,6 +498,7 @@ class BullSageAPITester:
         self.test_alerts()
         self.test_strategies()
         self.test_settings()
+        self.test_smart_invest()  # Add Smart Invest tests
         
         # Admin tests (if admin login successful)
         if admin_login_success:
