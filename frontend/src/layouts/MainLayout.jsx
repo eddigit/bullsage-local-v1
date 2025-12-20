@@ -35,7 +35,8 @@ import {
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Cockpit", href: "/cockpit", icon: Sun, highlight: true },
+  { name: "Académie", href: "/academy", icon: GraduationCap, highlight: true },
+  { name: "Cockpit", href: "/cockpit", icon: Sun },
   { name: "Mode Trading", href: "/trading", icon: Crosshair },
   { name: "Journal", href: "/journal", icon: BookOpen },
   { name: "Mes Signaux", href: "/signals", icon: Signal },
