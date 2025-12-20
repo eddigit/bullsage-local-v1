@@ -322,3 +322,45 @@
 ### agent_communication:
   - agent: "main"
   - message: "Completed comprehensive linting fixes. All backend (20) and frontend (52) errors resolved. App functionality verified."
+
+## Test Session: 2025-12-20 12:55
+### Implementation: Performance Tracking & AI Improvements
+
+**Changes Made:**
+
+1. **Backend - Enhanced Signal Stats** (`/api/signals/stats`):
+   - Added `total_pnl`, `avg_win`, `avg_loss`
+   - Added `profit_factor` (gross_profit / gross_loss)
+   - Added `best_signal`, `worst_signal` tracking
+   - Added `current_streak`, `max_streak`
+   - Added `monthly_performance` (last 6 months)
+   - Added `win_rate` per symbol and timeframe
+   - Added P&L per symbol tracking
+
+2. **Backend - Enhanced Trading Recommendation** (`generate_trading_recommendation`):
+   - Added entry/exit levels (entry, stop_loss, TP1, TP2)
+   - Added risk/reward ratio calculation
+   - Added risk_factors array
+   - Improved scoring algorithm (weighted indicators)
+   - Added volume analysis
+   - Added support/resistance proximity analysis
+
+3. **Frontend - Enhanced SignalsPage.jsx**:
+   - Added 6-column main stats row (Total, Active, Wins, Losses, Win Rate, P&L)
+   - Added 4-column advanced metrics (Profit Factor, Avg Win, Avg Loss, Streak)
+   - Added Best/Worst signals card
+   - Added Performance by Asset card with per-symbol stats
+
+**Files Modified:**
+- `/app/backend/server.py` - Enhanced signal stats and trading recommendation
+- `/app/frontend/src/pages/SignalsPage.jsx` - New performance dashboard
+
+**Verification:**
+- ✅ Backend restart successful
+- ✅ Signal stats API returns new metrics
+- ✅ Frontend displays new Performance Dashboard
+- ✅ Trading Mode page loads with market context
+
+### test_plan:
+  needs_retesting: true
+  test_priority: "high_first"
