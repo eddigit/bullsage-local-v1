@@ -422,6 +422,53 @@ class BullSageAPITester:
         success, _ = self.run_test("Update Trading Level", "PUT", "settings/trading-level?level=intermediate", 200)
         return success
 
+    def test_smart_invest(self):
+        """Test Smart Invest endpoints"""
+        self.log("=== SMART INVEST TESTS ===")
+        
+        # Test market analysis
+        analysis_data = {
+            "investment_amount": 100.0
+        }
+        success1, analysis_response = self.run_test("Smart Invest Analysis", "POST", "smart-invest/analyze", 200, analysis_data)
+        
+        # Test with invalid amount (too low)
+        invalid_data = {
+            "investment_amount": 5.0
+        }
+        success2, error_response = self.run_test("Smart Invest Invalid Amount", "POST", "smart-invest/analyze", 200, invalid_data)
+        
+        # Check if error response contains expected error message
+        if success2 and error_response.get("error"):
+            self.log("✅ Correctly handled invalid amount")
+        else:
+            self.log("❌ Should return error for amount < 10€")
+            self.failed_tests.append({
+                "test": "Smart Invest Invalid Amount Validation",
+                "error": "Should return error for amount < 10€",
+                "endpoint": "smart-invest/analyze"
+            })
+        
+        # Test execution if analysis was successful
+        execution_success = False
+        if success1 and analysis_response and not analysis_response.get("error"):
+            execute_data = {
+                "coin_id": analysis_response.get("coin_id", "bitcoin"),
+                "amount_usd": 50.0,
+                "entry_price": analysis_response.get("current_price", 50000)
+            }
+            execution_success, _ = self.run_test("Smart Invest Execute", "POST", "smart-invest/execute", 200, execute_data)
+        else:
+            # If analysis failed, test with fallback data
+            execute_data = {
+                "coin_id": "bitcoin",
+                "amount_usd": 50.0,
+                "entry_price": 50000
+            }
+            execution_success, _ = self.run_test("Smart Invest Execute (Fallback)", "POST", "smart-invest/execute", 200, execute_data)
+        
+        return success1 and execution_success
+
     def run_all_tests(self):
         """Run all test suites"""
         self.log("🚀 Starting BULL SAGE API Tests")
