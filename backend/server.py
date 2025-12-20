@@ -1519,6 +1519,7 @@ Explique pourquoi en 3-4 points clés maximum.
     try:
         chat = LlmChat(
             api_key=EMERGENT_LLM_KEY,
+            session_id=f"trading_analysis_{current_user['id']}_{datetime.now().strftime('%Y%m%d%H%M')}",
             system_message=f"""Tu es BULL, un trader professionnel expert avec 20 ans d'expérience.
 Tu analyses les marchés crypto avec précision et donnes des conseils actionnables.
 Style de trading demandé: {trading_style}
