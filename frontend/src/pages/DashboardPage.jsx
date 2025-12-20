@@ -371,6 +371,19 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
           </Button>
+          <Button
+            onClick={scanOpportunities}
+            disabled={scanning}
+            className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700"
+            data-testid="scan-btn"
+          >
+            {scanning ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Search className="w-4 h-4 mr-2" />
+            )}
+            <span className="hidden sm:inline">Scanner</span>
+          </Button>
         </div>
       </div>
 
