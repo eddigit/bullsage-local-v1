@@ -1,141 +1,142 @@
 {
-  "identity": {
+  "brand_identity": {
     "name": "BULL SAGE",
-    "persona": "The Intelligent Architect",
-    "vibe": "Professional, High-Frequency, Precision, Trustworthy",
-    "principles": [
-      "Fusion over Imitation: Mix Institutional Finance reliability with Web3 innovation.",
-      "Data is Art: Charts and metrics are the heroes. Treat them like museum pieces.",
-      "Dark Mode Default: Traders live in the dark. Optimize for low eye strain but high alertness.",
-      "The 'Sage' Presence: The AI is not a chatbot; it's a co-pilot. It lives in the UI, not just a drawer."
-    ]
+    "tagline": "Trade Smart. Learn Fast.",
+    "persona": "The Neon Bloomberg",
+    "description": "A fusion of high-frequency trading terminal precision and the addictive progression of a video game. Dark, sleek, and punctuated by neon signals.",
+    "emotional_tone": "Empowering, Futuristic, Sharp, Gamified",
+    "design_archetype": "Electric & Neon (Future, Speed, Disruption)"
   },
-  "typography": {
-    "fonts": {
-      "heading": "Manrope",
-      "body": "Inter",
-      "mono": "JetBrains Mono"
+  "design_system": {
+    "colors": {
+      "primary": {
+        "name": "Emerald Signal",
+        "hex": "#10b981",
+        "usage": "Primary Actions, Bull Market, Success States",
+        "tailwind": "bg-emerald-500 text-white"
+      },
+      "secondary": {
+        "name": "Cyber Violet",
+        "hex": "#8b5cf6",
+        "usage": "AI Assistant, Academy Progress, Premium Features",
+        "tailwind": "bg-violet-500 text-white"
+      },
+      "accent": {
+        "name": "Acid Lime",
+        "hex": "#bef264",
+        "usage": "New Notifications, High Priority Alerts, 'Pop' Elements",
+        "tailwind": "bg-lime-400 text-black"
+      },
+      "danger": {
+        "name": "Bear Rose",
+        "hex": "#f43f5e",
+        "usage": "Sell Actions, Bear Market, Errors",
+        "tailwind": "bg-rose-500 text-white"
+      },
+      "background": {
+        "base": "#050505",
+        "surface": "#0f0f10",
+        "glass": "rgba(15, 15, 16, 0.7)"
+      }
     },
-    "weights": {
-      "heading": "font-bold tracking-tight",
-      "body": "font-normal",
-      "mono": "font-medium"
+    "typography": {
+      "headings": {
+        "family": "Manrope, sans-serif",
+        "weights": ["700", "800"],
+        "tracking": "tracking-tight",
+        "usage": "Page Titles, Section Headers, Big Stats"
+      },
+      "body": {
+        "family": "Inter, sans-serif",
+        "weights": ["400", "500"],
+        "usage": "General Text, Descriptions"
+      },
+      "mono": {
+        "family": "JetBrains Mono, monospace",
+        "usage": "Prices, Tickers, Wallet Addresses, Code Snippets"
+      }
     },
-    "sizes": {
-      "h1": "text-4xl md:text-6xl lg:text-7xl",
-      "h2": "text-3xl md:text-4xl",
-      "h3": "text-2xl md:text-3xl",
-      "body": "text-base leading-relaxed",
-      "small": "text-sm text-muted-foreground",
-      "tiny": "text-xs uppercase tracking-widest"
+    "spacing": {
+      "scale": "Generous (2x standard)",
+      "container_padding": "p-6 md:p-8",
+      "section_gap": "gap-8 md:gap-12",
+      "touch_target": "min-h-[44px] min-w-[44px]"
     },
-    "installation": "Import fonts via Google Fonts in index.css: @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Manrope:wght@400;500;700;800&display=swap');"
-  },
-  "colors": {
-    "palette": {
-      "background": "#09090B",
-      "foreground": "#FAFAFA",
-      "card": "rgba(9, 9, 11, 0.6)",
-      "card_border": "rgba(255, 255, 255, 0.08)",
-      "primary": "#10B981",
-      "primary_foreground": "#000000",
-      "secondary": "#27272A",
-      "secondary_foreground": "#FAFAFA",
-      "accent": "#8B5CF6",
-      "accent_gradient": "linear-gradient(135deg, #8B5CF6 0%, #D946EF 100%)",
-      "destructive": "#F43F5E",
-      "success": "#10B981",
-      "warning": "#F59E0B",
-      "info": "#3B82F6"
-    },
-    "usage": {
-      "bull": "text-emerald-500",
-      "bear": "text-rose-500",
-      "sage": "bg-gradient-to-r from-violet-500 to-fuchsia-500 bg-clip-text text-transparent",
-      "glass": "bg-black/40 backdrop-blur-xl border border-white/10"
-    }
-  },
-  "visual_enhancers": {
-    "glassmorphism": {
-      "default": "bg-background/60 backdrop-blur-lg border border-border/50",
-      "heavy": "bg-background/80 backdrop-blur-xl border border-border",
-      "hover": "hover:bg-accent/10 transition-colors duration-300"
-    },
-    "borders": {
-      "subtle": "border border-white/5",
-      "active": "border border-primary/50",
-      "glow": "ring-1 ring-primary/20 shadow-[0_0_20px_rgba(16,185,129,0.1)]"
+    "radius": {
+      "default": "rounded-xl",
+      "button": "rounded-full (Pill shape)",
+      "card": "rounded-2xl"
     },
     "shadows": {
-      "card": "shadow-lg shadow-black/20",
-      "neon": "shadow-[0_0_15px_rgba(139,92,246,0.3)]"
+      "glow_primary": "0 0 20px rgba(16, 185, 129, 0.2)",
+      "glow_accent": "0 0 20px rgba(139, 92, 246, 0.3)",
+      "glass": "0 8px 32px 0 rgba(0, 0, 0, 0.37)"
     }
   },
-  "components": {
+  "ui_components": {
     "buttons": {
-      "primary": "bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_0_15px_rgba(16,185,129,0.4)] transition-all duration-300 font-manrope font-bold rounded-md",
-      "secondary": "bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-white/10 font-manrope font-medium rounded-md",
-      "ghost": "hover:bg-white/5 text-foreground/80 hover:text-foreground font-manrope font-medium rounded-md",
-      "outline": "border-2 border-primary/20 text-primary hover:border-primary hover:bg-primary/10 font-manrope font-bold rounded-md"
+      "primary": "bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-full shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all hover:scale-105 active:scale-95",
+      "secondary": "bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 rounded-full font-medium",
+      "ghost": "text-gray-400 hover:text-white hover:bg-white/5 rounded-lg"
     },
     "cards": {
-      "dashboard": "bg-card/50 backdrop-blur-md border border-white/5 rounded-xl p-6 hover:border-white/10 transition-colors",
-      "feature": "group relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/5 to-transparent p-8 hover:border-primary/30 transition-all duration-500"
+      "glass": "bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl",
+      "solid": "bg-[#0f0f10] border border-white/5 rounded-2xl",
+      "interactive": "group hover:border-emerald-500/30 transition-colors cursor-pointer"
     },
     "inputs": {
-      "default": "bg-black/20 border-white/10 focus:border-primary/50 focus:ring-1 focus:ring-primary/50 rounded-md font-mono text-sm placeholder:text-muted-foreground/50"
+      "default": "bg-black/20 border-white/10 focus:border-emerald-500/50 focus:ring-emerald-500/20 rounded-xl h-12"
+    },
+    "navigation": {
+      "bottom_bar": "fixed bottom-0 left-0 right-0 bg-black/80 backdrop-blur-lg border-t border-white/10 h-20 pb-4 pt-2 z-50 flex justify-around items-center"
     }
   },
-  "grids": {
-    "dashboard": "grid grid-cols-1 md:grid-cols-12 gap-4 p-4 md:p-6",
-    "marketing": "grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-12 px-4 md:px-12 max-w-7xl mx-auto"
-  },
-  "layout_strategies": {
-    "dashboard_view": {
-      "sidebar": "w-64 border-r border-white/5 bg-black/40 backdrop-blur-xl hidden md:flex flex-col fixed h-full z-50",
-      "main_content": "md:ml-64 min-h-screen bg-background",
-      "header": "h-16 border-b border-white/5 bg-background/80 backdrop-blur-md sticky top-0 z-40 flex items-center px-6 justify-between"
+  "layouts": {
+    "dashboard_bento": {
+      "wrapper": "grid grid-cols-1 md:grid-cols-4 gap-4 p-4 pb-24",
+      "hero_cell": "col-span-1 md:col-span-2 row-span-1 bg-gradient-to-br from-emerald-900/20 to-black border border-emerald-500/20",
+      "list_cell": "col-span-1 md:col-span-2 row-span-2 h-[400px] overflow-hidden"
+    },
+    "academy_path": {
+      "wrapper": "flex flex-col gap-8 p-6 pb-32 relative",
+      "connector": "absolute left-8 top-0 bottom-0 w-1 bg-gradient-to-b from-emerald-500 via-violet-500 to-transparent opacity-20",
+      "node": "relative z-10 ml-8"
     }
   },
-  "motion": {
-    "transitions": "transition-all duration-300 ease-out",
-    "hover_lift": "hover:-translate-y-1 hover:shadow-lg",
-    "page_enter": "animate-in fade-in slide-in-from-bottom-4 duration-500",
-    "list_stagger": "stagger-children"
+  "assets": {
+    "images": {
+      "splash_hero": {
+        "url": "https://images.unsplash.com/photo-1764258560163-198782335017?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzl8MHwxfHNlYXJjaHwxfHxmdXR1cmlzdGljJTIwYWJzdHJhY3QlMjBuZW9uJTIwZmluYW5jZSUyMGJhY2tncm91bmQlMjBkYXJrJTIwbW9kZXxlbnwwfHx8fDE3NjYyMjc0MzV8MA&ixlib=rb-4.1.0&q=85",
+        "alt": "Abstract Neon Finance Background",
+        "usage": "Splash Screen, Auth Background, Hero Section Overlay"
+      },
+      "ai_avatar": {
+        "url": "https://images.unsplash.com/photo-1659018966820-de07c94e0d01?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3MjQyMTd8MHwxfHNlYXJjaHwxfHwzZCUyMGN1dGUlMjByb2JvdCUyMG1hc2NvdCUyMGZ1dHVyaXN0aWMlMjBoaWdoJTIwcXVhbGl0eXxlbnwwfHx8fDE3NjYyMjc0Mzh8MA&ixlib=rb-4.1.0&q=85",
+        "alt": "3D Robot Assistant",
+        "usage": "AI Cockpit, Chat Interface, Onboarding Guide"
+      },
+      "level_up_bg": {
+        "url": "https://images.unsplash.com/photo-1680448589316-06be74f4651d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3MjQyMTd8MHwxfHNlYXJjaHwxfHwzZCUyMGZsb2F0aW5nJTIwZ29sZCUyMGNvaW4lMjB0cm9waHklMjByb2NrZXQlMjBpY29ufGVufDB8fHx8MTc2NjIyNzQ0MXww&ixlib=rb-4.1.0&q=85",
+        "alt": "Abstract Golden Spiral",
+        "usage": "Academy Level Up Modal, Premium Feature Background"
+      }
+    },
+    "icons": {
+      "library": "lucide-react",
+      "style": "Stroke width 1.5px, rounded corners"
+    }
   },
-  "image_urls": {
-    "hero_background": "https://images.pexels.com/photos/5949262/pexels-photo-5949262.jpeg",
-    "ai_assistant_avatar": "https://images.pexels.com/photos/8728559/pexels-photo-8728559.jpeg",
-    "market_abstract": "https://images.pexels.com/photos/5977664/pexels-photo-5977664.jpeg",
-    "neural_network": "https://images.pexels.com/photos/7789851/pexels-photo-7789851.jpeg"
-  },
-  "instructions_to_main_agent": [
-    "1. THEME ENFORCEMENT: The app is DARK MODE ONLY. Do not implement a light mode toggle unless explicitly asked. The 'light' is the data glowing against the void.",
-    "2. FONT USAGE: Use 'Manrope' for all headings (h1-h6). Use 'JetBrains Mono' for ALL numbers, prices, tickers, and code snippets. Use 'Inter' for paragraphs.",
-    "3. AI INTEGRATION: The 'BULL SAGE' assistant should not just be a chat page. It should be a floating action button (FAB) or a persistent sidebar available on ALL pages.",
-    "4. CHART STYLING: When using Recharts, remove grid lines (or make them 5% opacity). Use gradients for area charts. Tooltips must be dark glass.",
-    "5. DATA DENSITY: In the dashboard, avoid whitespace. Use borders and background shades to separate data. It's a cockpit, not a blog.",
-    "6. NAVIGATION: Sidebar for Desktop, Bottom Tab Bar for Mobile. This is a standard app pattern.",
-    "7. GLASSMORPHISM: Use the 'glass' utility class defined in colors.usage for all overlays, modals, and sticky headers."
+  "universal_guidelines": [
+    "FILE EXTENSION: Use .js or .jsx for all React files. DO NOT use .ts or .tsx.",
+    "NO TYPESCRIPT: Do not include interfaces or type definitions in the code.",
+    "MOBILE FIRST: Always design for 375px width first, then scale up.",
+    "TOUCH TARGETS: Ensure all interactive elements are at least 44x44px.",
+    "DARK MODE ONLY: The app is strictly dark mode. Do not implement light mode toggles.",
+    "GLASSMORPHISM: Use the .glass utility class for overlays, modals, and the bottom navigation bar.",
+    "DATA-TESTID: All interactive elements must have a data-testid attribute (e.g., data-testid='trade-button').",
+    "NO SCROLLBARS: Hide scrollbars in horizontal lists but allow scrolling (scrollbar-hide utility).",
+    "TEXT CONTRAST: Ensure text is never pure white (#ffffff) on pure black. Use #f8fafc (slate-50) on #0f0f10.",
+    "ANIMATION: Use framer-motion for page transitions and complex interactions. Use CSS transitions for hover states."
   ],
-  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
-    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
-    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
-    "Create depth through layered design elements with z-index hierarchy.",
-    "Use glass-morphism effects with backdrop filters (12-24px blur).",
-    "You MUST NOT apply universal transition. Eg: transition: all. This results in breaking transforms. Always add transitions for specific interactive elements like button, input excluding transforms.",
-    "You MUST NOT center align the app container, ie do not add .App { text-align: center; } in the css file. This disrupts the human natural reading flow of text.",
-    "Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style.",
-    "NEVER: use AI assistant Emoji characters like 🤖🧠💭💡 etc for icons. Use Lucide React icons.",
-    "Every interaction needs micro-animations - hover states, transitions, parallax effects, and entrance animations. Static = dead.",
-    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
-    "Subtle grain textures, noise overlays, custom cursors, selection states, and loading animations: separates good from extraordinary.",
-    "Main agent relies on these image URLs. Missing categories (especially sponsor logos) = main agent will use placeholder text which is FORBIDDEN.",
-    "Prioritize using pre-existing components from src/components/ui when applicable.",
-    "Create new components that match the style and conventions of existing components when needed.",
-    "Examine existing components to understand the project's component patterns before creating new ones.",
-    "Components MUST use named exports (export const ComponentName = ...).",
-    "Pages MUST use default exports (export default function PageName() {...}).",
-    "Use sonner for toasts. Sonner component are located in /app/frontend/src/components/ui/sonner.jsx."
-  ]
+  "instructions_to_main_agent": "You are building the 'BULL SAGE' PWA. Focus on the 'Academy' and 'Dashboard' first. Use the provided image URLs for the respective sections. Implement the 'Bottom Navigation' as the primary navigation method. Ensure the 'AI Cockpit' feels distinct with the Violet color scheme. Use the 'Manrope' font for all headings to maintain brand consistency. When creating the 'Trading Mode', prioritize data density but keep it readable on mobile."
 }
