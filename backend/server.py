@@ -1024,6 +1024,498 @@ async def evaluate_signals(current_user: dict = Depends(get_current_user)):
         "results": results
     }
 
+# ============== TRADING EXPERT SYSTEM ==============
+
+def calculate_rsi(prices: List[float], period: int = 14) -> float:
+    """Calculate Relative Strength Index"""
+    if len(prices) < period + 1:
+        return 50.0  # Neutral if not enough data
+    
+    deltas = np.diff(prices)
+    gains = np.where(deltas > 0, deltas, 0)
+    losses = np.where(deltas < 0, -deltas, 0)
+    
+    avg_gain = np.mean(gains[-period:])
+    avg_loss = np.mean(losses[-period:])
+    
+    if avg_loss == 0:
+        return 100.0
+    
+    rs = avg_gain / avg_loss
+    rsi = 100 - (100 / (1 + rs))
+    return round(rsi, 2)
+
+def calculate_macd(prices: List[float]) -> Dict[str, float]:
+    """Calculate MACD (Moving Average Convergence Divergence)"""
+    if len(prices) < 26:
+        return {"macd": 0, "signal": 0, "histogram": 0}
+    
+    prices_arr = np.array(prices)
+    
+    # EMA 12
+    ema12 = prices_arr[-12:].mean()  # Simplified EMA
+    # EMA 26
+    ema26 = prices_arr[-26:].mean()
+    
+    macd_line = ema12 - ema26
+    signal_line = macd_line * 0.9  # Simplified signal
+    histogram = macd_line - signal_line
+    
+    return {
+        "macd": round(macd_line, 4),
+        "signal": round(signal_line, 4),
+        "histogram": round(histogram, 4),
+        "trend": "bullish" if histogram > 0 else "bearish"
+    }
+
+def calculate_bollinger_bands(prices: List[float], period: int = 20, std_dev: int = 2) -> Dict[str, float]:
+    """Calculate Bollinger Bands"""
+    if len(prices) < period:
+        current = prices[-1] if prices else 0
+        return {"upper": current * 1.02, "middle": current, "lower": current * 0.98, "position": "middle"}
+    
+    prices_arr = np.array(prices[-period:])
+    middle = np.mean(prices_arr)
+    std = np.std(prices_arr)
+    
+    upper = middle + (std_dev * std)
+    lower = middle - (std_dev * std)
+    current = prices[-1]
+    
+    # Determine position
+    if current >= upper:
+        position = "overbought"
+    elif current <= lower:
+        position = "oversold"
+    elif current > middle:
+        position = "upper_half"
+    else:
+        position = "lower_half"
+    
+    return {
+        "upper": round(upper, 2),
+        "middle": round(middle, 2),
+        "lower": round(lower, 2),
+        "current": round(current, 2),
+        "position": position
+    }
+
+def calculate_moving_averages(prices: List[float]) -> Dict[str, Any]:
+    """Calculate Moving Averages (MA 20, 50, 200)"""
+    result = {}
+    current = prices[-1] if prices else 0
+    
+    if len(prices) >= 20:
+        result["ma20"] = round(np.mean(prices[-20:]), 2)
+    else:
+        result["ma20"] = current
+        
+    if len(prices) >= 50:
+        result["ma50"] = round(np.mean(prices[-50:]), 2)
+    else:
+        result["ma50"] = current
+        
+    if len(prices) >= 200:
+        result["ma200"] = round(np.mean(prices[-200:]), 2)
+    else:
+        result["ma200"] = current
+    
+    # Trend analysis
+    if result["ma20"] > result["ma50"] > result["ma200"]:
+        result["trend"] = "strong_bullish"
+    elif result["ma20"] > result["ma50"]:
+        result["trend"] = "bullish"
+    elif result["ma20"] < result["ma50"] < result["ma200"]:
+        result["trend"] = "strong_bearish"
+    elif result["ma20"] < result["ma50"]:
+        result["trend"] = "bearish"
+    else:
+        result["trend"] = "neutral"
+    
+    return result
+
+def calculate_support_resistance(prices: List[float]) -> Dict[str, float]:
+    """Calculate Support and Resistance levels"""
+    if len(prices) < 10:
+        current = prices[-1] if prices else 0
+        return {"support": current * 0.95, "resistance": current * 1.05}
+    
+    prices_arr = np.array(prices)
+    
+    # Simple support/resistance based on recent highs/lows
+    recent = prices_arr[-50:] if len(prices_arr) >= 50 else prices_arr
+    
+    support = float(np.percentile(recent, 10))
+    resistance = float(np.percentile(recent, 90))
+    
+    return {
+        "support": round(support, 2),
+        "resistance": round(resistance, 2),
+        "current": round(prices[-1], 2)
+    }
+
+def analyze_candlestick_patterns(prices: List[float]) -> Dict[str, Any]:
+    """Analyze candlestick patterns (simplified)"""
+    if len(prices) < 5:
+        return {"pattern": "insufficient_data", "signal": "neutral"}
+    
+    recent = prices[-5:]
+    
+    # Simplified pattern detection
+    if recent[-1] > recent[-2] > recent[-3]:
+        pattern = "three_white_soldiers"
+        signal = "bullish"
+    elif recent[-1] < recent[-2] < recent[-3]:
+        pattern = "three_black_crows"
+        signal = "bearish"
+    elif abs(recent[-1] - recent[-2]) < (recent[-1] * 0.001):
+        pattern = "doji"
+        signal = "reversal_possible"
+    elif recent[-1] > recent[-2] and recent[-2] < recent[-3]:
+        pattern = "hammer"
+        signal = "bullish_reversal"
+    elif recent[-1] < recent[-2] and recent[-2] > recent[-3]:
+        pattern = "shooting_star"
+        signal = "bearish_reversal"
+    else:
+        pattern = "none"
+        signal = "neutral"
+    
+    return {"pattern": pattern, "signal": signal}
+
+def generate_trading_recommendation(indicators: Dict) -> Dict[str, Any]:
+    """Generate trading recommendation based on all indicators"""
+    score = 0
+    reasons = []
+    
+    # RSI Analysis
+    rsi = indicators.get("rsi", 50)
+    if rsi < 30:
+        score += 2
+        reasons.append(f"RSI en survente ({rsi}) - Signal d'achat")
+    elif rsi < 40:
+        score += 1
+        reasons.append(f"RSI bas ({rsi}) - Potentiel de rebond")
+    elif rsi > 70:
+        score -= 2
+        reasons.append(f"RSI en surachat ({rsi}) - Signal de vente")
+    elif rsi > 60:
+        score -= 1
+        reasons.append(f"RSI élevé ({rsi}) - Prudence")
+    
+    # MACD Analysis
+    macd = indicators.get("macd", {})
+    if macd.get("trend") == "bullish":
+        score += 1
+        reasons.append("MACD haussier - Momentum positif")
+    elif macd.get("trend") == "bearish":
+        score -= 1
+        reasons.append("MACD baissier - Momentum négatif")
+    
+    # Bollinger Analysis
+    bb = indicators.get("bollinger", {})
+    if bb.get("position") == "oversold":
+        score += 2
+        reasons.append("Prix sur bande inférieure Bollinger - Survente")
+    elif bb.get("position") == "overbought":
+        score -= 2
+        reasons.append("Prix sur bande supérieure Bollinger - Surachat")
+    
+    # MA Trend
+    ma = indicators.get("moving_averages", {})
+    trend = ma.get("trend", "neutral")
+    if trend == "strong_bullish":
+        score += 2
+        reasons.append("Tendance fortement haussière (MA20 > MA50 > MA200)")
+    elif trend == "bullish":
+        score += 1
+        reasons.append("Tendance haussière")
+    elif trend == "strong_bearish":
+        score -= 2
+        reasons.append("Tendance fortement baissière (MA20 < MA50 < MA200)")
+    elif trend == "bearish":
+        score -= 1
+        reasons.append("Tendance baissière")
+    
+    # Candlestick patterns
+    candles = indicators.get("candlesticks", {})
+    if candles.get("signal") == "bullish" or candles.get("signal") == "bullish_reversal":
+        score += 1
+        reasons.append(f"Pattern chandelier: {candles.get('pattern')} - Haussier")
+    elif candles.get("signal") == "bearish" or candles.get("signal") == "bearish_reversal":
+        score -= 1
+        reasons.append(f"Pattern chandelier: {candles.get('pattern')} - Baissier")
+    
+    # Generate recommendation
+    if score >= 4:
+        action = "STRONG_BUY"
+        confidence = "high"
+        message = "🟢 ACHAT FORT recommandé"
+    elif score >= 2:
+        action = "BUY"
+        confidence = "medium"
+        message = "🟢 ACHAT recommandé"
+    elif score <= -4:
+        action = "STRONG_SELL"
+        confidence = "high"
+        message = "🔴 VENTE FORTE recommandée"
+    elif score <= -2:
+        action = "SELL"
+        confidence = "medium"
+        message = "🔴 VENTE recommandée"
+    else:
+        action = "WAIT"
+        confidence = "low"
+        message = "🟡 ATTENDRE - Pas de signal clair"
+    
+    return {
+        "action": action,
+        "confidence": confidence,
+        "message": message,
+        "score": score,
+        "reasons": reasons
+    }
+
+class TradingAnalysisRequest(BaseModel):
+    coin_id: str
+    timeframe: str = "4h"  # 1h, 4h, daily
+    trading_style: str = "swing"  # scalping, intraday, swing
+
+@api_router.post("/trading/analyze")
+async def analyze_for_trading(request: TradingAnalysisRequest, current_user: dict = Depends(get_current_user)):
+    """
+    Deep technical analysis for trading decisions.
+    Returns indicators + AI recommendation.
+    """
+    coin_id = request.coin_id
+    timeframe = request.timeframe
+    trading_style = request.trading_style
+    
+    # Map timeframe to days of data needed
+    days_map = {"1h": 1, "4h": 7, "daily": 30}
+    days = days_map.get(timeframe, 7)
+    
+    # Fetch historical price data
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{COINGECKO_API_URL}/coins/{coin_id}/market_chart",
+                params={"vs_currency": "usd", "days": days},
+                timeout=30.0
+            )
+            
+            if response.status_code != 200:
+                # Try cache or return error
+                raise HTTPException(status_code=503, detail="Unable to fetch market data")
+            
+            data = response.json()
+            prices = [p[1] for p in data.get("prices", [])]
+            volumes = [v[1] for v in data.get("total_volumes", [])]
+            
+            if not prices:
+                raise HTTPException(status_code=404, detail="No price data available")
+            
+            # Get current market info
+            market_response = await client.get(
+                f"{COINGECKO_API_URL}/coins/{coin_id}",
+                params={"localization": False, "tickers": False, "community_data": False, "developer_data": False},
+                timeout=15.0
+            )
+            
+            market_data = {}
+            if market_response.status_code == 200:
+                coin_data = market_response.json()
+                market_data = coin_data.get("market_data", {})
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching data for trading analysis: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch market data")
+    
+    # Calculate all indicators
+    indicators = {
+        "rsi": calculate_rsi(prices),
+        "macd": calculate_macd(prices),
+        "bollinger": calculate_bollinger_bands(prices),
+        "moving_averages": calculate_moving_averages(prices),
+        "support_resistance": calculate_support_resistance(prices),
+        "candlesticks": analyze_candlestick_patterns(prices)
+    }
+    
+    # Generate algorithmic recommendation
+    algo_recommendation = generate_trading_recommendation(indicators)
+    
+    # Current price info
+    current_price = prices[-1]
+    price_24h_change = market_data.get("price_change_percentage_24h", 0)
+    high_24h = market_data.get("high_24h", {}).get("usd", current_price * 1.01)
+    low_24h = market_data.get("low_24h", {}).get("usd", current_price * 0.99)
+    
+    # Calculate entry, SL, TP based on indicators
+    sr = indicators["support_resistance"]
+    bb = indicators["bollinger"]
+    
+    if algo_recommendation["action"] in ["BUY", "STRONG_BUY"]:
+        entry_price = current_price
+        stop_loss = max(sr["support"], bb["lower"]) * 0.99
+        take_profit_1 = min(sr["resistance"], bb["upper"]) * 0.95
+        take_profit_2 = sr["resistance"] * 1.02
+    elif algo_recommendation["action"] in ["SELL", "STRONG_SELL"]:
+        entry_price = current_price
+        stop_loss = min(sr["resistance"], bb["upper"]) * 1.01
+        take_profit_1 = max(sr["support"], bb["lower"]) * 1.05
+        take_profit_2 = sr["support"] * 0.98
+    else:
+        entry_price = current_price
+        stop_loss = sr["support"] * 0.99
+        take_profit_1 = sr["resistance"] * 0.98
+        take_profit_2 = sr["resistance"] * 1.02
+    
+    # Build context for AI
+    ai_context = f"""
+ANALYSE TECHNIQUE COMPLÈTE - {coin_id.upper()}
+Timeframe: {timeframe} | Style: {trading_style}
+
+PRIX ACTUEL: ${current_price:,.2f}
+Variation 24h: {price_24h_change:.2f}%
+High 24h: ${high_24h:,.2f} | Low 24h: ${low_24h:,.2f}
+
+INDICATEURS TECHNIQUES:
+- RSI (14): {indicators['rsi']} {'(SURVENTE)' if indicators['rsi'] < 30 else '(SURACHAT)' if indicators['rsi'] > 70 else ''}
+- MACD: {indicators['macd']['macd']:.4f} | Signal: {indicators['macd']['signal']:.4f} | Tendance: {indicators['macd']['trend']}
+- Bollinger: Upper ${bb['upper']:,.2f} | Middle ${bb['middle']:,.2f} | Lower ${bb['lower']:,.2f}
+- Position Bollinger: {bb['position']}
+- MA20: ${indicators['moving_averages']['ma20']:,.2f} | MA50: ${indicators['moving_averages']['ma50']:,.2f}
+- Tendance MA: {indicators['moving_averages']['trend']}
+- Support: ${sr['support']:,.2f} | Résistance: ${sr['resistance']:,.2f}
+- Pattern Chandelier: {indicators['candlesticks']['pattern']} ({indicators['candlesticks']['signal']})
+
+RECOMMANDATION ALGORITHMIQUE: {algo_recommendation['action']}
+Score: {algo_recommendation['score']}/10
+Raisons: {'; '.join(algo_recommendation['reasons'])}
+
+NIVEAUX SUGGÉRÉS:
+- Entrée: ${entry_price:,.2f}
+- Stop-Loss: ${stop_loss:,.2f} ({((entry_price - stop_loss) / entry_price * 100):.1f}%)
+- TP1: ${take_profit_1:,.2f} ({((take_profit_1 - entry_price) / entry_price * 100):.1f}%)
+- TP2: ${take_profit_2:,.2f} ({((take_profit_2 - entry_price) / entry_price * 100):.1f}%)
+
+En tant que trader expert, donne ton analyse et ta recommandation finale.
+Sois direct et précis. Indique clairement: ACHETER, VENDRE ou ATTENDRE.
+Explique pourquoi en 3-4 points clés maximum.
+"""
+
+    # Get AI analysis
+    try:
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            model="gpt-4o",
+            system_message=f"""Tu es BULL, un trader professionnel expert avec 20 ans d'expérience.
+Tu analyses les marchés crypto avec précision et donnes des conseils actionnables.
+Style de trading demandé: {trading_style}
+Timeframe: {timeframe}
+Niveau du trader: {current_user.get('trading_level', 'intermediate')}
+
+Tu dois être DIRECT et CLAIR. Pas de blabla. Des décisions concrètes.
+Utilise les indicateurs fournis pour justifier ta recommandation."""
+        )
+        
+        ai_response = await chat.send_message_async(ai_context)
+        ai_analysis = ai_response.content if hasattr(ai_response, 'content') else str(ai_response)
+    except Exception as e:
+        logger.error(f"AI analysis error: {e}")
+        ai_analysis = f"Analyse algorithmique: {algo_recommendation['message']}\n\nRaisons:\n" + "\n".join([f"• {r}" for r in algo_recommendation['reasons']])
+    
+    # Check if this is an alert-worthy situation
+    is_alert = algo_recommendation["action"] in ["STRONG_BUY", "STRONG_SELL", "BUY", "SELL"]
+    
+    return {
+        "coin_id": coin_id,
+        "timeframe": timeframe,
+        "trading_style": trading_style,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "current_price": current_price,
+        "price_change_24h": price_24h_change,
+        "high_24h": high_24h,
+        "low_24h": low_24h,
+        "indicators": indicators,
+        "recommendation": algo_recommendation,
+        "levels": {
+            "entry": round(entry_price, 2),
+            "stop_loss": round(stop_loss, 2),
+            "take_profit_1": round(take_profit_1, 2),
+            "take_profit_2": round(take_profit_2, 2)
+        },
+        "ai_analysis": ai_analysis,
+        "is_alert": is_alert
+    }
+
+@api_router.get("/trading/scan-opportunities")
+async def scan_trading_opportunities(current_user: dict = Depends(get_current_user)):
+    """
+    Scan watchlist for trading opportunities.
+    Returns alerts for coins with strong signals.
+    """
+    watchlist = current_user.get("watchlist", [])
+    
+    if not watchlist:
+        return {"alerts": [], "message": "Watchlist vide"}
+    
+    alerts = []
+    
+    for coin_id in watchlist[:10]:  # Limit to 10 to avoid rate limits
+        try:
+            # Quick analysis
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{COINGECKO_API_URL}/coins/{coin_id}/market_chart",
+                    params={"vs_currency": "usd", "days": 7},
+                    timeout=15.0
+                )
+                
+                if response.status_code != 200:
+                    continue
+                
+                data = response.json()
+                prices = [p[1] for p in data.get("prices", [])]
+                
+                if not prices:
+                    continue
+                
+                # Quick indicator check
+                rsi = calculate_rsi(prices)
+                bb = calculate_bollinger_bands(prices)
+                
+                # Check for alert conditions
+                alert_type = None
+                if rsi < 30 and bb["position"] == "oversold":
+                    alert_type = "STRONG_BUY"
+                elif rsi < 35:
+                    alert_type = "BUY"
+                elif rsi > 70 and bb["position"] == "overbought":
+                    alert_type = "STRONG_SELL"
+                elif rsi > 65:
+                    alert_type = "SELL"
+                
+                if alert_type:
+                    alerts.append({
+                        "coin_id": coin_id,
+                        "alert_type": alert_type,
+                        "rsi": rsi,
+                        "current_price": prices[-1],
+                        "bollinger_position": bb["position"],
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    })
+        except Exception as e:
+            logger.error(f"Error scanning {coin_id}: {e}")
+            continue
+    
+    return {
+        "alerts": alerts,
+        "scanned": len(watchlist),
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
 # ============== MARKET INTELLIGENCE ENDPOINT ==============
 
 @api_router.get("/market/intelligence")
