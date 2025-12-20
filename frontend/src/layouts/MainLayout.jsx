@@ -251,6 +251,33 @@ export default function MainLayout() {
             </nav>
           </ScrollArea>
 
+          {/* Smart Invest CTA */}
+          <div className="p-4 border-t border-white/5">
+            <NavLink
+              to="/smart-invest"
+              className={`
+                relative overflow-hidden flex items-center gap-3 px-4 py-4 rounded-xl 
+                bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600
+                hover:from-violet-500 hover:via-purple-500 hover:to-fuchsia-500
+                transition-all duration-300 group
+                ${location.pathname === '/smart-invest' ? 'ring-2 ring-white/30' : ''}
+              `}
+              data-testid="smart-invest-cta"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-violet-400/20 to-fuchsia-400/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative flex items-center gap-3 w-full">
+                <div className="p-2 bg-white/20 rounded-lg">
+                  <Zap className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-bold text-white">Smart Invest</p>
+                  <p className="text-xs text-white/70">L&apos;IA trade pour vous</p>
+                </div>
+                <ChevronRight className="w-5 h-5 text-white/50 group-hover:text-white group-hover:translate-x-1 transition-all" />
+              </div>
+            </NavLink>
+          </div>
+
           {/* User Section */}
           <div className="p-4 border-t border-white/5">
             <div className="flex items-center gap-3 mb-4">
