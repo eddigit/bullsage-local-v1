@@ -313,7 +313,6 @@ export default function ModulePage() {
 
   useEffect(() => {
     fetchModuleData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [moduleId]);
 
   const handleLessonSelect = async (lesson) => {
