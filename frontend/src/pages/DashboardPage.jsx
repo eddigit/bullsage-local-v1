@@ -103,6 +103,11 @@ export default function DashboardPage() {
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisDialogOpen, setAnalysisDialogOpen] = useState(false);
   
+  // Opportunity Scanner state
+  const [scanning, setScanning] = useState(false);
+  const [opportunities, setOpportunities] = useState(null);
+  const [scanDialogOpen, setScanDialogOpen] = useState(false);
+  
   // Add to watchlist state
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
