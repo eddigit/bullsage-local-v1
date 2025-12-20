@@ -476,6 +476,115 @@ async def get_fear_greed(current_user: dict = Depends(get_current_user)):
 
 # ============== FINNHUB ROUTES (NEWS, SENTIMENT, CALENDAR) ==============
 
+# Cache for AI news summary
+_news_summary_cache = {
+    "data": None,
+    "timestamp": None,
+    "ttl": 1800  # 30 minutes cache
+}
+
+@api_router.get("/market/news-impact")
+async def get_news_impact_summary(current_user: dict = Depends(get_current_user)):
+    """
+    Get AI-summarized news impact in French.
+    Returns concise market-moving news with bullish/bearish indicators.
+    """
+    global _news_summary_cache
+    
+    # Check cache
+    now = datetime.now(timezone.utc)
+    if _news_summary_cache["data"] and _news_summary_cache["timestamp"]:
+        age = (now - _news_summary_cache["timestamp"]).total_seconds()
+        if age < _news_summary_cache["ttl"]:
+            return _news_summary_cache["data"]
+    
+    # Fetch recent news
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://finnhub.io/api/v1/news",
+                params={"category": "crypto", "token": FINNHUB_API_KEY},
+                timeout=30.0
+            )
+            news_items = response.json()[:10] if response.status_code == 200 else []
+    except Exception as e:
+        logger.error(f"Error fetching news for summary: {e}")
+        news_items = []
+    
+    if not news_items:
+        return {
+            "summary": [],
+            "last_updated": now.isoformat(),
+            "source": "Finnhub"
+        }
+    
+    # Prepare news for AI analysis
+    news_text = "\n".join([
+        f"- {item.get('headline', '')} (Source: {item.get('source', 'Unknown')})"
+        for item in news_items[:8]
+    ])
+    
+    # Use AI to summarize and translate
+    try:
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            model="gpt-4o",
+            system_message="""Tu es un analyste financier expert. Ta tâche est de résumer les actualités crypto importantes en français.
+
+Pour chaque news importante, donne:
+1. Un résumé TRÈS CONCIS (1 ligne max)
+2. L'impact sur le marché: HAUSSIER 📈, BAISSIER 📉, ou NEUTRE ➡️
+3. Ce que le trader devrait faire
+
+Format de réponse STRICT (JSON array):
+[
+  {"news": "Résumé concis en français", "impact": "HAUSSIER", "action": "Opportunité d'achat"},
+  {"news": "Autre news", "impact": "BAISSIER", "action": "Prudence recommandée"}
+]
+
+Maximum 4-5 news les plus importantes. Sois TRÈS concis."""
+        )
+        
+        ai_response = await chat.send_message_async(f"Analyse ces actualités crypto des dernières 48h et résume en français avec impact marché:\n\n{news_text}")
+        
+        # Parse AI response
+        response_text = ai_response.content if hasattr(ai_response, 'content') else str(ai_response)
+        
+        # Try to extract JSON from response
+        import re
+        json_match = re.search(r'\[[\s\S]*\]', response_text)
+        if json_match:
+            import json
+            summary_data = json.loads(json_match.group())
+        else:
+            # Fallback: create simple summary
+            summary_data = [{"news": "Actualités en cours d'analyse", "impact": "NEUTRE", "action": "Surveiller le marché"}]
+        
+        result = {
+            "summary": summary_data[:5],  # Max 5 items
+            "last_updated": now.isoformat(),
+            "source": "Finnhub + AI Analysis"
+        }
+        
+        # Update cache
+        _news_summary_cache["data"] = result
+        _news_summary_cache["timestamp"] = now
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error generating news summary: {e}")
+        # Return raw headlines as fallback
+        fallback = [
+            {"news": item.get("headline", "")[:80], "impact": "NEUTRE", "action": "À analyser"}
+            for item in news_items[:3]
+        ]
+        return {
+            "summary": fallback,
+            "last_updated": now.isoformat(),
+            "source": "Finnhub (raw)"
+        }
+
 @api_router.get("/market/news")
 async def get_market_news(category: str = "general", current_user: dict = Depends(get_current_user)):
     """Get market news from Finnhub"""
