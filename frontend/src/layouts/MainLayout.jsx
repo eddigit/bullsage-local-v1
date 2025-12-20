@@ -69,6 +69,82 @@ const bottomNavItems = [
   { name: "Plus", href: null, icon: MoreHorizontal, isMore: true },
 ];
 
+// Desktop sidebar nav item - extracted outside MainLayout
+function NavItem({ item, currentPath, onClick }) {
+  const isActive = currentPath === item.href;
+  
+  return (
+    <NavLink
+      to={item.href}
+      onClick={onClick}
+      className={`
+        flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 min-h-[44px]
+        ${isActive 
+          ? "bg-primary/10 text-primary border border-primary/20" 
+          : "text-muted-foreground hover:text-foreground hover:bg-white/5 active:bg-white/10"
+        }
+        ${item.highlight && !isActive ? "text-violet-400 hover:text-violet-300" : ""}
+        ${item.admin && !isActive ? "text-violet-400 hover:text-violet-300" : ""}
+      `}
+      data-testid={`nav-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
+    >
+      <item.icon className={`w-5 h-5 flex-shrink-0 ${(item.highlight || item.admin) && !isActive ? "text-violet-400" : ""}`} />
+      <span className="font-medium truncate">{item.name}</span>
+      {item.highlight && (
+        <Zap className="w-4 h-4 ml-auto text-violet-400 flex-shrink-0" />
+      )}
+      {item.admin && (
+        <Shield className="w-4 h-4 ml-auto text-violet-400 flex-shrink-0" />
+      )}
+    </NavLink>
+  );
+}
+
+// Mobile bottom nav item - extracted outside MainLayout
+function BottomNavItem({ item, currentPath, moreMenuOpen, onClick }) {
+  const isActive = item.href && currentPath === item.href;
+  
+  if (item.isMore) {
+    return (
+      <button
+        onClick={onClick}
+        className={`
+          flex flex-col items-center justify-center gap-1 py-2 px-4 min-w-[64px] min-h-[56px]
+          transition-all duration-200 rounded-xl
+          ${moreMenuOpen ? "text-primary" : "text-muted-foreground"}
+        `}
+        data-testid="nav-more"
+      >
+        <item.icon className="w-6 h-6" />
+        <span className="text-[10px] font-medium">{item.name}</span>
+      </button>
+    );
+  }
+  
+  return (
+    <NavLink
+      to={item.href}
+      className={`
+        flex flex-col items-center justify-center gap-1 py-2 px-4 min-w-[64px] min-h-[56px]
+        transition-all duration-200 rounded-xl
+        ${isActive 
+          ? "text-primary" 
+          : "text-muted-foreground hover:text-foreground active:scale-95"
+        }
+      `}
+      data-testid={`nav-${item.name.toLowerCase()}`}
+    >
+      <div className={`relative ${isActive ? 'scale-110' : ''} transition-transform`}>
+        <item.icon className="w-6 h-6" />
+        {isActive && (
+          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary" />
+        )}
+      </div>
+      <span className="text-[10px] font-medium">{item.name}</span>
+    </NavLink>
+  );
+}
+
 export default function MainLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
@@ -101,82 +177,6 @@ export default function MainLayout() {
 
   const getInitials = (name) => {
     return name?.split(" ").map(n => n[0]).join("").toUpperCase() || "U";
-  };
-
-  // Desktop sidebar nav item
-  const NavItem = ({ item, mobile = false, onClick }) => {
-    const isActive = location.pathname === item.href;
-    
-    return (
-      <NavLink
-        to={item.href}
-        onClick={onClick}
-        className={`
-          flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 min-h-[44px]
-          ${isActive 
-            ? "bg-primary/10 text-primary border border-primary/20" 
-            : "text-muted-foreground hover:text-foreground hover:bg-white/5 active:bg-white/10"
-          }
-          ${item.highlight && !isActive ? "text-violet-400 hover:text-violet-300" : ""}
-          ${item.admin && !isActive ? "text-violet-400 hover:text-violet-300" : ""}
-        `}
-        data-testid={`nav-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
-      >
-        <item.icon className={`w-5 h-5 flex-shrink-0 ${(item.highlight || item.admin) && !isActive ? "text-violet-400" : ""}`} />
-        <span className="font-medium truncate">{item.name}</span>
-        {item.highlight && (
-          <Zap className="w-4 h-4 ml-auto text-violet-400 flex-shrink-0" />
-        )}
-        {item.admin && (
-          <Shield className="w-4 h-4 ml-auto text-violet-400 flex-shrink-0" />
-        )}
-      </NavLink>
-    );
-  };
-
-  // Mobile bottom nav item
-  const BottomNavItem = ({ item, onClick }) => {
-    const isActive = item.href && location.pathname === item.href;
-    
-    if (item.isMore) {
-      return (
-        <button
-          onClick={onClick}
-          className={`
-            flex flex-col items-center justify-center gap-1 py-2 px-4 min-w-[64px] min-h-[56px]
-            transition-all duration-200 rounded-xl
-            ${moreMenuOpen ? "text-primary" : "text-muted-foreground"}
-          `}
-          data-testid="nav-more"
-        >
-          <item.icon className="w-6 h-6" />
-          <span className="text-[10px] font-medium">{item.name}</span>
-        </button>
-      );
-    }
-    
-    return (
-      <NavLink
-        to={item.href}
-        className={`
-          flex flex-col items-center justify-center gap-1 py-2 px-4 min-w-[64px] min-h-[56px]
-          transition-all duration-200 rounded-xl
-          ${isActive 
-            ? "text-primary" 
-            : "text-muted-foreground hover:text-foreground active:scale-95"
-          }
-        `}
-        data-testid={`nav-${item.name.toLowerCase()}`}
-      >
-        <div className={`relative ${isActive ? 'scale-110' : ''} transition-transform`}>
-          <item.icon className="w-6 h-6" />
-          {isActive && (
-            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary" />
-          )}
-        </div>
-        <span className="text-[10px] font-medium">{item.name}</span>
-      </NavLink>
-    );
   };
 
   return (
