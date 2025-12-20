@@ -1077,7 +1077,7 @@ async def get_signals(limit: int = 50, status: str = None, current_user: dict = 
 
 @api_router.get("/signals/stats")
 async def get_signal_stats(current_user: dict = Depends(get_current_user)):
-    """Get trading signal statistics"""
+    """Get comprehensive trading signal statistics with professional metrics"""
     signals = await db.signals.find({"user_id": current_user["id"]}, {"_id": 0}).to_list(1000)
     
     total = len(signals)
@@ -1090,8 +1090,18 @@ async def get_signal_stats(current_user: dict = Depends(get_current_user)):
             "hit_sl": 0,
             "expired": 0,
             "win_rate": 0,
+            "total_pnl": 0,
+            "avg_win": 0,
+            "avg_loss": 0,
+            "profit_factor": 0,
+            "best_signal": None,
+            "worst_signal": None,
+            "current_streak": 0,
+            "max_streak": 0,
             "by_symbol": {},
-            "by_timeframe": {}
+            "by_timeframe": {},
+            "monthly_performance": [],
+            "recent_signals": []
         }
     
     active = len([s for s in signals if s["status"] == "active"])
@@ -1104,25 +1114,126 @@ async def get_signal_stats(current_user: dict = Depends(get_current_user)):
     wins = hit_tp1 + hit_tp2
     win_rate = (wins / completed * 100) if completed > 0 else 0
     
-    # Stats by symbol
+    # P&L Analysis
+    closed_signals = [s for s in signals if s.get("result_pnl") is not None]
+    pnl_values = [s.get("result_pnl", 0) for s in closed_signals]
+    
+    total_pnl = sum(pnl_values) if pnl_values else 0
+    win_pnls = [p for p in pnl_values if p > 0]
+    loss_pnls = [p for p in pnl_values if p < 0]
+    
+    avg_win = sum(win_pnls) / len(win_pnls) if win_pnls else 0
+    avg_loss = abs(sum(loss_pnls) / len(loss_pnls)) if loss_pnls else 0
+    
+    gross_profit = sum(win_pnls) if win_pnls else 0
+    gross_loss = abs(sum(loss_pnls)) if loss_pnls else 0
+    profit_factor = gross_profit / gross_loss if gross_loss > 0 else gross_profit
+    
+    # Best and worst signals
+    best_signal = None
+    worst_signal = None
+    if closed_signals:
+        sorted_by_pnl = sorted(closed_signals, key=lambda x: x.get("result_pnl", 0), reverse=True)
+        if sorted_by_pnl:
+            best = sorted_by_pnl[0]
+            best_signal = {"symbol": best.get("symbol_name"), "pnl": best.get("result_pnl", 0), "type": best.get("signal_type")}
+            worst = sorted_by_pnl[-1]
+            worst_signal = {"symbol": worst.get("symbol_name"), "pnl": worst.get("result_pnl", 0), "type": worst.get("signal_type")}
+    
+    # Streak calculation
+    sorted_signals = sorted([s for s in signals if s["status"] != "active"], key=lambda x: x.get("created_at", ""), reverse=True)
+    current_streak = 0
+    max_streak = 0
+    temp_streak = 0
+    last_result = None
+    
+    for s in sorted_signals:
+        is_win = s["status"] in ["hit_tp1", "hit_tp2"]
+        if last_result is None:
+            last_result = is_win
+            current_streak = 1 if is_win else -1
+            temp_streak = 1
+        elif is_win == last_result:
+            temp_streak += 1
+            if current_streak > 0:
+                current_streak = temp_streak
+            else:
+                current_streak = -temp_streak
+        else:
+            max_streak = max(max_streak, abs(temp_streak))
+            temp_streak = 1
+            last_result = is_win
+            current_streak = 1 if is_win else -1
+    max_streak = max(max_streak, abs(temp_streak))
+    
+    # Stats by symbol with P&L
     by_symbol = {}
     for s in signals:
         sym = s["symbol"]
         if sym not in by_symbol:
-            by_symbol[sym] = {"total": 0, "wins": 0}
+            by_symbol[sym] = {"total": 0, "wins": 0, "pnl": 0, "name": s.get("symbol_name", sym)}
         by_symbol[sym]["total"] += 1
         if s["status"] in ["hit_tp1", "hit_tp2"]:
             by_symbol[sym]["wins"] += 1
+        if s.get("result_pnl"):
+            by_symbol[sym]["pnl"] += s["result_pnl"]
+    
+    # Calculate win rate for each symbol
+    for sym in by_symbol:
+        if by_symbol[sym]["total"] > 0:
+            by_symbol[sym]["win_rate"] = round(by_symbol[sym]["wins"] / by_symbol[sym]["total"] * 100, 1)
+        else:
+            by_symbol[sym]["win_rate"] = 0
+        by_symbol[sym]["pnl"] = round(by_symbol[sym]["pnl"], 2)
     
     # Stats by timeframe
     by_timeframe = {}
     for s in signals:
         tf = s["timeframe"]
         if tf not in by_timeframe:
-            by_timeframe[tf] = {"total": 0, "wins": 0}
+            by_timeframe[tf] = {"total": 0, "wins": 0, "pnl": 0}
         by_timeframe[tf]["total"] += 1
         if s["status"] in ["hit_tp1", "hit_tp2"]:
             by_timeframe[tf]["wins"] += 1
+        if s.get("result_pnl"):
+            by_timeframe[tf]["pnl"] += s["result_pnl"]
+    
+    for tf in by_timeframe:
+        if by_timeframe[tf]["total"] > 0:
+            by_timeframe[tf]["win_rate"] = round(by_timeframe[tf]["wins"] / by_timeframe[tf]["total"] * 100, 1)
+        by_timeframe[tf]["pnl"] = round(by_timeframe[tf]["pnl"], 2)
+    
+    # Monthly performance (last 6 months)
+    from collections import defaultdict
+    monthly_perf = defaultdict(lambda: {"signals": 0, "wins": 0, "pnl": 0})
+    for s in closed_signals:
+        if s.get("created_at"):
+            month = s["created_at"][:7]  # YYYY-MM
+            monthly_perf[month]["signals"] += 1
+            if s["status"] in ["hit_tp1", "hit_tp2"]:
+                monthly_perf[month]["wins"] += 1
+            monthly_perf[month]["pnl"] += s.get("result_pnl", 0)
+    
+    monthly_performance = []
+    for month, data in sorted(monthly_perf.items(), reverse=True)[:6]:
+        monthly_performance.append({
+            "month": month,
+            "signals": data["signals"],
+            "wins": data["wins"],
+            "win_rate": round(data["wins"] / data["signals"] * 100, 1) if data["signals"] > 0 else 0,
+            "pnl": round(data["pnl"], 2)
+        })
+    
+    # Recent 5 closed signals
+    recent_signals = []
+    for s in sorted_signals[:5]:
+        recent_signals.append({
+            "symbol": s.get("symbol_name"),
+            "type": s.get("signal_type"),
+            "status": s.get("status"),
+            "pnl": s.get("result_pnl", 0),
+            "date": s.get("created_at", "")[:10]
+        })
     
     return {
         "total_signals": total,
@@ -1132,8 +1243,18 @@ async def get_signal_stats(current_user: dict = Depends(get_current_user)):
         "hit_sl": hit_sl,
         "expired": expired,
         "win_rate": round(win_rate, 1),
+        "total_pnl": round(total_pnl, 2),
+        "avg_win": round(avg_win, 2),
+        "avg_loss": round(avg_loss, 2),
+        "profit_factor": round(profit_factor, 2),
+        "best_signal": best_signal,
+        "worst_signal": worst_signal,
+        "current_streak": current_streak,
+        "max_streak": max_streak,
         "by_symbol": by_symbol,
-        "by_timeframe": by_timeframe
+        "by_timeframe": by_timeframe,
+        "monthly_performance": monthly_performance,
+        "recent_signals": recent_signals
     }
 
 @api_router.put("/signals/{signal_id}/status")
