@@ -380,12 +380,22 @@ export default function CockpitPage() {
               <Bell className="w-5 h-5 text-primary" />
               Mes Alertes
             </CardTitle>
-            <Button onClick={() => setNewAlertOpen(true)} size="sm" className="bg-primary text-black">
-              <Plus className="w-4 h-4 mr-1" /> Nouvelle Alerte
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button 
+                onClick={checkAlerts} 
+                variant="outline" 
+                size="sm" 
+                className="border-white/10"
+              >
+                <RefreshCw className="w-4 h-4 mr-1" /> Vérifier
+              </Button>
+              <Button onClick={() => setNewAlertOpen(true)} size="sm" className="bg-primary text-black">
+                <Plus className="w-4 h-4 mr-1" /> Nouvelle Alerte
+              </Button>
+            </div>
           </div>
           <CardDescription>
-            Recevez une notification quand vos conditions sont atteintes
+            Cliquez sur "Vérifier" pour contrôler si vos alertes ont été déclenchées
           </CardDescription>
         </CardHeader>
         <CardContent>
