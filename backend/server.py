@@ -1532,7 +1532,7 @@ Utilise les indicateurs fournis pour justifier ta recommandation."""
         )
         chat.with_model("openai", "gpt-4o")
         
-        ai_response = await chat.send_message_async(ai_context)
+        ai_response = await asyncio.to_thread(chat.send_message, ai_context)
         ai_analysis = ai_response.content if hasattr(ai_response, 'content') else str(ai_response)
     except Exception as e:
         logger.error(f"AI analysis error: {e}")
