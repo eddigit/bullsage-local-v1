@@ -359,7 +359,7 @@ export default function JournalPage() {
             <div className="text-center py-12">
               <BookOpen className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
               <p className="text-muted-foreground">Aucun trade enregistré</p>
-              <p className="text-sm text-muted-foreground/70">Cliquez sur "Nouveau Trade" pour commencer</p>
+              <p className="text-sm text-muted-foreground/70">Cliquez sur &quot;Nouveau Trade&quot; pour commencer</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -538,7 +538,7 @@ export default function JournalPage() {
             {/* Prices */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Prix d'entrée *</Label>
+                <Label>Prix d&apos;entrée *</Label>
                 <Input
                   type="number"
                   step="any"
