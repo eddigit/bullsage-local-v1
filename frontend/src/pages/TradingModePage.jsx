@@ -235,6 +235,32 @@ export default function TradingModePage() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [alerts, setAlerts] = useState([]);
+  const [marketContext, setMarketContext] = useState(null);
+  const [loadingContext, setLoadingContext] = useState(false);
+  
+  // Fetch global market context
+  const fetchMarketContext = async () => {
+    setLoadingContext(true);
+    try {
+      const [fearGreedRes, macroRes, newsRes, forexRes] = await Promise.all([
+        axios.get(`${API}/market/fear-greed`).catch(() => ({ data: null })),
+        axios.get(`${API}/market/macro-overview`).catch(() => ({ data: null })),
+        axios.get(`${API}/market/news?category=crypto`).catch(() => ({ data: [] })),
+        axios.get(`${API}/market/forex/EUR/USD`).catch(() => ({ data: null }))
+      ]);
+      
+      setMarketContext({
+        fearGreed: fearGreedRes.data?.data?.[0] || null,
+        macro: macroRes.data || null,
+        news: newsRes.data?.slice(0, 5) || [],
+        eurusd: forexRes.data?.["Realtime Currency Exchange Rate"] || null
+      });
+    } catch (error) {
+      console.error("Error fetching market context:", error);
+    } finally {
+      setLoadingContext(false);
+    }
+  };
   
   // Fetch watchlist coins
   useEffect(() => {
@@ -258,6 +284,7 @@ export default function TradingModePage() {
     };
     
     fetchMarkets();
+    fetchMarketContext(); // Load market context on mount
   }, [user]);
 
   // Filter watchlist coins
