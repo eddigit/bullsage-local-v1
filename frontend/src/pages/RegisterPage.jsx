@@ -40,7 +40,8 @@ export default function RegisterPage() {
     try {
       await register(name, email, password, tradingLevel);
       toast.success("Compte créé avec succès !");
-      navigate("/");
+      // Redirect to onboarding for new users
+      navigate("/onboarding");
     } catch (error) {
       toast.error(error.response?.data?.detail || "Erreur lors de l'inscription");
     } finally {
