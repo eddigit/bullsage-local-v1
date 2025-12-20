@@ -3415,6 +3415,157 @@ async def get_onboarding_options():
         }
     }
 
+# ============== SIMPLE BACKTESTING ==============
+
+@api_router.post("/trading/backtest")
+async def simple_backtest(
+    coin_id: str,
+    strategy: str = "rsi_oversold",
+    days: int = 30,
+    initial_capital: float = 10000,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Simple backtesting of trading strategies.
+    Strategies: rsi_oversold, rsi_overbought, ma_crossover, bollinger_bounce
+    """
+    if days > 365:
+        days = 365
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            # Get historical data
+            response = await client.get(
+                f"{COINGECKO_API_URL}/coins/{coin_id}/market_chart",
+                params={"vs_currency": "usd", "days": days},
+                timeout=30.0
+            )
+            
+            if response.status_code != 200:
+                return {"error": "Impossible de récupérer les données historiques"}
+            
+            data = response.json()
+            prices = [p[1] for p in data.get("prices", [])]
+            
+            if len(prices) < 50:
+                return {"error": "Pas assez de données historiques"}
+            
+            # Initialize backtesting variables
+            capital = initial_capital
+            position = 0  # Amount of crypto held
+            entry_price = 0
+            trades = []
+            wins = 0
+            losses = 0
+            total_pnl = 0
+            
+            # Strategy implementation
+            for i in range(20, len(prices)):
+                price = prices[i]
+                
+                # Calculate indicators for this point
+                window = prices[max(0, i-14):i+1]
+                rsi = calculate_rsi(window)
+                bb = calculate_bollinger_bands(prices[max(0, i-20):i+1])
+                
+                # Short MA and Long MA for crossover
+                ma_short = sum(prices[i-10:i+1]) / 11 if i >= 10 else price
+                ma_long = sum(prices[i-20:i+1]) / 21 if i >= 20 else price
+                
+                buy_signal = False
+                sell_signal = False
+                
+                # Apply strategy rules
+                if strategy == "rsi_oversold":
+                    buy_signal = rsi < 30 and position == 0
+                    sell_signal = rsi > 70 and position > 0
+                elif strategy == "rsi_overbought":
+                    # Inverse strategy - buy high, sell low (for comparison)
+                    buy_signal = rsi > 70 and position == 0
+                    sell_signal = rsi < 30 and position > 0
+                elif strategy == "ma_crossover":
+                    buy_signal = ma_short > ma_long and position == 0
+                    sell_signal = ma_short < ma_long and position > 0
+                elif strategy == "bollinger_bounce":
+                    buy_signal = bb.get("position") == "oversold" and position == 0
+                    sell_signal = bb.get("position") == "overbought" and position > 0
+                
+                # Execute trades
+                if buy_signal and capital > 0:
+                    # Buy with all capital
+                    position = capital / price
+                    entry_price = price
+                    capital = 0
+                    trades.append({
+                        "type": "buy",
+                        "price": round(price, 2),
+                        "amount": round(position, 6),
+                        "day": i
+                    })
+                elif sell_signal and position > 0:
+                    # Sell all
+                    exit_value = position * price
+                    pnl = exit_value - (position * entry_price)
+                    pnl_percent = (price - entry_price) / entry_price * 100
+                    
+                    if pnl > 0:
+                        wins += 1
+                    else:
+                        losses += 1
+                    
+                    total_pnl += pnl
+                    capital = exit_value
+                    
+                    trades.append({
+                        "type": "sell",
+                        "price": round(price, 2),
+                        "pnl": round(pnl, 2),
+                        "pnl_percent": round(pnl_percent, 2),
+                        "day": i
+                    })
+                    position = 0
+            
+            # Close any open position at the end
+            final_value = capital
+            if position > 0:
+                final_value = position * prices[-1]
+                pnl = final_value - (position * entry_price)
+                if pnl > 0:
+                    wins += 1
+                else:
+                    losses += 1
+                total_pnl += pnl
+            
+            # Calculate statistics
+            total_trades = len([t for t in trades if t["type"] == "sell"])
+            win_rate = (wins / total_trades * 100) if total_trades > 0 else 0
+            total_return = ((final_value - initial_capital) / initial_capital * 100)
+            
+            # Buy & Hold comparison
+            buy_hold_return = ((prices[-1] - prices[20]) / prices[20] * 100)
+            
+            return {
+                "strategy": strategy,
+                "coin_id": coin_id,
+                "period_days": days,
+                "initial_capital": initial_capital,
+                "final_value": round(final_value, 2),
+                "total_return": round(total_return, 2),
+                "total_pnl": round(total_pnl, 2),
+                "total_trades": total_trades,
+                "wins": wins,
+                "losses": losses,
+                "win_rate": round(win_rate, 1),
+                "buy_hold_return": round(buy_hold_return, 2),
+                "strategy_vs_buyhold": round(total_return - buy_hold_return, 2),
+                "trades_sample": trades[-10:] if trades else [],
+                "message": f"Stratégie {'gagnante' if total_return > buy_hold_return else 'moins performante'} vs Buy & Hold"
+            }
+            
+    except Exception as e:
+        logger.error(f"Backtest error: {e}")
+        return {"error": f"Erreur de backtesting: {str(e)}"}
+
 # ============== OPPORTUNITY SCANNER ==============
 
 @api_router.get("/trading/scan-opportunities")
