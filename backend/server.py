@@ -3184,27 +3184,27 @@ async def get_academy_modules(current_user: dict = Depends(get_current_user)):
     
     # Build response with progress
     modules_with_progress = []
-    for module in ALL_ACADEMY_MODULES:
-        lesson_ids = [l["id"] for l in module["lessons"]]
-        completed_lessons = [l for l in lesson_ids if l in progress.get("completed_lessons", [])]
-        quiz_completed = module["id"] in progress.get("completed_quizzes", [])
-        quiz_score = progress.get("quiz_scores", {}).get(module["id"], None)
+    for mod in ALL_ACADEMY_MODULES:
+        lesson_ids = [les["id"] for les in mod["lessons"]]
+        completed_lessons = [les for les in lesson_ids if les in progress.get("completed_lessons", [])]
+        quiz_completed = mod["id"] in progress.get("completed_quizzes", [])
+        quiz_score = progress.get("quiz_scores", {}).get(mod["id"], None)
         
         modules_with_progress.append({
-            "id": module["id"],
-            "title": module["title"],
-            "description": module["description"],
-            "icon": module["icon"],
-            "color": module["color"],
-            "order": module["order"],
-            "estimated_time": module["estimated_time"],
-            "total_lessons": len(module["lessons"]),
+            "id": mod["id"],
+            "title": mod["title"],
+            "description": mod["description"],
+            "icon": mod["icon"],
+            "color": mod["color"],
+            "order": mod["order"],
+            "estimated_time": mod["estimated_time"],
+            "total_lessons": len(mod["lessons"]),
             "completed_lessons": len(completed_lessons),
             "quiz_completed": quiz_completed,
             "quiz_score": quiz_score,
-            "is_locked": module["order"] > 1 and not any(
+            "is_locked": mod["order"] > 1 and not any(
                 m["id"] in progress.get("completed_quizzes", [])
-                for m in ALL_ACADEMY_MODULES if m["order"] == module["order"] - 1
+                for m in ALL_ACADEMY_MODULES if m["order"] == mod["order"] - 1
             )
         })
     
@@ -3268,12 +3268,12 @@ async def complete_lesson(lesson_id: str, current_user: dict = Depends(get_curre
     """Mark a lesson as complete and earn XP"""
     # Find the lesson
     lesson = None
-    module = None
+    found_module = None
     for m in ALL_ACADEMY_MODULES:
-        for l in m["lessons"]:
-            if l["id"] == lesson_id:
-                lesson = l
-                module = m
+        for les in m["lessons"]:
+            if les["id"] == lesson_id:
+                lesson = les
+                found_module = m
                 break
     
     if not lesson:
