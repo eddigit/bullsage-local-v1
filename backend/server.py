@@ -3415,6 +3415,267 @@ async def get_onboarding_options():
         }
     }
 
+# ============== SMART INVEST ==============
+
+class SmartInvestRequest(BaseModel):
+    investment_amount: float
+
+class SmartInvestExecute(BaseModel):
+    coin_id: str
+    amount_usd: float
+    entry_price: float
+
+@api_router.post("/smart-invest/analyze")
+async def smart_invest_analyze(request: SmartInvestRequest, current_user: dict = Depends(get_current_user)):
+    """
+    Analyze the market and recommend the best investment opportunity.
+    Uses all available indicators to find the most promising asset.
+    """
+    if request.investment_amount < 10:
+        return {"error": "Montant minimum: 10€"}
+    
+    watchlist = current_user.get("watchlist", ["bitcoin", "ethereum", "solana", "ripple", "cardano"])
+    
+    if not watchlist:
+        watchlist = ["bitcoin", "ethereum", "solana"]
+    
+    best_opportunity = None
+    best_score = -999
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            # Get prices for all watchlist
+            symbols_str = ",".join(watchlist[:10])
+            prices_response = await client.get(
+                f"{COINGECKO_API_URL}/simple/price",
+                params={
+                    "ids": symbols_str,
+                    "vs_currencies": "usd",
+                    "include_24hr_change": "true"
+                },
+                timeout=15.0
+            )
+            
+            if prices_response.status_code != 200:
+                return {"error": "Impossible de récupérer les prix. Réessayez dans 1 minute."}
+            
+            prices_data = prices_response.json()
+            
+            # Analyze each coin
+            for coin_id in watchlist[:5]:  # Limit to avoid rate limits
+                try:
+                    # Get historical data
+                    hist_response = await client.get(
+                        f"{COINGECKO_API_URL}/coins/{coin_id}/market_chart",
+                        params={"vs_currency": "usd", "days": 14},
+                        timeout=15.0
+                    )
+                    
+                    if hist_response.status_code != 200:
+                        continue
+                    
+                    hist_data = hist_response.json()
+                    prices = [p[1] for p in hist_data.get("prices", [])]
+                    
+                    if len(prices) < 30:
+                        continue
+                    
+                    # Calculate indicators
+                    rsi = calculate_rsi(prices)
+                    macd = calculate_macd(prices)
+                    bb = calculate_bollinger_bands(prices)
+                    ma = calculate_moving_averages(prices)
+                    sr = calculate_support_resistance(prices)
+                    
+                    current_price = prices[-1]
+                    price_data = prices_data.get(coin_id, {})
+                    change_24h = price_data.get("usd_24h_change", 0)
+                    
+                    # Calculate composite score
+                    score = 0
+                    reasons = []
+                    
+                    # RSI Analysis (weight: 3)
+                    if rsi < 25:
+                        score += 4
+                        reasons.append(f"🔥 RSI extrême ({rsi:.1f}) - Excellente opportunité d'achat")
+                    elif rsi < 30:
+                        score += 3
+                        reasons.append(f"RSI en survente ({rsi:.1f}) - Signal d'achat fort")
+                    elif rsi < 40:
+                        score += 2
+                        reasons.append(f"RSI favorable ({rsi:.1f}) - Potentiel de rebond")
+                    elif rsi > 70:
+                        score -= 3
+                        reasons.append(f"RSI en surachat ({rsi:.1f}) - Éviter")
+                    
+                    # Bollinger Analysis (weight: 2)
+                    if bb.get("position") == "oversold":
+                        score += 3
+                        reasons.append("💰 Prix sur bande inférieure Bollinger - Zone d'achat optimale")
+                    elif bb.get("position") == "lower_half":
+                        score += 1
+                    elif bb.get("position") == "overbought":
+                        score -= 2
+                    
+                    # Trend Analysis (weight: 2)
+                    trend = ma.get("trend", "neutral")
+                    if trend == "strong_bullish":
+                        score += 3
+                        reasons.append("🚀 Tendance fortement haussière")
+                    elif trend == "bullish":
+                        score += 2
+                        reasons.append("📈 Tendance haussière confirmée")
+                    elif trend == "strong_bearish":
+                        score -= 3
+                    elif trend == "bearish":
+                        score -= 2
+                    
+                    # MACD Analysis (weight: 1)
+                    if macd.get("trend") == "bullish":
+                        score += 1.5
+                        reasons.append("MACD haussier - Momentum positif")
+                    elif macd.get("trend") == "bearish":
+                        score -= 1.5
+                    
+                    # 24h change bonus (small weight)
+                    if -10 < change_24h < -3:
+                        score += 1
+                        reasons.append(f"Correction récente ({change_24h:.1f}%) - Point d'entrée potentiel")
+                    elif change_24h > 15:
+                        score -= 1
+                    
+                    # Calculate entry/exit levels
+                    support = sr.get("support", current_price * 0.95)
+                    resistance = sr.get("resistance", current_price * 1.15)
+                    
+                    stop_loss = max(support * 0.98, current_price * 0.92)
+                    take_profit_1 = current_price * 1.08
+                    take_profit_2 = min(resistance * 0.98, current_price * 1.15)
+                    
+                    # Get coin info
+                    coin_info_response = await client.get(
+                        f"{COINGECKO_API_URL}/coins/{coin_id}",
+                        params={"localization": "false", "tickers": "false", "community_data": "false"},
+                        timeout=10.0
+                    )
+                    
+                    coin_name = coin_id.replace("-", " ").title()
+                    coin_symbol = coin_id[:3].upper()
+                    
+                    if coin_info_response.status_code == 200:
+                        coin_info = coin_info_response.json()
+                        coin_name = coin_info.get("name", coin_name)
+                        coin_symbol = coin_info.get("symbol", coin_symbol).upper()
+                    
+                    # Check if this is the best opportunity
+                    if score > best_score and score >= 2:
+                        best_score = score
+                        quantity = request.investment_amount / current_price
+                        
+                        best_opportunity = {
+                            "coin_id": coin_id,
+                            "name": coin_name,
+                            "symbol": coin_symbol,
+                            "current_price": current_price,
+                            "change_24h": change_24h,
+                            "score": round(score, 1),
+                            "confidence": "HAUTE" if score >= 5 else "MOYENNE" if score >= 3 else "MODÉRÉE",
+                            "quantity_to_buy": quantity,
+                            "investment_amount": request.investment_amount,
+                            "indicators": {
+                                "rsi": round(rsi, 1),
+                                "trend": trend,
+                                "bollinger": bb.get("position", "middle"),
+                                "macd": macd.get("trend", "neutral")
+                            },
+                            "levels": {
+                                "entry": current_price,
+                                "stop_loss": round(stop_loss, 2 if stop_loss >= 1 else 6),
+                                "take_profit_1": round(take_profit_1, 2 if take_profit_1 >= 1 else 6),
+                                "take_profit_2": round(take_profit_2, 2 if take_profit_2 >= 1 else 6)
+                            },
+                            "reasons": reasons
+                        }
+                    
+                except Exception as e:
+                    logger.warning(f"Error analyzing {coin_id}: {e}")
+                    continue
+            
+            if not best_opportunity:
+                return {
+                    "error": "Aucune opportunité détectée. Les marchés sont neutres ou en surachat. Réessayez plus tard.",
+                    "message": "BULL recommande d'attendre une meilleure opportunité."
+                }
+            
+            return best_opportunity
+            
+    except Exception as e:
+        logger.error(f"Smart invest analysis error: {e}")
+        return {"error": f"Erreur d'analyse: {str(e)}"}
+
+@api_router.post("/smart-invest/execute")
+async def smart_invest_execute(request: SmartInvestExecute, current_user: dict = Depends(get_current_user)):
+    """
+    Execute a smart investment as a paper trade.
+    """
+    user_id = current_user["id"]
+    
+    # Get user's paper trading balance
+    user = await db.users.find_one({"id": user_id})
+    balance = user.get("paper_balance", 10000.0)
+    portfolio = user.get("portfolio", {})
+    
+    if request.amount_usd > balance:
+        return {"success": False, "error": "Solde insuffisant en Paper Trading"}
+    
+    # Calculate quantity
+    quantity = request.amount_usd / request.entry_price
+    
+    # Update portfolio
+    current_holding = portfolio.get(request.coin_id, {"amount": 0, "avg_price": 0})
+    total_amount = current_holding["amount"] + quantity
+    
+    if total_amount > 0:
+        new_avg_price = ((current_holding["amount"] * current_holding["avg_price"]) + request.amount_usd) / total_amount
+    else:
+        new_avg_price = request.entry_price
+    
+    portfolio[request.coin_id] = {"amount": total_amount, "avg_price": new_avg_price}
+    new_balance = balance - request.amount_usd
+    
+    # Update user
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"paper_balance": new_balance, "portfolio": portfolio}}
+    )
+    
+    # Record the trade
+    trade_doc = {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "symbol": request.coin_id,
+        "type": "buy",
+        "amount": quantity,
+        "price": request.entry_price,
+        "total_value": request.amount_usd,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "status": "executed",
+        "source": "smart_invest"
+    }
+    await db.paper_trades.insert_one(trade_doc)
+    
+    return {
+        "success": True,
+        "message": "Investissement exécuté avec succès!",
+        "trade_id": trade_doc["id"],
+        "coin_id": request.coin_id,
+        "quantity": quantity,
+        "entry_price": request.entry_price,
+        "total_invested": request.amount_usd,
+        "new_balance": new_balance
+    }
+
 # ============== SIMPLE BACKTESTING ==============
 
 @api_router.post("/trading/backtest")
