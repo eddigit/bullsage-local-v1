@@ -441,8 +441,12 @@ class BullSageAPITester:
         
         # Core functionality tests (require auth)
         self.test_market_endpoints()
+        self.test_market_context()
         self.test_ai_assistant()
         self.test_paper_trading()
+        self.test_signals()
+        self.test_trading_mode()
+        self.test_academy()
         self.test_watchlist()
         self.test_alerts()
         self.test_strategies()
