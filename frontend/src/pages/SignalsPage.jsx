@@ -234,43 +234,187 @@ export default function SignalsPage() {
 
       {/* Stats Cards */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <Card className="glass border-white/5">
-            <CardContent className="pt-4 pb-4 text-center">
-              <p className="text-3xl font-bold font-mono">{stats.total_signals}</p>
-              <p className="text-xs text-muted-foreground">Total Signaux</p>
-            </CardContent>
-          </Card>
+        <div className="space-y-4">
+          {/* Main Performance Row */}
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+            <Card className="glass border-white/5">
+              <CardContent className="pt-4 pb-4 text-center">
+                <p className="text-2xl md:text-3xl font-bold font-mono">{stats.total_signals}</p>
+                <p className="text-xs text-muted-foreground">Total Signaux</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="glass border-white/5">
+              <CardContent className="pt-4 pb-4 text-center">
+                <p className="text-2xl md:text-3xl font-bold font-mono text-blue-500">{stats.active}</p>
+                <p className="text-xs text-muted-foreground">Actifs</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="glass border-white/5">
+              <CardContent className="pt-4 pb-4 text-center">
+                <p className="text-2xl md:text-3xl font-bold font-mono text-emerald-500">{stats.hit_tp1 + stats.hit_tp2}</p>
+                <p className="text-xs text-muted-foreground">Gagnants</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="glass border-white/5">
+              <CardContent className="pt-4 pb-4 text-center">
+                <p className="text-2xl md:text-3xl font-bold font-mono text-rose-500">{stats.hit_sl}</p>
+                <p className="text-xs text-muted-foreground">Perdants</p>
+              </CardContent>
+            </Card>
+            
+            <Card className={`glass border-2 ${stats.win_rate >= 50 ? "border-emerald-500/30" : "border-rose-500/30"}`}>
+              <CardContent className="pt-4 pb-4 text-center">
+                <p className={`text-2xl md:text-3xl font-bold font-mono ${stats.win_rate >= 50 ? "text-emerald-500" : "text-rose-500"}`}>
+                  {stats.win_rate}%
+                </p>
+                <p className="text-xs text-muted-foreground">Win Rate</p>
+              </CardContent>
+            </Card>
+            
+            <Card className={`glass border-2 ${(stats.total_pnl || 0) >= 0 ? "border-emerald-500/30" : "border-rose-500/30"}`}>
+              <CardContent className="pt-4 pb-4 text-center">
+                <p className={`text-2xl md:text-3xl font-bold font-mono ${(stats.total_pnl || 0) >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                  {(stats.total_pnl || 0) >= 0 ? "+" : ""}{(stats.total_pnl || 0).toFixed(1)}%
+                </p>
+                <p className="text-xs text-muted-foreground">P&L Total</p>
+              </CardContent>
+            </Card>
+          </div>
           
-          <Card className="glass border-white/5">
-            <CardContent className="pt-4 pb-4 text-center">
-              <p className="text-3xl font-bold font-mono text-blue-500">{stats.active}</p>
-              <p className="text-xs text-muted-foreground">Actifs</p>
-            </CardContent>
-          </Card>
+          {/* Advanced Metrics Row */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Card className="glass border-white/5">
+              <CardContent className="pt-3 pb-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Profit Factor</p>
+                    <p className={`text-xl font-bold font-mono ${(stats.profit_factor || 0) >= 1 ? "text-emerald-500" : "text-rose-500"}`}>
+                      {(stats.profit_factor || 0).toFixed(2)}
+                    </p>
+                  </div>
+                  <div className={`p-2 rounded-lg ${(stats.profit_factor || 0) >= 1 ? "bg-emerald-500/20" : "bg-rose-500/20"}`}>
+                    <BarChart3 className={`w-5 h-5 ${(stats.profit_factor || 0) >= 1 ? "text-emerald-500" : "text-rose-500"}`} />
+                  </div>
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-1">{(stats.profit_factor || 0) >= 1 ? "Rentable" : "À améliorer"}</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="glass border-white/5">
+              <CardContent className="pt-3 pb-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Gain Moyen</p>
+                    <p className="text-xl font-bold font-mono text-emerald-500">
+                      +{(stats.avg_win || 0).toFixed(1)}%
+                    </p>
+                  </div>
+                  <ArrowUpRight className="w-6 h-6 text-emerald-500" />
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-1">sur trades gagnants</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="glass border-white/5">
+              <CardContent className="pt-3 pb-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Perte Moyenne</p>
+                    <p className="text-xl font-bold font-mono text-rose-500">
+                      -{(stats.avg_loss || 0).toFixed(1)}%
+                    </p>
+                  </div>
+                  <ArrowDownRight className="w-6 h-6 text-rose-500" />
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-1">sur trades perdants</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="glass border-white/5">
+              <CardContent className="pt-3 pb-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Série Actuelle</p>
+                    <p className={`text-xl font-bold font-mono ${(stats.current_streak || 0) >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                      {(stats.current_streak || 0) >= 0 ? "+" : ""}{stats.current_streak || 0}
+                    </p>
+                  </div>
+                  <Zap className={`w-6 h-6 ${(stats.current_streak || 0) >= 0 ? "text-emerald-500" : "text-rose-500"}`} />
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {(stats.current_streak || 0) >= 0 ? "victoires" : "défaites"} consécutives
+                </p>
+              </CardContent>
+            </Card>
+          </div>
           
-          <Card className="glass border-white/5">
-            <CardContent className="pt-4 pb-4 text-center">
-              <p className="text-3xl font-bold font-mono text-emerald-500">{stats.hit_tp1 + stats.hit_tp2}</p>
-              <p className="text-xs text-muted-foreground">Gagnants</p>
-            </CardContent>
-          </Card>
-          
-          <Card className="glass border-white/5">
-            <CardContent className="pt-4 pb-4 text-center">
-              <p className="text-3xl font-bold font-mono text-rose-500">{stats.hit_sl}</p>
-              <p className="text-xs text-muted-foreground">Perdants</p>
-            </CardContent>
-          </Card>
-          
-          <Card className={`glass border-2 ${stats.win_rate >= 50 ? "border-emerald-500/30" : "border-rose-500/30"}`}>
-            <CardContent className="pt-4 pb-4 text-center">
-              <p className={`text-3xl font-bold font-mono ${stats.win_rate >= 50 ? "text-emerald-500" : "text-rose-500"}`}>
-                {stats.win_rate}%
-              </p>
-              <p className="text-xs text-muted-foreground">Win Rate</p>
-            </CardContent>
-          </Card>
+          {/* Best/Worst Signals & Performance by Asset */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Best & Worst */}
+            <Card className="glass border-white/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">🏆 Meilleurs & Pires Signaux</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {stats.best_signal && (
+                  <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <ArrowUpRight className="w-4 h-4 text-emerald-500" />
+                      <span className="font-medium">{stats.best_signal.symbol}</span>
+                      <Badge className="text-xs bg-emerald-500/20 text-emerald-400">{stats.best_signal.type}</Badge>
+                    </div>
+                    <span className="font-mono font-bold text-emerald-500">+{stats.best_signal.pnl?.toFixed(1)}%</span>
+                  </div>
+                )}
+                {stats.worst_signal && (
+                  <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <ArrowDownRight className="w-4 h-4 text-rose-500" />
+                      <span className="font-medium">{stats.worst_signal.symbol}</span>
+                      <Badge className="text-xs bg-rose-500/20 text-rose-400">{stats.worst_signal.type}</Badge>
+                    </div>
+                    <span className="font-mono font-bold text-rose-500">{stats.worst_signal.pnl?.toFixed(1)}%</span>
+                  </div>
+                )}
+                {!stats.best_signal && !stats.worst_signal && (
+                  <p className="text-sm text-muted-foreground text-center py-4">Pas encore de signaux clôturés</p>
+                )}
+              </CardContent>
+            </Card>
+            
+            {/* Performance by Asset */}
+            <Card className="glass border-white/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">📊 Performance par Actif</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {Object.entries(stats.by_symbol || {}).slice(0, 5).map(([symbol, data]) => (
+                    <div key={symbol} className="flex items-center justify-between p-2 rounded bg-white/5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm">{data.name || symbol}</span>
+                        <span className="text-xs text-muted-foreground">({data.total})</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className={`text-xs ${data.win_rate >= 50 ? "text-emerald-500" : "text-rose-500"}`}>
+                          {data.win_rate}% WR
+                        </span>
+                        <span className={`font-mono text-sm font-bold ${data.pnl >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                          {data.pnl >= 0 ? "+" : ""}{data.pnl}%
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                  {Object.keys(stats.by_symbol || {}).length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">Aucune donnée disponible</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       )}
 
