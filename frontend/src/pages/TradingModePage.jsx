@@ -593,7 +593,9 @@ export default function TradingModePage() {
                       {analysis.recommendation.message}
                     </p>
                     <p className="text-muted-foreground">
-                      Confiance: <span className="font-medium">{analysis.recommendation.confidence.toUpperCase()}</span>
+                      <InfoTooltip tooltipKey="confidence">
+                        <span>Confiance: <span className="font-medium">{analysis.recommendation.confidence.toUpperCase()}</span></span>
+                      </InfoTooltip>
                       {" • "}Score: {analysis.recommendation.score}/10
                     </p>
                   </div>
