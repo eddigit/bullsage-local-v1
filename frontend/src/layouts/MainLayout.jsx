@@ -17,7 +17,8 @@ import {
   Shield,
   Key,
   Brain,
-  Signal
+  Signal,
+  Crosshair
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { ScrollArea } from "../components/ui/scroll-area";
@@ -31,7 +32,8 @@ import {
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Intelligence", href: "/intelligence", icon: Brain, highlight: true },
+  { name: "Mode Trading", href: "/trading", icon: Crosshair, highlight: true },
+  { name: "Intelligence", href: "/intelligence", icon: Brain },
   { name: "Mes Signaux", href: "/signals", icon: Signal },
   { name: "Marchés", href: "/markets", icon: TrendingUp },
   { name: "Assistant IA", href: "/assistant", icon: MessageCircle },
