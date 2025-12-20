@@ -3264,6 +3264,170 @@ async def get_onboarding_options():
         }
     }
 
+# ============== OPPORTUNITY SCANNER ==============
+
+@api_router.get("/trading/scan-opportunities")
+async def scan_trading_opportunities(current_user: dict = Depends(get_current_user)):
+    """
+    Scan user's watchlist for trading opportunities.
+    Returns ranked list of assets with buy/sell signals.
+    """
+    watchlist = current_user.get("watchlist", ["bitcoin", "ethereum", "solana"])
+    
+    if not watchlist:
+        return {"opportunities": [], "message": "Watchlist vide. Ajoutez des actifs à suivre."}
+    
+    opportunities = []
+    
+    # Fetch all prices in one call
+    try:
+        async with httpx.AsyncClient() as client:
+            # Get prices for all watchlist items
+            response = await client.get(
+                f"{COINGECKO_API_URL}/simple/price",
+                params={
+                    "ids": ",".join(watchlist[:10]),  # Max 10 to avoid rate limits
+                    "vs_currencies": "usd",
+                    "include_24hr_change": "true",
+                    "include_24hr_vol": "true"
+                },
+                timeout=15.0
+            )
+            
+            if response.status_code != 200:
+                return {"opportunities": [], "message": "Erreur API - réessayez dans 1 minute"}
+            
+            prices_data = response.json()
+            
+            # Get historical data for each coin to calculate indicators
+            for coin_id in watchlist[:5]:  # Limit to 5 to avoid rate limits
+                try:
+                    # Get 7 days of data for analysis
+                    hist_response = await client.get(
+                        f"{COINGECKO_API_URL}/coins/{coin_id}/market_chart",
+                        params={"vs_currency": "usd", "days": 7},
+                        timeout=15.0
+                    )
+                    
+                    if hist_response.status_code != 200:
+                        continue
+                    
+                    hist_data = hist_response.json()
+                    prices = [p[1] for p in hist_data.get("prices", [])]
+                    
+                    if len(prices) < 20:
+                        continue
+                    
+                    # Calculate indicators
+                    rsi = calculate_rsi(prices)
+                    macd = calculate_macd(prices)
+                    bb = calculate_bollinger_bands(prices)
+                    ma = calculate_moving_averages(prices)
+                    
+                    # Calculate opportunity score
+                    score = 0
+                    signals = []
+                    
+                    # RSI
+                    if rsi < 30:
+                        score += 3
+                        signals.append(f"RSI survente ({rsi})")
+                    elif rsi < 40:
+                        score += 1
+                        signals.append(f"RSI bas ({rsi})")
+                    elif rsi > 70:
+                        score -= 3
+                        signals.append(f"RSI surachat ({rsi})")
+                    
+                    # Bollinger
+                    if bb.get("position") == "oversold":
+                        score += 2
+                        signals.append("Sur bande Bollinger inf.")
+                    elif bb.get("position") == "overbought":
+                        score -= 2
+                        signals.append("Sur bande Bollinger sup.")
+                    
+                    # Trend
+                    trend = ma.get("trend", "neutral")
+                    if trend in ["strong_bullish", "bullish"]:
+                        score += 2
+                        signals.append(f"Tendance {trend}")
+                    elif trend in ["strong_bearish", "bearish"]:
+                        score -= 2
+                        signals.append(f"Tendance {trend}")
+                    
+                    # MACD
+                    if macd.get("trend") == "bullish":
+                        score += 1
+                        signals.append("MACD haussier")
+                    elif macd.get("trend") == "bearish":
+                        score -= 1
+                        signals.append("MACD baissier")
+                    
+                    current_price = prices[-1]
+                    price_24h = prices_data.get(coin_id, {})
+                    change_24h = price_24h.get("usd_24h_change", 0)
+                    
+                    # Determine action
+                    if score >= 4:
+                        action = "STRONG_BUY"
+                        confidence = "high"
+                        emoji = "🟢🟢"
+                    elif score >= 2:
+                        action = "BUY"
+                        confidence = "medium"
+                        emoji = "🟢"
+                    elif score <= -4:
+                        action = "STRONG_SELL"
+                        confidence = "high"
+                        emoji = "🔴🔴"
+                    elif score <= -2:
+                        action = "SELL"
+                        confidence = "medium"
+                        emoji = "🔴"
+                    else:
+                        action = "HOLD"
+                        confidence = "low"
+                        emoji = "🟡"
+                    
+                    opportunities.append({
+                        "coin_id": coin_id,
+                        "name": coin_id.replace("-", " ").title(),
+                        "current_price": round(current_price, 2 if current_price >= 1 else 6),
+                        "change_24h": round(change_24h, 2) if change_24h else 0,
+                        "action": action,
+                        "confidence": confidence,
+                        "score": score,
+                        "emoji": emoji,
+                        "signals": signals,
+                        "rsi": round(rsi, 1),
+                        "trend": trend
+                    })
+                    
+                except Exception as e:
+                    logger.warning(f"Error analyzing {coin_id}: {e}")
+                    continue
+                
+    except Exception as e:
+        logger.error(f"Error in opportunity scanner: {e}")
+        return {"opportunities": [], "message": "Erreur lors du scan - réessayez"}
+    
+    # Sort by absolute score (best opportunities first)
+    opportunities.sort(key=lambda x: abs(x["score"]), reverse=True)
+    
+    # Generate summary
+    buy_signals = len([o for o in opportunities if o["action"] in ["BUY", "STRONG_BUY"]])
+    sell_signals = len([o for o in opportunities if o["action"] in ["SELL", "STRONG_SELL"]])
+    
+    summary = f"🔍 Scan terminé: {buy_signals} signal(s) d'achat, {sell_signals} signal(s) de vente"
+    
+    return {
+        "opportunities": opportunities,
+        "summary": summary,
+        "scan_time": datetime.now(timezone.utc).isoformat(),
+        "watchlist_size": len(watchlist)
+    }
+
 # ============== HEALTH CHECK ==============
 
 @api_router.get("/")
