@@ -129,7 +129,8 @@ function App() {
     localStorage.setItem("token", access_token);
     localStorage.setItem("user", JSON.stringify(userData));
     setUser(userData);
-    return userData;
+    // Return with flag indicating new user for onboarding
+    return { ...userData, isNewUser: true };
   };
 
   const logout = () => {
@@ -138,11 +139,13 @@ function App() {
     setUser(null);
   };
 
-  const updateUser = (updates) => {
-    const updatedUser = { ...user, ...updates };
-    setUser(updatedUser);
-    localStorage.setItem("user", JSON.stringify(updatedUser));
+  const updateUser = (newUserData) => {
+    setUser(newUserData);
+    localStorage.setItem("user", JSON.stringify(newUserData));
   };
+
+  // Check if user needs onboarding
+  const needsOnboarding = user && !user.onboarding_completed;
 
   return (
     <AuthContext.Provider value={{ user, login, register, logout, loading, updateUser }}>
@@ -163,6 +166,9 @@ function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/onboarding" element={
+              user ? <OnboardingPage /> : <Navigate to="/login" replace />
+            } />
             
             <Route path="/" element={
               <ProtectedRoute>
