@@ -103,6 +103,18 @@ export default function PaperTradingPage() {
     }
   };
 
+  const fetchStats = async () => {
+    setLoadingStats(true);
+    try {
+      const response = await axios.get(`${API}/paper-trading/stats`);
+      setTradingStats(response.data);
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
+
   useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 60000);
