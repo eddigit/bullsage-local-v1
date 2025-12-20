@@ -144,6 +144,47 @@
   - agent: "main"
   - message: "Completed P0 (emoji replacement) and P1 (signal evaluation). Ready for testing."
 
+## Test Session: 2025-12-20 09:45
+### Implementation: Manual Refresh Architecture & Bug Fixes
+
+**Changes Made:**
+1. **Removed Automatic Polling (Rate Limiting Prevention)**
+   - Removed `setInterval` from CockpitPage.jsx that was checking alerts every 30 seconds
+   - All pages now use manual refresh buttons instead of continuous API polling
+
+2. **Added Manual "Vérifier" Button for Alerts**
+   - Added "Vérifier" button in CockpitPage to manually check alerts
+   - Updated description to guide users on manual verification
+
+3. **Bug Fix: Dashboard Prices $0.00**
+   - Issue was caused by CoinGecko API rate limiting
+   - Backend cache mechanism is working correctly
+   - Verified: Bitcoin $88,222, Ethereum $2,984.34, Solana $126.58 displaying correctly
+
+**Pages Verified:**
+- Dashboard: ✅ Prices loading correctly, News Impact working
+- Journal: ✅ Modal opens, stats display, trade history ready
+- Cockpit: ✅ Briefing loads, Alert creation modal works, "Vérifier" button added
+- TradingMode: ✅ (Previously tested)
+
+### Credentials:
+- Email: coachdigitalparis@gmail.com
+- Password: $$Reussite888!!
+
+### Tasks to Test:
+1. **Create a new Journal Entry**: Fill form and submit
+2. **Create a new Alert**: Fill form and verify it appears in list
+3. **Verify "Vérifier" button**: Click and check console for response
+4. **Test refresh buttons**: Ensure data updates without continuous polling
+
+### test_plan:
+  needs_retesting: true
+  test_priority: "high_first"
+
+### agent_communication:
+  - agent: "main"
+  - message: "Completed manual refresh architecture. Removed auto-polling. All pages now use buttons to refresh data. Ready for testing."
+
 ## Test Session: 2025-12-20 08:00
 ### Implementation: Trading Expert Mode
 
