@@ -78,6 +78,10 @@ export default function PaperTradingPage() {
   const [tradeType, setTradeType] = useState("buy");
   const [tradeAmount, setTradeAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  
+  // Stats state
+  const [tradingStats, setTradingStats] = useState(null);
+  const [loadingStats, setLoadingStats] = useState(false);
 
   const fetchData = async () => {
     try {
