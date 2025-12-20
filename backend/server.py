@@ -1518,7 +1518,6 @@ Explique pourquoi en 3-4 points clés maximum.
     try:
         chat = LlmChat(
             api_key=EMERGENT_LLM_KEY,
-            model="gpt-4o",
             system_message=f"""Tu es BULL, un trader professionnel expert avec 20 ans d'expérience.
 Tu analyses les marchés crypto avec précision et donnes des conseils actionnables.
 Style de trading demandé: {trading_style}
@@ -1528,6 +1527,7 @@ Niveau du trader: {current_user.get('trading_level', 'intermediate')}
 Tu dois être DIRECT et CLAIR. Pas de blabla. Des décisions concrètes.
 Utilise les indicateurs fournis pour justifier ta recommandation."""
         )
+        chat.with_model("openai", "gpt-4o")
         
         ai_response = await chat.send_message_async(ai_context)
         ai_analysis = ai_response.content if hasattr(ai_response, 'content') else str(ai_response)
