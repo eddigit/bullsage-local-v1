@@ -719,25 +719,33 @@ export default function TradingModePage() {
                   <p className="text-lg font-bold font-mono">{formatPrice(analysis.current_price)}</p>
                 </div>
                 <div className="p-3 rounded-lg bg-blue-500/10 text-center">
-                  <p className="text-xs text-blue-400">Entrée</p>
+                  <InfoTooltip tooltipKey="entry">
+                    <p className="text-xs text-blue-400">Entrée</p>
+                  </InfoTooltip>
                   <p className="text-lg font-bold font-mono text-blue-400">{formatPrice(analysis.levels.entry)}</p>
                 </div>
                 <div className="p-3 rounded-lg bg-rose-500/10 text-center">
-                  <p className="text-xs text-rose-400">Stop-Loss</p>
+                  <InfoTooltip tooltipKey="stopLoss">
+                    <p className="text-xs text-rose-400">Stop-Loss</p>
+                  </InfoTooltip>
                   <p className="text-lg font-bold font-mono text-rose-400">{formatPrice(analysis.levels.stop_loss)}</p>
                   <p className="text-xs text-muted-foreground">
                     {(((analysis.levels.entry - analysis.levels.stop_loss) / analysis.levels.entry) * 100).toFixed(1)}%
                   </p>
                 </div>
                 <div className="p-3 rounded-lg bg-emerald-500/10 text-center">
-                  <p className="text-xs text-emerald-400">TP1</p>
+                  <InfoTooltip tooltipKey="takeProfit">
+                    <p className="text-xs text-emerald-400">TP1</p>
+                  </InfoTooltip>
                   <p className="text-lg font-bold font-mono text-emerald-400">{formatPrice(analysis.levels.take_profit_1)}</p>
                   <p className="text-xs text-muted-foreground">
                     +{(((analysis.levels.take_profit_1 - analysis.levels.entry) / analysis.levels.entry) * 100).toFixed(1)}%
                   </p>
                 </div>
                 <div className="p-3 rounded-lg bg-emerald-500/10 text-center">
-                  <p className="text-xs text-emerald-400">TP2</p>
+                  <InfoTooltip tooltipKey="takeProfit">
+                    <p className="text-xs text-emerald-400">TP2</p>
+                  </InfoTooltip>
                   <p className="text-lg font-bold font-mono text-emerald-400">{formatPrice(analysis.levels.take_profit_2)}</p>
                   <p className="text-xs text-muted-foreground">
                     +{(((analysis.levels.take_profit_2 - analysis.levels.entry) / analysis.levels.entry) * 100).toFixed(1)}%
@@ -747,12 +755,16 @@ export default function TradingModePage() {
               
               {/* Support/Resistance */}
               <div className="mt-4 flex items-center justify-between text-sm">
-                <span className="text-emerald-400">
-                  Support: {formatPrice(analysis.indicators.support_resistance.support)}
-                </span>
-                <span className="text-rose-400">
-                  Résistance: {formatPrice(analysis.indicators.support_resistance.resistance)}
-                </span>
+                <InfoTooltip tooltipKey="support">
+                  <span className="text-emerald-400">
+                    Support: {formatPrice(analysis.indicators.support_resistance.support)}
+                  </span>
+                </InfoTooltip>
+                <InfoTooltip tooltipKey="resistance">
+                  <span className="text-rose-400">
+                    Résistance: {formatPrice(analysis.indicators.support_resistance.resistance)}
+                  </span>
+                </InfoTooltip>
               </div>
             </CardContent>
           </Card>
