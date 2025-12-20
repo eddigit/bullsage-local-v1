@@ -366,6 +366,154 @@ export default function StrategiesPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Backtesting Section */}
+      <Card className="glass border-white/5 mt-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-violet-500" />
+            🧪 Backtesting Rapide
+          </CardTitle>
+          <CardDescription>
+            Testez des stratégies prédéfinies sur l&apos;historique des prix
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <div className="space-y-2">
+              <Label>Crypto</Label>
+              <Select value={backtestCoin} onValueChange={setBacktestCoin}>
+                <SelectTrigger className="bg-black/20 border-white/10">
+                  <SelectValue placeholder="Choisir..." />
+                </SelectTrigger>
+                <SelectContent className="glass border-white/10">
+                  <SelectItem value="bitcoin">Bitcoin (BTC)</SelectItem>
+                  <SelectItem value="ethereum">Ethereum (ETH)</SelectItem>
+                  <SelectItem value="solana">Solana (SOL)</SelectItem>
+                  <SelectItem value="ripple">XRP</SelectItem>
+                  <SelectItem value="cardano">Cardano (ADA)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Stratégie</Label>
+              <Select value={backtestStrategy} onValueChange={setBacktestStrategy}>
+                <SelectTrigger className="bg-black/20 border-white/10">
+                  <SelectValue placeholder="Choisir..." />
+                </SelectTrigger>
+                <SelectContent className="glass border-white/10">
+                  <SelectItem value="rsi_oversold">RSI Survente (&lt;30)</SelectItem>
+                  <SelectItem value="rsi_overbought">RSI Surachat (&gt;70)</SelectItem>
+                  <SelectItem value="ma_crossover">MA Crossover</SelectItem>
+                  <SelectItem value="bollinger_bounce">Bollinger Bounce</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Période</Label>
+              <Select value={backtestDays} onValueChange={setBacktestDays}>
+                <SelectTrigger className="bg-black/20 border-white/10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="glass border-white/10">
+                  <SelectItem value="30">30 jours</SelectItem>
+                  <SelectItem value="60">60 jours</SelectItem>
+                  <SelectItem value="90">90 jours</SelectItem>
+                  <SelectItem value="180">6 mois</SelectItem>
+                  <SelectItem value="365">1 an</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>&nbsp;</Label>
+              <Button 
+                onClick={runBacktest}
+                disabled={backtesting || !backtestCoin || !backtestStrategy}
+                className="w-full bg-violet-600 hover:bg-violet-700"
+              >
+                {backtesting ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Play className="w-4 h-4 mr-2" />
+                )}
+                Lancer le Backtest
+              </Button>
+            </div>
+          </div>
+          
+          {/* Backtest Results */}
+          {backtestResult && (
+            <div className="mt-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="font-semibold">Résultats du Backtest</h4>
+                <Badge className={backtestResult.strategy_vs_buyhold >= 0 ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"}>
+                  {backtestResult.strategy_vs_buyhold >= 0 ? "+" : ""}{backtestResult.strategy_vs_buyhold}% vs Buy&Hold
+                </Badge>
+              </div>
+              
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div className="p-3 rounded-lg bg-white/5 text-center">
+                  <p className="text-xs text-muted-foreground">Capital Final</p>
+                  <p className="text-lg font-bold font-mono">${backtestResult.final_value?.toLocaleString()}</p>
+                </div>
+                <div className={`p-3 rounded-lg text-center ${backtestResult.total_return >= 0 ? "bg-emerald-500/10" : "bg-rose-500/10"}`}>
+                  <p className="text-xs text-muted-foreground">Rendement</p>
+                  <p className={`text-lg font-bold font-mono ${backtestResult.total_return >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                    {backtestResult.total_return >= 0 ? "+" : ""}{backtestResult.total_return}%
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-white/5 text-center">
+                  <p className="text-xs text-muted-foreground">Trades</p>
+                  <p className="text-lg font-bold font-mono">{backtestResult.total_trades}</p>
+                </div>
+                <div className={`p-3 rounded-lg text-center ${backtestResult.win_rate >= 50 ? "bg-emerald-500/10" : "bg-rose-500/10"}`}>
+                  <p className="text-xs text-muted-foreground">Win Rate</p>
+                  <p className={`text-lg font-bold font-mono ${backtestResult.win_rate >= 50 ? "text-emerald-500" : "text-rose-500"}`}>
+                    {backtestResult.win_rate}%
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-blue-500/10 text-center">
+                  <p className="text-xs text-muted-foreground">Buy & Hold</p>
+                  <p className="text-lg font-bold font-mono text-blue-400">
+                    {backtestResult.buy_hold_return >= 0 ? "+" : ""}{backtestResult.buy_hold_return}%
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-violet-500/10 border border-violet-500/20">
+                <Info className="w-5 h-5 text-violet-400 flex-shrink-0" />
+                <p className="text-sm">{backtestResult.message}</p>
+              </div>
+              
+              {/* Trade History */}
+              {backtestResult.trades_sample?.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Derniers trades simulés:</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                    {backtestResult.trades_sample.map((trade, idx) => (
+                      <div key={idx} className={`p-2 rounded text-xs flex justify-between items-center ${
+                        trade.type === "buy" ? "bg-emerald-500/10" : "bg-rose-500/10"
+                      }`}>
+                        <span className={trade.type === "buy" ? "text-emerald-400" : "text-rose-400"}>
+                          {trade.type === "buy" ? "ACHAT" : "VENTE"} @ ${trade.price?.toLocaleString()}
+                        </span>
+                        {trade.pnl !== undefined && (
+                          <span className={trade.pnl >= 0 ? "text-emerald-400" : "text-rose-400"}>
+                            {trade.pnl >= 0 ? "+" : ""}{trade.pnl_percent}%
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
