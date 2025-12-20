@@ -528,6 +528,7 @@ async def get_news_impact_summary(current_user: dict = Depends(get_current_user)
     try:
         chat = LlmChat(
             api_key=EMERGENT_LLM_KEY,
+            session_id=f"news_summary_{datetime.now().strftime('%Y%m%d%H')}",
             system_message="""Tu es un analyste financier expert. Ta tâche est de résumer les actualités crypto importantes en français.
 
 Pour chaque news importante, donne:
