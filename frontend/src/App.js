@@ -23,6 +23,7 @@ import CockpitPage from "./pages/CockpitPage";
 import AcademyPage from "./pages/AcademyPage";
 import ModulePage from "./pages/ModulePage";
 import OnboardingPage from "./pages/OnboardingPage";
+import SmartInvestPage from "./pages/SmartInvestPage";
 
 // Layout
 import MainLayout from "./layouts/MainLayout";
