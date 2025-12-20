@@ -135,7 +135,7 @@ export default function RegisterPage() {
                   </SelectTrigger>
                   <SelectContent className="glass border-white/10">
                     <SelectItem value="beginner">Débutant - Je découvre le trading</SelectItem>
-                    <SelectItem value="intermediate">Intermédiaire - J'ai quelques bases</SelectItem>
+                    <SelectItem value="intermediate">Intermédiaire - J&apos;ai quelques bases</SelectItem>
                     <SelectItem value="advanced">Avancé - Je trade régulièrement</SelectItem>
                   </SelectContent>
                 </Select>

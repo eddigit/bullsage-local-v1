@@ -81,7 +81,7 @@ function ExperienceStep({ options, value, onChange }) {
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold mb-2">Quel est ton niveau ? 🎯</h2>
         <p className="text-muted-foreground">
-          Dis-moi où tu en es, je m'adapte à toi !
+          Dis-moi où tu en es, je m&apos;adapte à toi !
         </p>
       </div>
       
@@ -112,7 +112,7 @@ function MarketsStep({ options, values, onChange }) {
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold mb-2">Quels marchés t'intéressent ? 📊</h2>
+        <h2 className="text-2xl font-bold mb-2">Quels marchés t&apos;intéressent ? 📊</h2>
         <p className="text-muted-foreground">
           Sélectionne tous ceux qui te plaisent
         </p>
@@ -529,7 +529,7 @@ export default function OnboardingPage() {
             ) : (
               <>
                 <Rocket className="w-5 h-5 mr-2" />
-                C'est parti !
+                C&apos;est parti !
               </>
             )}
           </Button>
