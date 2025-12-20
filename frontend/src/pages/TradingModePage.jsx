@@ -360,6 +360,7 @@ export default function TradingModePage() {
   }
 
   return (
+    <TooltipProvider>
     <div className="space-y-6" data-testid="trading-mode-page">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
