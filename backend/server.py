@@ -2337,8 +2337,8 @@ async def analyze_for_trading(request: TradingAnalysisRequest, current_user: dic
         "candlesticks": analyze_candlestick_patterns(prices)
     }
     
-    # Generate algorithmic recommendation
-    algo_recommendation = generate_trading_recommendation(indicators)
+    # Generate algorithmic recommendation with levels
+    algo_recommendation = generate_trading_recommendation(indicators, current_price=prices[-1], market_data=market_data)
     
     # Current price info
     current_price = prices[-1]
