@@ -105,6 +105,26 @@ const TOOLTIPS = {
   candlesticks: {
     title: "Patterns Chandeliers",
     content: "Formations de prix qui prédisent les mouvements futurs. Doji = indécision. Marteau = retournement haussier. Étoile filante = retournement baissier."
+  },
+  fearGreed: {
+    title: "Fear & Greed Index",
+    content: "Mesure le sentiment du marché crypto (0-100). <25 = Peur Extrême (opportunité d'achat). >75 = Cupidité Extrême (prudence/vente). Indicateur contrarien."
+  },
+  vix: {
+    title: "VIX (Indice de Volatilité)",
+    content: "Mesure la volatilité attendue du S&P 500. VIX élevé (>25) = marché nerveux, risque élevé. VIX bas (<15) = marché calme. Influence les cryptos."
+  },
+  fedRate: {
+    title: "Taux Directeur Fed",
+    content: "Taux d'intérêt de la Réserve Fédérale US. Taux élevé = dollar fort, actifs risqués sous pression. Taux bas = liquidité, favorable aux cryptos."
+  },
+  eurusd: {
+    title: "EUR/USD",
+    content: "Taux de change Euro/Dollar. EUR/USD haut = dollar faible = généralement positif pour Bitcoin. Indicateur de la force du dollar."
+  },
+  unemployment: {
+    title: "Taux de Chômage US",
+    content: "Indicateur de santé économique. Chômage bas = économie forte. Chômage élevé = récession possible, la Fed pourrait baisser les taux (positif crypto)."
   }
 };
 
