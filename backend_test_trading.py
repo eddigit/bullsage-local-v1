@@ -252,7 +252,8 @@ class TradingAPITester:
         if self.failed_tests:
             self.log("❌ Failed tests:")
             for test in self.failed_tests:
-                self.log(f"   - {test['name']}: {test.get('error', f'Status {test.get(\"actual\")} vs {test.get(\"expected\")}')}")
+                error_msg = test.get('error', f"Status {test.get('actual')} vs {test.get('expected')}")
+                self.log(f"   - {test['name']}: {error_msg}")
         
         return self.tests_passed == self.tests_run
 
