@@ -19,6 +19,7 @@ import { Button } from "../components/ui/button";
 import { Textarea } from "../components/ui/textarea";
 import { ScrollArea } from "../components/ui/scroll-area";
 import { Badge } from "../components/ui/badge";
+import { chatMarkdownComponents } from "../components/MarkdownComponents";
 
 const QUICK_PROMPTS = [
   { icon: TrendingUp, text: "Analyse BTC/USD pour aujourd'hui", color: "text-emerald-500" },
