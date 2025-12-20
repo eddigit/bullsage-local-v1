@@ -1729,7 +1729,7 @@ Format JSON:
             import json
             try:
                 briefing_data = json.loads(json_match.group())
-            except:
+            except Exception:
                 briefing_data = {
                     "sentiment": "neutral",
                     "summary": response_text[:200],
@@ -2464,7 +2464,7 @@ def analyze_market_conditions(data: dict) -> dict:
                 analysis["warnings"].append("VIX élevé = incertitude sur les marchés")
             else:
                 analysis["key_factors"].append(f"VIX à {vix:.1f} = Volatilité normale")
-        except:
+        except Exception:
             pass
     
     # Economic events
@@ -2533,7 +2533,7 @@ async def chat_with_bull(request: ChatRequest, current_user: dict = Depends(get_
 
         # Macro data
         if market_data["macro"]:
-            market_context += f"""
+            market_context += """
 
 🏦 DONNÉES MACRO:"""
             if market_data["macro"].get("vix"):
@@ -2548,7 +2548,7 @@ async def chat_with_bull(request: ChatRequest, current_user: dict = Depends(get_
                         market_context += " (Normal)"
                     else:
                         market_context += " (ÉLEVÉ - PRUDENCE, forte incertitude)"
-                except:
+                except Exception:
                     pass
             
             if market_data["macro"].get("fed_rate"):
