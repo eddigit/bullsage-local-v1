@@ -291,6 +291,39 @@ class TradingStats(BaseModel):
     current_streak: int
     max_drawdown: float
 
+# ============== ACADEMY MODELS ==============
+
+class AcademyProgress(BaseModel):
+    user_id: str
+    total_xp: int = 0
+    level: int = 1
+    level_title: str = "Nouveau Venu"
+    level_icon: str = "🌱"
+    completed_lessons: List[str] = []
+    completed_quizzes: List[str] = []
+    quiz_scores: Dict[str, int] = {}
+    badges: List[str] = []
+    streak_days: int = 0
+    last_activity: Optional[str] = None
+    daily_xp_earned: int = 0
+
+class QuizSubmission(BaseModel):
+    lesson_id: str
+    answers: Dict[str, int]  # question_id: selected_answer_index
+
+class QuizResult(BaseModel):
+    score: int
+    total: int
+    percentage: float
+    passed: bool
+    xp_earned: int
+    badges_earned: List[str]
+    correct_answers: Dict[str, bool]
+    explanations: Dict[str, str]
+
+class LessonComplete(BaseModel):
+    lesson_id: str
+
 # ============== AUTH HELPERS ==============
 
 def hash_password(password: str) -> str:
