@@ -124,6 +124,25 @@ export default function DashboardPage() {
     }
   };
 
+  const scanOpportunities = async () => {
+    setScanning(true);
+    try {
+      const response = await axios.get(`${API}/trading/scan-opportunities`);
+      setOpportunities(response.data);
+      setScanDialogOpen(true);
+      if (response.data.opportunities?.length > 0) {
+        toast.success(response.data.summary);
+      } else {
+        toast.info("Aucune opportunité détectée pour le moment");
+      }
+    } catch (error) {
+      console.error("Error scanning opportunities:", error);
+      toast.error("Erreur lors du scan - réessayez dans 1 minute");
+    } finally {
+      setScanning(false);
+    }
+  };
+
   const fetchData = async () => {
     try {
       const [marketsRes, fgRes, portfolioRes] = await Promise.all([
