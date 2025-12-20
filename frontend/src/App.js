@@ -20,6 +20,8 @@ import SignalsPage from "./pages/SignalsPage";
 import TradingModePage from "./pages/TradingModePage";
 import JournalPage from "./pages/JournalPage";
 import CockpitPage from "./pages/CockpitPage";
+import AcademyPage from "./pages/AcademyPage";
+import ModulePage from "./pages/ModulePage";
 
 // Layout
 import MainLayout from "./layouts/MainLayout";
