@@ -436,3 +436,35 @@
 ### Credentials:
 - Email: coachdigitalparis@gmail.com
 - Password: $$Reussite888!!
+
+## Test Session: 2025-12-20 13:35
+### Implementation: Backtesting UI + Performance Charts
+
+**New Features Added:**
+
+1. **Backtesting Interface** (Strategies Page):
+   - Crypto selector (BTC, ETH, SOL, XRP, ADA)
+   - Strategy selector (RSI, MA Crossover, Bollinger)
+   - Period selector (30d to 1y)
+   - Results display: Capital, Return, Trades, Win Rate
+   - Comparison vs Buy & Hold
+   - Trade history sample
+
+2. **Performance Chart** (Signals Page):
+   - Monthly P&L evolution chart using Recharts
+   - Green area gradient visualization
+   - Tooltip with P&L percentage
+   - Legend with data points count
+
+3. **Visual Improvements**:
+   - Badge showing strategy vs B&H performance
+   - Color-coded results (green/red)
+   - Trade history with entry/exit details
+
+**Screenshots:**
+- ✅ Backtesting: +18.86% return, 81.8% WR, +11.77% vs B&H
+- ✅ P&L Chart visible with 2025-12 data point
+
+### Credentials:
+- Email: coachdigitalparis@gmail.com
+- Password: $$Reussite888!!
