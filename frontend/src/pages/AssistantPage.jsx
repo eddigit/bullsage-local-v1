@@ -216,20 +216,7 @@ export default function AssistantPage() {
                       </div>
                       <div className="prose prose-sm prose-invert max-w-none">
                         {message.role === "assistant" ? (
-                          <ReactMarkdown
-                            components={{
-                              p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                              ul: ({ children }) => <ul className="list-disc pl-4 mb-2">{children}</ul>,
-                              ol: ({ children }) => <ol className="list-decimal pl-4 mb-2">{children}</ol>,
-                              li: ({ children }) => <li className="mb-1">{children}</li>,
-                              strong: ({ children }) => <strong className="text-primary">{children}</strong>,
-                              code: ({ children }) => (
-                                <code className="bg-white/10 px-1 py-0.5 rounded font-mono text-sm">
-                                  {children}
-                                </code>
-                              ),
-                            }}
-                          >
+                          <ReactMarkdown components={chatMarkdownComponents}>
                             {message.content}
                           </ReactMarkdown>
                         ) : (
