@@ -237,7 +237,7 @@ export default function StrategiesPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Règles d'entrée</Label>
+                <Label>Règles d&apos;entrée</Label>
                 <Textarea
                   value={entryRules}
                   onChange={(e) => setEntryRules(e.target.value)}
@@ -357,7 +357,7 @@ export default function StrategiesPage() {
             <Target className="w-16 h-16 text-muted-foreground/30 mb-4" />
             <h3 className="text-lg font-medium mb-2">Aucune stratégie</h3>
             <p className="text-muted-foreground text-center max-w-md mb-4">
-              Créez votre première stratégie de trading pour définir vos règles d'entrée et de sortie.
+              Créez votre première stratégie de trading pour définir vos règles d&apos;entrée et de sortie.
             </p>
             <Button onClick={() => setDialogOpen(true)} className="bg-primary hover:bg-primary/90 text-black">
               <Plus className="w-4 h-4 mr-2" />

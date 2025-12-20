@@ -139,7 +139,7 @@ export default function SettingsPage() {
             Niveau de Trading
           </CardTitle>
           <CardDescription>
-            L'assistant IA adaptera ses réponses à votre niveau
+            L&apos;assistant IA adaptera ses réponses à votre niveau
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

@@ -281,7 +281,7 @@ export default function SignalsPage() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Zap className="w-5 h-5 text-violet-500" />
-                Résultats de l'évaluation
+                Résultats de l&apos;évaluation
               </CardTitle>
               <Button
                 variant="ghost"
