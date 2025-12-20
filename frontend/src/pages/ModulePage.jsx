@@ -296,10 +296,6 @@ export default function ModulePage() {
   const [quizResult, setQuizResult] = useState(null);
   const [showCelebration, setShowCelebration] = useState(false);
 
-  useEffect(() => {
-    fetchModuleData();
-  }, [moduleId]);
-
   const fetchModuleData = async () => {
     try {
       const token = localStorage.getItem("token");
@@ -314,6 +310,11 @@ export default function ModulePage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchModuleData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moduleId]);
 
   const handleLessonSelect = async (lesson) => {
     try {
