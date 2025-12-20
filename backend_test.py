@@ -267,6 +267,60 @@ class BullSageAPITester:
         
         return success1 and success2
 
+    def test_signals(self):
+        """Test trading signals endpoints with new performance metrics"""
+        self.log("=== SIGNALS TESTS ===")
+        
+        # Create a test signal
+        signal_data = {
+            "symbol": "bitcoin",
+            "symbol_name": "Bitcoin",
+            "signal_type": "BUY",
+            "entry_price": 50000,
+            "stop_loss": 48000,
+            "take_profit_1": 52000,
+            "take_profit_2": 55000,
+            "timeframe": "4h",
+            "confidence": "high",
+            "reason": "RSI oversold + MACD bullish cross",
+            "price_at_signal": 49500
+        }
+        success1, signal_response = self.run_test("Create Signal", "POST", "signals", 200, signal_data)
+        
+        # Get signals
+        success2, _ = self.run_test("Get Signals", "GET", "signals", 200)
+        
+        # Test NEW signals stats endpoint with enhanced metrics
+        success3, stats_response = self.run_test("Get Signal Stats", "GET", "signals/stats", 200)
+        
+        if success3 and stats_response:
+            # Verify new metrics are present
+            required_metrics = [
+                'total_pnl', 'profit_factor', 'avg_win', 'avg_loss', 
+                'current_streak', 'max_streak', 'by_symbol', 'monthly_performance'
+            ]
+            missing_metrics = [metric for metric in required_metrics if metric not in stats_response]
+            if missing_metrics:
+                self.log(f"❌ Missing new metrics in signals stats: {missing_metrics}")
+                self.failed_tests.append({
+                    "test": "Signal Stats New Metrics",
+                    "error": f"Missing metrics: {missing_metrics}",
+                    "endpoint": "signals/stats"
+                })
+            else:
+                self.log("✅ All new signal metrics present")
+        
+        # Test signal evaluation
+        success4, _ = self.run_test("Evaluate Signals", "POST", "signals/evaluate", 200)
+        
+        # Delete signal if created
+        if success1 and 'id' in signal_response:
+            signal_id = signal_response['id']
+            success5, _ = self.run_test("Delete Signal", "DELETE", f"signals/{signal_id}", 200)
+            return success1 and success2 and success3 and success4 and success5
+        
+        return success1 and success2 and success3 and success4
+
     def test_strategies(self):
         """Test strategies endpoints"""
         self.log("=== STRATEGIES TESTS ===")
@@ -292,6 +346,57 @@ class BullSageAPITester:
             return success1 and success2 and success3
         
         return success1 and success2
+
+    def test_trading_mode(self):
+        """Test trading mode endpoints"""
+        self.log("=== TRADING MODE TESTS ===")
+        
+        # Test trading analysis
+        analysis_data = {
+            "coin_id": "bitcoin",
+            "timeframe": "4h",
+            "trading_style": "swing"
+        }
+        success1, _ = self.run_test("Trading Analysis", "POST", "trading/analyze", 200, analysis_data)
+        
+        # Test scan opportunities
+        success2, _ = self.run_test("Scan Opportunities", "GET", "trading/scan-opportunities", 200)
+        
+        return success1 and success2
+
+    def test_academy(self):
+        """Test academy endpoints"""
+        self.log("=== ACADEMY TESTS ===")
+        
+        # Get academy progress
+        success1, _ = self.run_test("Get Academy Progress", "GET", "academy/progress", 200)
+        
+        # Get lessons
+        success2, _ = self.run_test("Get Lessons", "GET", "academy/lessons", 200)
+        
+        # Complete a lesson
+        lesson_data = {"lesson_id": "basics_intro"}
+        success3, _ = self.run_test("Complete Lesson", "POST", "academy/complete-lesson", 200, lesson_data)
+        
+        return success1 and success2 and success3
+
+    def test_market_context(self):
+        """Test market context endpoints for Trading Mode"""
+        self.log("=== MARKET CONTEXT TESTS ===")
+        
+        # Test Fear & Greed Index
+        success1, _ = self.run_test("Fear & Greed Index", "GET", "market/fear-greed", 200)
+        
+        # Test News Impact
+        success2, _ = self.run_test("News Impact", "GET", "market/news-impact", 200)
+        
+        # Test Macro Overview
+        success3, _ = self.run_test("Macro Overview", "GET", "market/macro-overview", 200)
+        
+        # Test Forex data
+        success4, _ = self.run_test("EUR/USD Rate", "GET", "market/forex/EUR/USD", 200)
+        
+        return success1 and success2 and success3 and success4
 
     def test_admin_endpoints(self):
         """Test admin-only endpoints"""
