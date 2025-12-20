@@ -795,6 +795,119 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
         </DialogContent>
       </Dialog>
 
+      {/* Opportunity Scanner Dialog */}
+      <Dialog open={scanDialogOpen} onOpenChange={setScanDialogOpen}>
+        <DialogContent className="glass border-white/10 max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Search className="w-5 h-5 text-violet-500" />
+              🔍 Scanner d&apos;Opportunités
+            </DialogTitle>
+            <DialogDescription>
+              {opportunities?.summary || "Analyse de votre watchlist"}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-3">
+            {opportunities?.opportunities?.length > 0 ? (
+              opportunities.opportunities.map((opp, idx) => (
+                <div 
+                  key={idx}
+                  className={`p-4 rounded-lg border ${
+                    opp.action.includes("BUY") 
+                      ? "bg-emerald-500/10 border-emerald-500/30" 
+                      : opp.action.includes("SELL")
+                        ? "bg-rose-500/10 border-rose-500/30"
+                        : "bg-white/5 border-white/10"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">{opp.emoji}</span>
+                      <div>
+                        <p className="font-bold">{opp.name}</p>
+                        <p className="text-sm text-muted-foreground font-mono">
+                          {formatPrice(opp.current_price)}
+                          <span className={`ml-2 ${opp.change_24h >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                            {opp.change_24h >= 0 ? "+" : ""}{opp.change_24h?.toFixed(2)}%
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                    <Badge 
+                      className={`${
+                        opp.action.includes("BUY") 
+                          ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" 
+                          : opp.action.includes("SELL")
+                            ? "bg-rose-500/20 text-rose-400 border-rose-500/30"
+                            : "bg-yellow-500/20 text-yellow-400 border-yellow-500/30"
+                      }`}
+                    >
+                      {opp.action.replace("_", " ")}
+                    </Badge>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-2 text-xs mb-2">
+                    <div className="p-2 rounded bg-white/5">
+                      <span className="text-muted-foreground">RSI</span>
+                      <span className={`ml-1 font-mono ${opp.rsi < 30 ? "text-emerald-500" : opp.rsi > 70 ? "text-rose-500" : ""}`}>
+                        {opp.rsi}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded bg-white/5">
+                      <span className="text-muted-foreground">Score</span>
+                      <span className={`ml-1 font-mono font-bold ${opp.score >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                        {opp.score >= 0 ? "+" : ""}{opp.score}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded bg-white/5">
+                      <span className="text-muted-foreground">Tendance</span>
+                      <span className="ml-1 text-[10px]">{opp.trend}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-1">
+                    {opp.signals?.map((signal, sidx) => (
+                      <Badge key={sidx} variant="outline" className="text-[10px] border-white/20">
+                        {signal}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8">
+                <Search className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
+                <p className="text-muted-foreground">
+                  {opportunities?.message || "Aucune opportunité détectée pour le moment"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Les marchés sont neutres. Réessayez plus tard.
+                </p>
+              </div>
+            )}
+          </div>
+          
+          <div className="flex gap-2 mt-4">
+            <Button 
+              onClick={scanOpportunities} 
+              disabled={scanning}
+              variant="outline" 
+              className="flex-1 border-white/10"
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${scanning ? "animate-spin" : ""}`} />
+              Re-scanner
+            </Button>
+            <Link to="/trading" className="flex-1">
+              <Button className="w-full bg-violet-500 hover:bg-violet-600">
+                <Zap className="w-4 h-4 mr-2" />
+                Analyser en détail
+              </Button>
+            </Link>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Quick Actions */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Link to="/markets">
