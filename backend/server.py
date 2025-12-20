@@ -547,19 +547,13 @@ Maximum 4-5 news les plus importantes. Sois TRÈS concis."""
         )
         chat.with_model("openai", "gpt-4o")
         
-        ai_response = await chat.send_message(f"Analyse ces actualités crypto des dernières 48h et résume en français avec impact marché:\n\n{news_text}")
+        user_msg = UserMessage(text=f"Analyse ces actualités crypto des dernières 48h et résume en français avec impact marché:\n\n{news_text}")
+        ai_response = await chat.send_message(user_msg)
         
-        # Parse AI response - handle different response types
-        if isinstance(ai_response, str):
-            response_text = ai_response
-        elif hasattr(ai_response, 'content'):
-            response_text = ai_response.content
-        elif hasattr(ai_response, 'message'):
-            response_text = ai_response.message
-        else:
-            response_text = str(ai_response)
+        # Parse AI response - the response is a string directly
+        response_text = str(ai_response) if ai_response else ""
         
-        logger.info(f"AI news response type: {type(ai_response)}, text preview: {response_text[:200] if response_text else 'empty'}")
+        logger.info(f"AI news response preview: {response_text[:300] if response_text else 'empty'}")
         
         # Try to extract JSON from response
         import re
