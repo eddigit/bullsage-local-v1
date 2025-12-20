@@ -425,6 +425,67 @@ export default function SignalsPage() {
               </CardContent>
             </Card>
           </div>
+          
+          {/* Monthly Performance Chart */}
+          {stats.monthly_performance && stats.monthly_performance.length > 0 && (
+            <Card className="glass border-white/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <LineChart className="w-4 h-4 text-primary" />
+                  📈 Évolution Mensuelle du P&L
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={[...stats.monthly_performance].reverse()}>
+                      <defs>
+                        <linearGradient id="pnlGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                      <XAxis 
+                        dataKey="month" 
+                        stroke="#666" 
+                        tick={{ fill: '#888', fontSize: 10 }}
+                      />
+                      <YAxis 
+                        stroke="#666" 
+                        tick={{ fill: '#888', fontSize: 10 }}
+                        tickFormatter={(v) => `${v}%`}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: '#1a1a2e', 
+                          border: '1px solid #333',
+                          borderRadius: '8px'
+                        }}
+                        labelStyle={{ color: '#888' }}
+                        formatter={(value, name) => {
+                          if (name === 'pnl') return [`${value}%`, 'P&L'];
+                          if (name === 'win_rate') return [`${value}%`, 'Win Rate'];
+                          return [value, name];
+                        }}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="pnl" 
+                        stroke="#22c55e" 
+                        fillOpacity={1} 
+                        fill="url(#pnlGradient)" 
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="flex justify-center gap-6 mt-2 text-xs text-muted-foreground">
+                  <span>🟢 P&L cumulé par mois</span>
+                  <span>📊 {stats.monthly_performance.length} mois de données</span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
