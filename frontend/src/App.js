@@ -180,6 +180,8 @@ function App() {
               <Route path="trading" element={<TradingModePage />} />
               <Route path="journal" element={<JournalPage />} />
               <Route path="cockpit" element={<CockpitPage />} />
+              <Route path="academy" element={<AcademyPage />} />
+              <Route path="academy/module/:moduleId" element={<ModulePage />} />
               <Route path="admin" element={<AdminPage />} />
               <Route path="admin/api-keys" element={<ApiKeysPage />} />
             </Route>
