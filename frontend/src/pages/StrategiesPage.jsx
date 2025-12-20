@@ -64,6 +64,34 @@ export default function StrategiesPage() {
   const [exitRules, setExitRules] = useState("");
   const [riskPercentage, setRiskPercentage] = useState("2");
 
+  // Backtesting state
+  const [backtestCoin, setBacktestCoin] = useState("bitcoin");
+  const [backtestStrategy, setBacktestStrategy] = useState("rsi_oversold");
+  const [backtestDays, setBacktestDays] = useState("30");
+  const [backtesting, setBacktesting] = useState(false);
+  const [backtestResult, setBacktestResult] = useState(null);
+
+  const runBacktest = async () => {
+    setBacktesting(true);
+    setBacktestResult(null);
+    try {
+      const response = await axios.post(
+        `${API}/trading/backtest?coin_id=${backtestCoin}&strategy=${backtestStrategy}&days=${backtestDays}`
+      );
+      setBacktestResult(response.data);
+      if (response.data.error) {
+        toast.error(response.data.error);
+      } else {
+        toast.success(`Backtest terminé: ${response.data.total_return}% de rendement`);
+      }
+    } catch (error) {
+      console.error("Backtest error:", error);
+      toast.error("Erreur lors du backtest - réessayez");
+    } finally {
+      setBacktesting(false);
+    }
+  };
+
   const fetchStrategies = async () => {
     try {
       const response = await axios.get(`${API}/strategies`);
