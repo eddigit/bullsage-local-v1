@@ -693,7 +693,7 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
               )}
             </DialogTitle>
             <DialogDescription>
-              Signal de trading généré par l'IA BULL SAGE
+              Signal de trading généré par l&apos;IA BULL SAGE
             </DialogDescription>
           </DialogHeader>
           
@@ -774,7 +774,7 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
             <CardContent className="pt-6 text-center">
               <Wallet className="w-8 h-8 mx-auto text-primary mb-2" />
               <p className="font-medium">Paper Trading</p>
-              <p className="text-xs text-muted-foreground">S'entraîner</p>
+              <p className="text-xs text-muted-foreground">S&apos;entraîner</p>
             </CardContent>
           </Card>
         </Link>

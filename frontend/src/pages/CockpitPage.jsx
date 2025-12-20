@@ -395,7 +395,7 @@ export default function CockpitPage() {
             </div>
           </div>
           <CardDescription>
-            Cliquez sur "Vérifier" pour contrôler si vos alertes ont été déclenchées
+            Cliquez sur &quot;Vérifier&quot; pour contrôler si vos alertes ont été déclenchées
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -539,7 +539,7 @@ export default function CockpitPage() {
             
             <div className="flex items-center justify-between">
               <Label className="flex items-center gap-2">
-                <RefreshCw className="w-4 h-4" /> Répéter l'alerte
+                <RefreshCw className="w-4 h-4" /> Répéter l&apos;alerte
               </Label>
               <Switch
                 checked={newAlert.repeat}
@@ -553,7 +553,7 @@ export default function CockpitPage() {
               className="w-full bg-primary text-black"
             >
               {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Bell className="w-4 h-4 mr-2" />}
-              Créer l'Alerte
+              Créer l&apos;Alerte
             </Button>
           </div>
         </DialogContent>
