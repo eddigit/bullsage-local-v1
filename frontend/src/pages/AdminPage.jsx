@@ -46,11 +46,6 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Redirect if not admin
-  if (!user?.is_admin) {
-    return <Navigate to="/" replace />;
-  }
-
   const fetchData = async () => {
     try {
       const [statsRes, usersRes] = await Promise.all([
@@ -69,8 +64,15 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (user?.is_admin) {
+      fetchData();
+    }
+  }, [user?.is_admin]);
+
+  // Redirect if not admin - AFTER all hooks
+  if (!user?.is_admin) {
+    return <Navigate to="/" replace />;
+  }
 
   const handleRefresh = () => {
     setRefreshing(true);
