@@ -2984,6 +2984,476 @@ async def get_api_keys(admin: dict = Depends(get_admin_user)):
         "emergent_llm": {**mask_key(EMERGENT_LLM_KEY), "name": "Emergent LLM", "usage": "IA GPT-5.1"}
     }
 
+# ============== ACADEMY ENDPOINTS ==============
+
+from academy_data import ACADEMY_MODULES, BADGES, LEVEL_THRESHOLDS, XP_REWARDS
+from academy_data_part2 import ACADEMY_MODULES_PART2, ACADEMY_MODULE_6
+
+# Combine all modules
+ALL_ACADEMY_MODULES = ACADEMY_MODULES + ACADEMY_MODULES_PART2 + [ACADEMY_MODULE_6]
+
+def calculate_level(xp: int) -> dict:
+    """Calculate level from XP"""
+    current_level = LEVEL_THRESHOLDS[0]
+    next_level = LEVEL_THRESHOLDS[1] if len(LEVEL_THRESHOLDS) > 1 else None
+    
+    for i, level in enumerate(LEVEL_THRESHOLDS):
+        if xp >= level["min_xp"]:
+            current_level = level
+            next_level = LEVEL_THRESHOLDS[i + 1] if i + 1 < len(LEVEL_THRESHOLDS) else None
+    
+    return {
+        "level": current_level["level"],
+        "title": current_level["title"],
+        "icon": current_level["icon"],
+        "current_xp": xp,
+        "next_level_xp": next_level["min_xp"] if next_level else None,
+        "xp_to_next": (next_level["min_xp"] - xp) if next_level else 0
+    }
+
+@api_router.get("/academy/modules")
+async def get_academy_modules(current_user: dict = Depends(get_current_user)):
+    """Get all academy modules with progress"""
+    # Get user progress
+    progress = await db.academy_progress.find_one(
+        {"user_id": current_user["id"]},
+        {"_id": 0}
+    )
+    
+    if not progress:
+        progress = {
+            "user_id": current_user["id"],
+            "total_xp": 0,
+            "completed_lessons": [],
+            "completed_quizzes": [],
+            "quiz_scores": {},
+            "badges": [],
+            "streak_days": 0
+        }
+    
+    # Build response with progress
+    modules_with_progress = []
+    for module in ALL_ACADEMY_MODULES:
+        lesson_ids = [l["id"] for l in module["lessons"]]
+        completed_lessons = [l for l in lesson_ids if l in progress.get("completed_lessons", [])]
+        quiz_completed = module["id"] in progress.get("completed_quizzes", [])
+        quiz_score = progress.get("quiz_scores", {}).get(module["id"], None)
+        
+        modules_with_progress.append({
+            "id": module["id"],
+            "title": module["title"],
+            "description": module["description"],
+            "icon": module["icon"],
+            "color": module["color"],
+            "order": module["order"],
+            "estimated_time": module["estimated_time"],
+            "total_lessons": len(module["lessons"]),
+            "completed_lessons": len(completed_lessons),
+            "quiz_completed": quiz_completed,
+            "quiz_score": quiz_score,
+            "is_locked": module["order"] > 1 and not any(
+                m["id"] in progress.get("completed_quizzes", [])
+                for m in ALL_ACADEMY_MODULES if m["order"] == module["order"] - 1
+            )
+        })
+    
+    return {
+        "modules": modules_with_progress,
+        "user_progress": calculate_level(progress.get("total_xp", 0)),
+        "total_xp": progress.get("total_xp", 0),
+        "badges": progress.get("badges", []),
+        "streak_days": progress.get("streak_days", 0)
+    }
+
+@api_router.get("/academy/modules/{module_id}")
+async def get_module_detail(module_id: str, current_user: dict = Depends(get_current_user)):
+    """Get detailed module with all lessons"""
+    module = next((m for m in ALL_ACADEMY_MODULES if m["id"] == module_id), None)
+    if not module:
+        raise HTTPException(status_code=404, detail="Module not found")
+    
+    # Get user progress
+    progress = await db.academy_progress.find_one(
+        {"user_id": current_user["id"]},
+        {"_id": 0}
+    )
+    completed_lessons = progress.get("completed_lessons", []) if progress else []
+    
+    # Add completion status to lessons
+    lessons_with_status = []
+    for lesson in module["lessons"]:
+        lessons_with_status.append({
+            **lesson,
+            "completed": lesson["id"] in completed_lessons
+        })
+    
+    return {
+        **module,
+        "lessons": lessons_with_status,
+        "quiz_info": {
+            "title": module["quiz"]["title"],
+            "description": module["quiz"]["description"],
+            "passing_score": module["quiz"]["passing_score"],
+            "question_count": len(module["quiz"]["questions"])
+        }
+    }
+
+@api_router.get("/academy/lessons/{lesson_id}")
+async def get_lesson(lesson_id: str, current_user: dict = Depends(get_current_user)):
+    """Get lesson content"""
+    for module in ALL_ACADEMY_MODULES:
+        for lesson in module["lessons"]:
+            if lesson["id"] == lesson_id:
+                return {
+                    "lesson": lesson,
+                    "module_id": module["id"],
+                    "module_title": module["title"]
+                }
+    
+    raise HTTPException(status_code=404, detail="Lesson not found")
+
+@api_router.post("/academy/lessons/{lesson_id}/complete")
+async def complete_lesson(lesson_id: str, current_user: dict = Depends(get_current_user)):
+    """Mark a lesson as complete and earn XP"""
+    # Find the lesson
+    lesson = None
+    module = None
+    for m in ALL_ACADEMY_MODULES:
+        for l in m["lessons"]:
+            if l["id"] == lesson_id:
+                lesson = l
+                module = m
+                break
+    
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+    
+    # Get or create progress
+    progress = await db.academy_progress.find_one({"user_id": current_user["id"]})
+    
+    if not progress:
+        progress = {
+            "user_id": current_user["id"],
+            "total_xp": 0,
+            "completed_lessons": [],
+            "completed_quizzes": [],
+            "quiz_scores": {},
+            "badges": [],
+            "streak_days": 0,
+            "last_activity": None,
+            "daily_xp_earned": 0
+        }
+        await db.academy_progress.insert_one(progress)
+    
+    xp_earned = 0
+    badges_earned = []
+    
+    # Check if already completed
+    if lesson_id not in progress.get("completed_lessons", []):
+        xp_earned = lesson["xp_reward"]
+        
+        # Update progress
+        new_completed = progress.get("completed_lessons", []) + [lesson_id]
+        new_xp = progress.get("total_xp", 0) + xp_earned
+        
+        # Check for badges
+        if len(new_completed) == 1:
+            badges_earned.append("first_lesson")
+        if len(new_completed) == 5:
+            badges_earned.append("curious_mind")
+        if len(new_completed) == 15:
+            badges_earned.append("bookworm")
+        
+        # Update streak
+        today = datetime.now(timezone.utc).date().isoformat()
+        last_activity = progress.get("last_activity")
+        streak = progress.get("streak_days", 0)
+        
+        if last_activity:
+            last_date = datetime.fromisoformat(last_activity.replace('Z', '+00:00')).date()
+            today_date = datetime.now(timezone.utc).date()
+            if (today_date - last_date).days == 1:
+                streak += 1
+                xp_earned += XP_REWARDS["daily_streak"]
+            elif (today_date - last_date).days > 1:
+                streak = 1
+        else:
+            streak = 1
+        
+        # Check streak badges
+        if streak == 3 and "streak_3" not in progress.get("badges", []):
+            badges_earned.append("streak_3")
+        if streak == 7 and "streak_7" not in progress.get("badges", []):
+            badges_earned.append("streak_7")
+        if streak == 30 and "streak_30" not in progress.get("badges", []):
+            badges_earned.append("streak_30")
+        
+        # Save progress
+        await db.academy_progress.update_one(
+            {"user_id": current_user["id"]},
+            {
+                "$set": {
+                    "completed_lessons": new_completed,
+                    "total_xp": new_xp,
+                    "streak_days": streak,
+                    "last_activity": datetime.now(timezone.utc).isoformat(),
+                    "badges": progress.get("badges", []) + badges_earned
+                }
+            },
+            upsert=True
+        )
+    
+    level_info = calculate_level(progress.get("total_xp", 0) + xp_earned)
+    
+    return {
+        "success": True,
+        "xp_earned": xp_earned,
+        "total_xp": progress.get("total_xp", 0) + xp_earned,
+        "badges_earned": badges_earned,
+        "level": level_info
+    }
+
+@api_router.get("/academy/quiz/{module_id}")
+async def get_quiz(module_id: str, current_user: dict = Depends(get_current_user)):
+    """Get quiz questions for a module"""
+    module = next((m for m in ALL_ACADEMY_MODULES if m["id"] == module_id), None)
+    if not module:
+        raise HTTPException(status_code=404, detail="Module not found")
+    
+    # Return questions without correct answers
+    questions = []
+    for q in module["quiz"]["questions"]:
+        questions.append({
+            "id": q["id"],
+            "question": q["question"],
+            "type": q["type"],
+            "options": q["options"]
+        })
+    
+    return {
+        "module_id": module_id,
+        "title": module["quiz"]["title"],
+        "description": module["quiz"]["description"],
+        "passing_score": module["quiz"]["passing_score"],
+        "questions": questions
+    }
+
+@api_router.post("/academy/quiz/{module_id}/submit")
+async def submit_quiz(module_id: str, submission: QuizSubmission, current_user: dict = Depends(get_current_user)):
+    """Submit quiz answers and get results"""
+    module = next((m for m in ALL_ACADEMY_MODULES if m["id"] == module_id), None)
+    if not module:
+        raise HTTPException(status_code=404, detail="Module not found")
+    
+    quiz = module["quiz"]
+    correct_count = 0
+    correct_answers = {}
+    explanations = {}
+    
+    for question in quiz["questions"]:
+        q_id = question["id"]
+        user_answer = submission.answers.get(q_id)
+        is_correct = user_answer == question["correct_answer"]
+        correct_answers[q_id] = is_correct
+        explanations[q_id] = question["explanation"]
+        if is_correct:
+            correct_count += 1
+    
+    total = len(quiz["questions"])
+    percentage = (correct_count / total) * 100 if total > 0 else 0
+    passed = percentage >= quiz["passing_score"]
+    
+    # Calculate XP
+    xp_earned = 0
+    badges_earned = []
+    
+    # Get user progress
+    progress = await db.academy_progress.find_one({"user_id": current_user["id"]})
+    if not progress:
+        progress = {
+            "user_id": current_user["id"],
+            "total_xp": 0,
+            "completed_lessons": [],
+            "completed_quizzes": [],
+            "quiz_scores": {},
+            "badges": []
+        }
+    
+    # Award XP only if passed and first time OR better score
+    previous_score = progress.get("quiz_scores", {}).get(module_id)
+    is_first_time = module_id not in progress.get("completed_quizzes", [])
+    
+    if passed:
+        if is_first_time:
+            xp_earned = XP_REWARDS["quiz_pass"]
+            if percentage == 100:
+                xp_earned += XP_REWARDS["quiz_perfect"]
+                if "quiz_master" not in progress.get("badges", []):
+                    badges_earned.append("quiz_master")
+            
+            # Module completion badge
+            module_badge = f"module_{module['order']}_complete"
+            if module_badge not in progress.get("badges", []):
+                badge_map = {
+                    1: "module_1_complete",
+                    2: "module_2_complete",
+                    3: "module_3_complete",
+                    4: "module_4_complete",
+                    5: "module_5_complete",
+                    6: "module_6_complete"
+                }
+                if module["order"] in badge_map:
+                    badges_earned.append(badge_map[module["order"]])
+            
+            # Add module XP
+            xp_earned += XP_REWARDS["module_complete"]
+            
+            # Check if all modules complete
+            new_completed = progress.get("completed_quizzes", []) + [module_id]
+            if len(new_completed) == len(ALL_ACADEMY_MODULES):
+                xp_earned += XP_REWARDS["all_modules_complete"]
+                badges_earned.append("graduate")
+        
+        # Update progress
+        new_quizzes = list(set(progress.get("completed_quizzes", []) + [module_id]))
+        new_scores = {**progress.get("quiz_scores", {}), module_id: int(percentage)}
+        new_xp = progress.get("total_xp", 0) + xp_earned
+        new_badges = list(set(progress.get("badges", []) + badges_earned))
+        
+        await db.academy_progress.update_one(
+            {"user_id": current_user["id"]},
+            {
+                "$set": {
+                    "completed_quizzes": new_quizzes,
+                    "quiz_scores": new_scores,
+                    "total_xp": new_xp,
+                    "badges": new_badges,
+                    "last_activity": datetime.now(timezone.utc).isoformat()
+                }
+            },
+            upsert=True
+        )
+    
+    return {
+        "score": correct_count,
+        "total": total,
+        "percentage": round(percentage, 1),
+        "passed": passed,
+        "passing_score": quiz["passing_score"],
+        "xp_earned": xp_earned,
+        "badges_earned": badges_earned,
+        "correct_answers": correct_answers,
+        "explanations": explanations,
+        "level": calculate_level(progress.get("total_xp", 0) + xp_earned)
+    }
+
+@api_router.get("/academy/progress")
+async def get_academy_progress(current_user: dict = Depends(get_current_user)):
+    """Get user's academy progress"""
+    progress = await db.academy_progress.find_one(
+        {"user_id": current_user["id"]},
+        {"_id": 0}
+    )
+    
+    if not progress:
+        progress = {
+            "user_id": current_user["id"],
+            "total_xp": 0,
+            "completed_lessons": [],
+            "completed_quizzes": [],
+            "quiz_scores": {},
+            "badges": [],
+            "streak_days": 0
+        }
+    
+    # Calculate stats
+    total_lessons = sum(len(m["lessons"]) for m in ALL_ACADEMY_MODULES)
+    completed_lessons = len(progress.get("completed_lessons", []))
+    total_modules = len(ALL_ACADEMY_MODULES)
+    completed_modules = len(progress.get("completed_quizzes", []))
+    
+    # Get badge details
+    badge_details = []
+    for badge_id in progress.get("badges", []):
+        badge = next((b for b in BADGES if b["id"] == badge_id), None)
+        if badge:
+            badge_details.append(badge)
+    
+    return {
+        "level": calculate_level(progress.get("total_xp", 0)),
+        "total_xp": progress.get("total_xp", 0),
+        "streak_days": progress.get("streak_days", 0),
+        "completed_lessons": completed_lessons,
+        "total_lessons": total_lessons,
+        "completed_modules": completed_modules,
+        "total_modules": total_modules,
+        "progress_percentage": round((completed_lessons / total_lessons) * 100, 1) if total_lessons > 0 else 0,
+        "badges": badge_details,
+        "quiz_scores": progress.get("quiz_scores", {})
+    }
+
+@api_router.get("/academy/leaderboard")
+async def get_leaderboard(current_user: dict = Depends(get_current_user)):
+    """Get academy leaderboard"""
+    # Get all progress sorted by XP
+    all_progress = await db.academy_progress.find(
+        {},
+        {"_id": 0}
+    ).sort("total_xp", -1).limit(20).to_list(20)
+    
+    leaderboard = []
+    for i, prog in enumerate(all_progress):
+        user = await db.users.find_one({"id": prog["user_id"]}, {"_id": 0, "password": 0})
+        if user:
+            level_info = calculate_level(prog.get("total_xp", 0))
+            leaderboard.append({
+                "rank": i + 1,
+                "user_id": user["id"],
+                "name": user.get("name", "Trader Anonyme"),
+                "total_xp": prog.get("total_xp", 0),
+                "level": level_info["level"],
+                "level_title": level_info["title"],
+                "level_icon": level_info["icon"],
+                "badges_count": len(prog.get("badges", [])),
+                "is_current_user": user["id"] == current_user["id"]
+            })
+    
+    # Find current user's rank if not in top 20
+    current_user_in_list = any(l["is_current_user"] for l in leaderboard)
+    current_user_rank = None
+    
+    if not current_user_in_list:
+        user_progress = await db.academy_progress.find_one({"user_id": current_user["id"]})
+        if user_progress:
+            higher_count = await db.academy_progress.count_documents(
+                {"total_xp": {"$gt": user_progress.get("total_xp", 0)}}
+            )
+            current_user_rank = higher_count + 1
+    
+    return {
+        "leaderboard": leaderboard,
+        "current_user_rank": current_user_rank
+    }
+
+@api_router.get("/academy/badges")
+async def get_all_badges(current_user: dict = Depends(get_current_user)):
+    """Get all available badges with unlock status"""
+    progress = await db.academy_progress.find_one(
+        {"user_id": current_user["id"]},
+        {"_id": 0}
+    )
+    
+    earned_badges = progress.get("badges", []) if progress else []
+    
+    badges_with_status = []
+    for badge in BADGES:
+        badges_with_status.append({
+            **badge,
+            "unlocked": badge["id"] in earned_badges
+        })
+    
+    return badges_with_status
+
 # ============== STARTUP EVENTS ==============
 
 @app.on_event("startup")
