@@ -1256,6 +1256,493 @@ async def evaluate_signals(current_user: dict = Depends(get_current_user)):
         "results": results
     }
 
+# ============== TRADING JOURNAL ROUTES ==============
+
+@api_router.post("/journal/trades")
+async def create_journal_entry(entry: TradeJournalCreate, current_user: dict = Depends(get_current_user)):
+    """Create a new trade journal entry"""
+    # Calculate risk/reward ratio
+    if entry.trade_type == "BUY":
+        risk = entry.entry_price - entry.stop_loss
+        reward = entry.take_profit - entry.entry_price
+    else:
+        risk = entry.stop_loss - entry.entry_price
+        reward = entry.entry_price - entry.take_profit
+    
+    rr_ratio = round(reward / risk, 2) if risk > 0 else 0
+    
+    journal_entry = {
+        "id": str(uuid.uuid4()),
+        "user_id": current_user["id"],
+        "symbol": entry.symbol,
+        "symbol_name": entry.symbol_name,
+        "trade_type": entry.trade_type,
+        "entry_price": entry.entry_price,
+        "exit_price": None,
+        "quantity": entry.quantity,
+        "entry_date": datetime.now(timezone.utc).isoformat(),
+        "exit_date": None,
+        "timeframe": entry.timeframe,
+        "stop_loss": entry.stop_loss,
+        "take_profit": entry.take_profit,
+        "risk_reward_ratio": rr_ratio,
+        "status": "open",
+        "pnl_amount": None,
+        "pnl_percent": None,
+        "emotion_before": entry.emotion_before,
+        "emotion_after": None,
+        "strategy_used": entry.strategy_used,
+        "reason_entry": entry.reason_entry,
+        "reason_exit": None,
+        "lessons_learned": None,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": None
+    }
+    
+    await db.journal.insert_one(journal_entry)
+    del journal_entry["_id"] if "_id" in journal_entry else None
+    return journal_entry
+
+@api_router.get("/journal/trades")
+async def get_journal_entries(
+    status: Optional[str] = None,
+    limit: int = 50,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get trade journal entries"""
+    query = {"user_id": current_user["id"]}
+    if status:
+        query["status"] = status
+    
+    entries = await db.journal.find(query, {"_id": 0}).sort("created_at", -1).to_list(limit)
+    return entries
+
+@api_router.put("/journal/trades/{trade_id}/close")
+async def close_journal_trade(trade_id: str, close_data: TradeJournalClose, current_user: dict = Depends(get_current_user)):
+    """Close a trade and calculate P&L"""
+    trade = await db.journal.find_one({"id": trade_id, "user_id": current_user["id"]}, {"_id": 0})
+    if not trade:
+        raise HTTPException(status_code=404, detail="Trade not found")
+    
+    if trade["status"] != "open":
+        raise HTTPException(status_code=400, detail="Trade already closed")
+    
+    # Calculate P&L
+    if trade["trade_type"] == "BUY":
+        pnl_amount = (close_data.exit_price - trade["entry_price"]) * trade["quantity"]
+        pnl_percent = ((close_data.exit_price - trade["entry_price"]) / trade["entry_price"]) * 100
+    else:
+        pnl_amount = (trade["entry_price"] - close_data.exit_price) * trade["quantity"]
+        pnl_percent = ((trade["entry_price"] - close_data.exit_price) / trade["entry_price"]) * 100
+    
+    # Determine status
+    if pnl_percent > 0.5:
+        status = "closed_profit"
+    elif pnl_percent < -0.5:
+        status = "closed_loss"
+    else:
+        status = "closed_breakeven"
+    
+    update_data = {
+        "exit_price": close_data.exit_price,
+        "exit_date": datetime.now(timezone.utc).isoformat(),
+        "status": status,
+        "pnl_amount": round(pnl_amount, 2),
+        "pnl_percent": round(pnl_percent, 2),
+        "emotion_after": close_data.emotion_after,
+        "reason_exit": close_data.reason_exit,
+        "lessons_learned": close_data.lessons_learned,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.journal.update_one({"id": trade_id}, {"$set": update_data})
+    return {"message": "Trade closed", "pnl_percent": round(pnl_percent, 2), "status": status}
+
+@api_router.get("/journal/stats")
+async def get_trading_stats(current_user: dict = Depends(get_current_user)):
+    """Get comprehensive trading statistics"""
+    trades = await db.journal.find(
+        {"user_id": current_user["id"], "status": {"$ne": "open"}},
+        {"_id": 0}
+    ).to_list(1000)
+    
+    if not trades:
+        return {
+            "total_trades": 0,
+            "winning_trades": 0,
+            "losing_trades": 0,
+            "win_rate": 0,
+            "total_pnl": 0,
+            "average_win": 0,
+            "average_loss": 0,
+            "best_trade": 0,
+            "worst_trade": 0,
+            "profit_factor": 0,
+            "average_rr": 0,
+            "most_traded_symbol": "N/A",
+            "best_timeframe": "N/A",
+            "best_day_of_week": "N/A",
+            "current_streak": 0,
+            "max_drawdown": 0
+        }
+    
+    # Basic stats
+    total = len(trades)
+    winning = [t for t in trades if t["status"] == "closed_profit"]
+    losing = [t for t in trades if t["status"] == "closed_loss"]
+    
+    win_rate = (len(winning) / total * 100) if total > 0 else 0
+    
+    # P&L stats
+    pnls = [t.get("pnl_percent", 0) for t in trades]
+    total_pnl = sum(pnls)
+    
+    win_pnls = [t.get("pnl_percent", 0) for t in winning]
+    loss_pnls = [t.get("pnl_percent", 0) for t in losing]
+    
+    avg_win = sum(win_pnls) / len(win_pnls) if win_pnls else 0
+    avg_loss = sum(loss_pnls) / len(loss_pnls) if loss_pnls else 0
+    
+    best_trade = max(pnls) if pnls else 0
+    worst_trade = min(pnls) if pnls else 0
+    
+    # Profit factor
+    gross_profit = sum([p for p in pnls if p > 0])
+    gross_loss = abs(sum([p for p in pnls if p < 0]))
+    profit_factor = gross_profit / gross_loss if gross_loss > 0 else gross_profit
+    
+    # Average R:R
+    rrs = [t.get("risk_reward_ratio", 0) for t in trades]
+    avg_rr = sum(rrs) / len(rrs) if rrs else 0
+    
+    # Most traded symbol
+    from collections import Counter
+    symbols = [t["symbol"] for t in trades]
+    most_traded = Counter(symbols).most_common(1)[0][0] if symbols else "N/A"
+    
+    # Best timeframe (by win rate)
+    timeframes = {}
+    for t in trades:
+        tf = t.get("timeframe", "unknown")
+        if tf not in timeframes:
+            timeframes[tf] = {"wins": 0, "total": 0}
+        timeframes[tf]["total"] += 1
+        if t["status"] == "closed_profit":
+            timeframes[tf]["wins"] += 1
+    
+    best_tf = max(timeframes.items(), key=lambda x: x[1]["wins"]/x[1]["total"] if x[1]["total"] > 0 else 0)[0] if timeframes else "N/A"
+    
+    # Current streak
+    sorted_trades = sorted(trades, key=lambda x: x.get("exit_date", ""), reverse=True)
+    streak = 0
+    streak_type = None
+    for t in sorted_trades:
+        if streak_type is None:
+            streak_type = t["status"]
+            streak = 1
+        elif t["status"] == streak_type:
+            streak += 1
+        else:
+            break
+    
+    current_streak = streak if streak_type == "closed_profit" else -streak
+    
+    # Max drawdown (simplified)
+    cumulative = 0
+    peak = 0
+    max_dd = 0
+    for pnl in pnls:
+        cumulative += pnl
+        if cumulative > peak:
+            peak = cumulative
+        dd = peak - cumulative
+        if dd > max_dd:
+            max_dd = dd
+    
+    return {
+        "total_trades": total,
+        "winning_trades": len(winning),
+        "losing_trades": len(losing),
+        "win_rate": round(win_rate, 1),
+        "total_pnl": round(total_pnl, 2),
+        "average_win": round(avg_win, 2),
+        "average_loss": round(avg_loss, 2),
+        "best_trade": round(best_trade, 2),
+        "worst_trade": round(worst_trade, 2),
+        "profit_factor": round(profit_factor, 2),
+        "average_rr": round(avg_rr, 2),
+        "most_traded_symbol": most_traded,
+        "best_timeframe": best_tf,
+        "best_day_of_week": "N/A",  # Would need more data
+        "current_streak": current_streak,
+        "max_drawdown": round(max_dd, 2)
+    }
+
+# ============== SMART ALERTS ROUTES ==============
+
+@api_router.post("/alerts/smart")
+async def create_smart_alert(alert: SmartAlertCreate, current_user: dict = Depends(get_current_user)):
+    """Create a smart alert (price, RSI, MACD, etc.)"""
+    alert_doc = {
+        "id": str(uuid.uuid4()),
+        "user_id": current_user["id"],
+        "symbol": alert.symbol,
+        "symbol_name": alert.symbol_name,
+        "alert_type": alert.alert_type,
+        "condition": alert.condition,
+        "value": alert.value,
+        "message": alert.message or f"{alert.symbol_name} {alert.condition} {alert.value}",
+        "sound_enabled": alert.sound_enabled,
+        "repeat": alert.repeat,
+        "triggered": False,
+        "triggered_at": None,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.smart_alerts.insert_one(alert_doc)
+    del alert_doc["_id"] if "_id" in alert_doc else None
+    return alert_doc
+
+@api_router.get("/alerts/smart")
+async def get_smart_alerts(current_user: dict = Depends(get_current_user)):
+    """Get all smart alerts for user"""
+    alerts = await db.smart_alerts.find(
+        {"user_id": current_user["id"]},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    return alerts
+
+@api_router.delete("/alerts/smart/{alert_id}")
+async def delete_smart_alert(alert_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a smart alert"""
+    result = await db.smart_alerts.delete_one({"id": alert_id, "user_id": current_user["id"]})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    return {"message": "Alert deleted"}
+
+@api_router.get("/alerts/check")
+async def check_alerts(current_user: dict = Depends(get_current_user)):
+    """Check all alerts against current prices and return triggered ones"""
+    alerts = await db.smart_alerts.find(
+        {"user_id": current_user["id"], "triggered": False},
+        {"_id": 0}
+    ).to_list(100)
+    
+    if not alerts:
+        return {"triggered": [], "checked": 0}
+    
+    # Get unique symbols
+    symbols = list(set([a["symbol"] for a in alerts]))
+    
+    # Fetch current prices
+    current_prices = {}
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(
+                f"{COINGECKO_API_URL}/simple/price",
+                params={"ids": ",".join(symbols), "vs_currencies": "usd"},
+                timeout=15.0
+            )
+            if response.status_code == 200:
+                price_data = response.json()
+                for symbol, data in price_data.items():
+                    current_prices[symbol] = data.get("usd", 0)
+        except Exception as e:
+            logger.error(f"Error checking alerts: {e}")
+            return {"triggered": [], "checked": 0, "error": str(e)}
+    
+    triggered = []
+    for alert in alerts:
+        symbol = alert["symbol"]
+        current_price = current_prices.get(symbol, 0)
+        
+        if not current_price:
+            continue
+        
+        is_triggered = False
+        
+        if alert["alert_type"] == "price":
+            if alert["condition"] == "above" and current_price >= alert["value"]:
+                is_triggered = True
+            elif alert["condition"] == "below" and current_price <= alert["value"]:
+                is_triggered = True
+        
+        if is_triggered:
+            # Update alert as triggered
+            if not alert["repeat"]:
+                await db.smart_alerts.update_one(
+                    {"id": alert["id"]},
+                    {"$set": {"triggered": True, "triggered_at": datetime.now(timezone.utc).isoformat()}}
+                )
+            
+            triggered.append({
+                **alert,
+                "current_price": current_price,
+                "triggered_at": datetime.now(timezone.utc).isoformat()
+            })
+    
+    return {"triggered": triggered, "checked": len(alerts)}
+
+# ============== DAILY BRIEFING ROUTE ==============
+
+@api_router.get("/briefing/daily")
+async def get_daily_briefing(current_user: dict = Depends(get_current_user)):
+    """Get AI-generated daily trading briefing"""
+    
+    # Gather market data
+    market_data = {}
+    
+    async with httpx.AsyncClient() as client:
+        # Fear & Greed
+        try:
+            fg_response = await client.get("https://api.alternative.me/fng/?limit=1", timeout=10.0)
+            if fg_response.status_code == 200:
+                market_data["fear_greed"] = fg_response.json().get("data", [{}])[0]
+        except:
+            market_data["fear_greed"] = {"value": "50", "value_classification": "Neutral"}
+        
+        # BTC price and change
+        try:
+            btc_response = await client.get(
+                f"{COINGECKO_API_URL}/simple/price",
+                params={"ids": "bitcoin,ethereum,solana", "vs_currencies": "usd", "include_24hr_change": "true"},
+                timeout=10.0
+            )
+            if btc_response.status_code == 200:
+                market_data["prices"] = btc_response.json()
+        except:
+            market_data["prices"] = {}
+    
+    # Get user's watchlist performance
+    watchlist = current_user.get("watchlist", [])[:5]
+    
+    # Get recent trades stats
+    recent_trades = await db.journal.find(
+        {"user_id": current_user["id"]},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(10)
+    
+    open_trades = [t for t in recent_trades if t.get("status") == "open"]
+    
+    # Build context for AI
+    fg_value = int(market_data.get("fear_greed", {}).get("value", 50))
+    fg_class = market_data.get("fear_greed", {}).get("value_classification", "Neutral")
+    
+    btc_price = market_data.get("prices", {}).get("bitcoin", {}).get("usd", 0)
+    btc_change = market_data.get("prices", {}).get("bitcoin", {}).get("usd_24h_change", 0)
+    
+    context = f"""
+BRIEFING MATINAL - {datetime.now().strftime('%d/%m/%Y')}
+
+DONNÉES MARCHÉ:
+- Fear & Greed Index: {fg_value} ({fg_class})
+- Bitcoin: ${btc_price:,.0f} ({btc_change:+.1f}% 24h)
+- Watchlist utilisateur: {', '.join(watchlist) if watchlist else 'Vide'}
+- Trades ouverts: {len(open_trades)}
+
+Niveau du trader: {current_user.get('trading_level', 'intermediate')}
+
+Génère un briefing matinal CONCIS et ACTIONNABLE en français:
+1. SENTIMENT GÉNÉRAL (1 phrase)
+2. OPPORTUNITÉS DU JOUR (2-3 points max)
+3. RISQUES À SURVEILLER (2-3 points max)
+4. RECOMMANDATION PRINCIPALE (1 action claire)
+
+Format JSON:
+{{
+  "sentiment": "bullish/bearish/neutral",
+  "summary": "Résumé en 2 phrases",
+  "opportunities": ["opp1", "opp2"],
+  "risks": ["risk1", "risk2"],
+  "main_action": "Action principale recommandée",
+  "watchlist_focus": "Crypto à surveiller en priorité"
+}}
+"""
+
+    try:
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"briefing_{current_user['id']}_{datetime.now().strftime('%Y%m%d')}",
+            system_message="Tu es BULL, un trader expert qui donne des briefings matinaux concis et actionnables."
+        )
+        chat.with_model("openai", "gpt-4o")
+        
+        user_msg = UserMessage(text=context)
+        ai_response = await chat.send_message(user_msg)
+        response_text = str(ai_response) if ai_response else ""
+        
+        # Try to parse JSON
+        import re
+        json_match = re.search(r'\{[\s\S]*\}', response_text)
+        if json_match:
+            import json
+            try:
+                briefing_data = json.loads(json_match.group())
+            except:
+                briefing_data = {
+                    "sentiment": "neutral",
+                    "summary": response_text[:200],
+                    "opportunities": [],
+                    "risks": [],
+                    "main_action": "Analyser le marché",
+                    "watchlist_focus": watchlist[0] if watchlist else "bitcoin"
+                }
+        else:
+            briefing_data = {
+                "sentiment": "neutral",
+                "summary": response_text[:200] if response_text else "Briefing en cours de génération",
+                "opportunities": [],
+                "risks": [],
+                "main_action": "Surveiller le marché",
+                "watchlist_focus": watchlist[0] if watchlist else "bitcoin"
+            }
+        
+    except Exception as e:
+        logger.error(f"Error generating briefing: {e}")
+        briefing_data = {
+            "sentiment": "neutral",
+            "summary": "Briefing temporairement indisponible",
+            "opportunities": [],
+            "risks": [],
+            "main_action": "Vérifier manuellement le marché",
+            "watchlist_focus": "bitcoin"
+        }
+    
+    return {
+        "date": datetime.now().strftime('%Y-%m-%d'),
+        "fear_greed": fg_value,
+        "fear_greed_label": fg_class,
+        "btc_price": btc_price,
+        "btc_change_24h": round(btc_change, 2),
+        "open_trades": len(open_trades),
+        **briefing_data,
+        "generated_at": datetime.now(timezone.utc).isoformat()
+    }
+
+# ============== TRADING CHECKLIST ROUTE ==============
+
+@api_router.get("/trading/checklist")
+async def get_pre_trade_checklist(symbol: str, current_user: dict = Depends(get_current_user)):
+    """Get pre-trade checklist for a specific symbol"""
+    
+    checklist = {
+        "symbol": symbol,
+        "items": [
+            {"id": "trend", "label": "Tendance identifiée (haussière/baissière)", "checked": False},
+            {"id": "support", "label": "Niveaux de support/résistance identifiés", "checked": False},
+            {"id": "rsi", "label": "RSI vérifié (pas en zone extrême)", "checked": False},
+            {"id": "news", "label": "Pas d'annonce majeure imminente", "checked": False},
+            {"id": "risk", "label": "Risque limité à 1-2% du capital", "checked": False},
+            {"id": "sl", "label": "Stop-loss défini AVANT l'entrée", "checked": False},
+            {"id": "tp", "label": "Take-profit défini (R:R min 1:2)", "checked": False},
+            {"id": "emotion", "label": "État émotionnel stable", "checked": False},
+            {"id": "plan", "label": "Ce trade fait partie de mon plan", "checked": False}
+        ],
+        "warning": "Ne tradez que si tous les points sont cochés ✓"
+    }
+    
+    return checklist
+
 # ============== TRADING EXPERT SYSTEM ==============
 
 def calculate_rsi(prices: List[float], period: int = 14) -> float:
