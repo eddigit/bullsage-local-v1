@@ -549,15 +549,27 @@ Maximum 4-5 news les plus importantes. Sois TRÈS concis."""
         
         ai_response = await chat.send_message(f"Analyse ces actualités crypto des dernières 48h et résume en français avec impact marché:\n\n{news_text}")
         
-        # Parse AI response
-        response_text = ai_response.content if hasattr(ai_response, 'content') else str(ai_response)
+        # Parse AI response - handle different response types
+        if isinstance(ai_response, str):
+            response_text = ai_response
+        elif hasattr(ai_response, 'content'):
+            response_text = ai_response.content
+        elif hasattr(ai_response, 'message'):
+            response_text = ai_response.message
+        else:
+            response_text = str(ai_response)
+        
+        logger.info(f"AI news response type: {type(ai_response)}, text preview: {response_text[:200] if response_text else 'empty'}")
         
         # Try to extract JSON from response
         import re
-        json_match = re.search(r'\[[\s\S]*\]', response_text)
+        json_match = re.search(r'\[[\s\S]*?\]', response_text)
         if json_match:
             import json
-            summary_data = json.loads(json_match.group())
+            try:
+                summary_data = json.loads(json_match.group())
+            except json.JSONDecodeError:
+                summary_data = [{"news": "Parsing error", "impact": "NEUTRE", "action": "Surveiller le marché"}]
         else:
             # Fallback: create simple summary
             summary_data = [{"news": "Actualités en cours d'analyse", "impact": "NEUTRE", "action": "Surveiller le marché"}]
