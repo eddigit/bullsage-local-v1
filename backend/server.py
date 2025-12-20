@@ -1538,8 +1538,9 @@ Utilise les indicateurs fournis pour justifier ta recommandation."""
         )
         chat.with_model("openai", "gpt-4o")
         
-        ai_response = await chat.send_message(ai_context)
-        ai_analysis = ai_response.content if hasattr(ai_response, 'content') else str(ai_response)
+        user_msg = UserMessage(text=ai_context)
+        ai_response = await chat.send_message(user_msg)
+        ai_analysis = str(ai_response) if ai_response else "Analyse non disponible"
     except Exception as e:
         logger.error(f"AI analysis error: {e}")
         ai_analysis = f"Analyse algorithmique: {algo_recommendation['message']}\n\nRaisons:\n" + "\n".join([f"• {r}" for r in algo_recommendation['reasons']])
