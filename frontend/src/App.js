@@ -18,6 +18,8 @@ import ApiKeysPage from "./pages/ApiKeysPage";
 import MarketIntelligencePage from "./pages/MarketIntelligencePage";
 import SignalsPage from "./pages/SignalsPage";
 import TradingModePage from "./pages/TradingModePage";
+import JournalPage from "./pages/JournalPage";
+import CockpitPage from "./pages/CockpitPage";
 
 // Layout
 import MainLayout from "./layouts/MainLayout";
