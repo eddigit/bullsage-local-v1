@@ -3013,6 +3013,157 @@ async def reset_paper_portfolio(current_user: dict = Depends(get_current_user)):
     await db.paper_trades.delete_many({"user_id": current_user["id"]})
     return {"message": "Portfolio reset successfully", "balance": 10000.0}
 
+@api_router.get("/paper-trading/stats")
+async def get_paper_trading_stats(current_user: dict = Depends(get_current_user)):
+    """Get comprehensive paper trading statistics"""
+    trades = await db.paper_trades.find(
+        {"user_id": current_user["id"]},
+        {"_id": 0}
+    ).to_list(1000)
+    
+    user = await db.users.find_one({"id": current_user["id"]})
+    current_balance = user.get("paper_balance", 10000.0)
+    portfolio = user.get("portfolio", {})
+    initial_balance = 10000.0
+    
+    if not trades:
+        return {
+            "total_trades": 0,
+            "buy_trades": 0,
+            "sell_trades": 0,
+            "total_volume": 0,
+            "current_balance": current_balance,
+            "initial_balance": initial_balance,
+            "total_pnl": 0,
+            "total_pnl_percent": 0,
+            "portfolio_value": current_balance,
+            "best_trade": None,
+            "worst_trade": None,
+            "most_traded": None,
+            "trading_history": [],
+            "daily_pnl": []
+        }
+    
+    total_trades = len(trades)
+    buy_trades = len([t for t in trades if t["type"] == "buy"])
+    sell_trades = len([t for t in trades if t["type"] == "sell"])
+    total_volume = sum(t["amount"] * t["price"] for t in trades)
+    
+    # Calculate realized P&L from sell trades
+    realized_pnl = 0
+    trade_pnls = []
+    
+    # Group trades by symbol
+    from collections import defaultdict
+    trades_by_symbol = defaultdict(list)
+    for t in sorted(trades, key=lambda x: x.get("timestamp", "")):
+        trades_by_symbol[t["symbol"]].append(t)
+    
+    # Calculate P&L for each closed position
+    for symbol, symbol_trades in trades_by_symbol.items():
+        position_cost = 0
+        position_amount = 0
+        
+        for t in symbol_trades:
+            if t["type"] == "buy":
+                cost = t["amount"] * t["price"]
+                position_cost += cost
+                position_amount += t["amount"]
+            elif t["type"] == "sell":
+                if position_amount > 0:
+                    avg_cost = position_cost / position_amount
+                    sell_value = t["amount"] * t["price"]
+                    cost_basis = t["amount"] * avg_cost
+                    pnl = sell_value - cost_basis
+                    pnl_percent = (pnl / cost_basis * 100) if cost_basis > 0 else 0
+                    
+                    realized_pnl += pnl
+                    trade_pnls.append({
+                        "symbol": symbol,
+                        "pnl": pnl,
+                        "pnl_percent": pnl_percent,
+                        "timestamp": t.get("timestamp")
+                    })
+                    
+                    # Update position
+                    position_cost -= t["amount"] * avg_cost
+                    position_amount -= t["amount"]
+    
+    # Get current portfolio value with live prices (estimate)
+    portfolio_value = current_balance
+    for symbol, holding in portfolio.items():
+        # Use stored average price as estimate
+        portfolio_value += holding.get("amount", 0) * holding.get("avg_price", 0)
+    
+    total_pnl = portfolio_value - initial_balance
+    total_pnl_percent = (total_pnl / initial_balance * 100) if initial_balance > 0 else 0
+    
+    # Best and worst trades
+    best_trade = None
+    worst_trade = None
+    if trade_pnls:
+        sorted_pnls = sorted(trade_pnls, key=lambda x: x["pnl"], reverse=True)
+        if sorted_pnls:
+            best = sorted_pnls[0]
+            best_trade = {"symbol": best["symbol"], "pnl": round(best["pnl"], 2), "pnl_percent": round(best["pnl_percent"], 2)}
+            worst = sorted_pnls[-1]
+            worst_trade = {"symbol": worst["symbol"], "pnl": round(worst["pnl"], 2), "pnl_percent": round(worst["pnl_percent"], 2)}
+    
+    # Most traded symbol
+    symbol_counts = {}
+    for t in trades:
+        sym = t["symbol"]
+        symbol_counts[sym] = symbol_counts.get(sym, 0) + 1
+    most_traded = max(symbol_counts.items(), key=lambda x: x[1])[0] if symbol_counts else None
+    
+    # Recent trading history (last 10)
+    trading_history = []
+    for t in sorted(trades, key=lambda x: x.get("timestamp", ""), reverse=True)[:10]:
+        trading_history.append({
+            "symbol": t["symbol"],
+            "type": t["type"],
+            "amount": t["amount"],
+            "price": t["price"],
+            "value": round(t["amount"] * t["price"], 2),
+            "timestamp": t.get("timestamp", "")[:10] if t.get("timestamp") else ""
+        })
+    
+    # Daily P&L (simplified - based on trade dates)
+    daily_pnl = []
+    daily_trades = defaultdict(lambda: {"buys": 0, "sells": 0, "volume": 0})
+    for t in trades:
+        date = t.get("timestamp", "")[:10] if t.get("timestamp") else "unknown"
+        daily_trades[date]["volume"] += t["amount"] * t["price"]
+        if t["type"] == "buy":
+            daily_trades[date]["buys"] += 1
+        else:
+            daily_trades[date]["sells"] += 1
+    
+    for date, data in sorted(daily_trades.items(), reverse=True)[:7]:
+        daily_pnl.append({
+            "date": date,
+            "trades": data["buys"] + data["sells"],
+            "volume": round(data["volume"], 2)
+        })
+    
+    return {
+        "total_trades": total_trades,
+        "buy_trades": buy_trades,
+        "sell_trades": sell_trades,
+        "total_volume": round(total_volume, 2),
+        "current_balance": round(current_balance, 2),
+        "initial_balance": initial_balance,
+        "realized_pnl": round(realized_pnl, 2),
+        "total_pnl": round(total_pnl, 2),
+        "total_pnl_percent": round(total_pnl_percent, 2),
+        "portfolio_value": round(portfolio_value, 2),
+        "best_trade": best_trade,
+        "worst_trade": worst_trade,
+        "most_traded": most_traded,
+        "trading_history": trading_history,
+        "daily_pnl": daily_pnl
+    }
+
 # ============== WATCHLIST ROUTES ==============
 
 @api_router.put("/watchlist")
