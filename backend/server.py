@@ -1300,7 +1300,7 @@ async def create_journal_entry(entry: TradeJournalCreate, current_user: dict = D
     }
     
     await db.journal.insert_one(journal_entry)
-    del journal_entry["_id"] if "_id" in journal_entry else None
+    journal_entry.pop("_id", None)
     return journal_entry
 
 @api_router.get("/journal/trades")
@@ -1500,7 +1500,7 @@ async def create_smart_alert(alert: SmartAlertCreate, current_user: dict = Depen
     }
     
     await db.smart_alerts.insert_one(alert_doc)
-    del alert_doc["_id"] if "_id" in alert_doc else None
+    alert_doc.pop("_id", None)
     return alert_doc
 
 @api_router.get("/alerts/smart")
