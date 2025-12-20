@@ -242,7 +242,7 @@ export default function AcademyPage() {
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Chargement de l'Académie...</p>
+          <p className="text-muted-foreground">Chargement de l&apos;Académie...</p>
         </div>
       </div>
     );

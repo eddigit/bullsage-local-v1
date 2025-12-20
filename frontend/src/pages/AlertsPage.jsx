@@ -236,7 +236,7 @@ export default function AlertsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Nom de l'alerte (optionnel)</Label>
+                <Label>Nom de l&apos;alerte (optionnel)</Label>
                 <Input
                   value={alertName}
                   onChange={(e) => setAlertName(e.target.value)}

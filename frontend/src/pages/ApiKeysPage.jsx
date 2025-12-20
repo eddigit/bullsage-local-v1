@@ -110,7 +110,7 @@ export default function ApiKeysPage() {
         </div>
         <div>
           <h1 className="text-2xl md:text-3xl font-bold font-manrope">Clés API</h1>
-          <p className="text-muted-foreground">Gérez vos clés d'accès aux services externes</p>
+          <p className="text-muted-foreground">Gérez vos clés d&apos;accès aux services externes</p>
         </div>
       </div>
 

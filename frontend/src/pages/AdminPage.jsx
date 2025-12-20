@@ -291,7 +291,7 @@ export default function AdminPage() {
                               </AlertDialogTrigger>
                               <AlertDialogContent className="glass border-white/10">
                                 <AlertDialogHeader>
-                                  <AlertDialogTitle>Supprimer l'utilisateur?</AlertDialogTitle>
+                                  <AlertDialogTitle>Supprimer l&apos;utilisateur?</AlertDialogTitle>
                                   <AlertDialogDescription>
                                     Cette action supprimera définitivement {u.name} et toutes ses données (trades, stratégies, alertes).
                                   </AlertDialogDescription>
