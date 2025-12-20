@@ -528,7 +528,6 @@ async def get_news_impact_summary(current_user: dict = Depends(get_current_user)
     try:
         chat = LlmChat(
             api_key=EMERGENT_LLM_KEY,
-            model="gpt-4o",
             system_message="""Tu es un analyste financier expert. Ta tâche est de résumer les actualités crypto importantes en français.
 
 Pour chaque news importante, donne:
@@ -544,6 +543,7 @@ Format de réponse STRICT (JSON array):
 
 Maximum 4-5 news les plus importantes. Sois TRÈS concis."""
         )
+        chat.with_model("openai", "gpt-4o")
         
         ai_response = await chat.send_message_async(f"Analyse ces actualités crypto des dernières 48h et résume en français avec impact marché:\n\n{news_text}")
         
