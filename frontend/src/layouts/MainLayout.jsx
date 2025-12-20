@@ -233,7 +233,7 @@ export default function MainLayout() {
           <ScrollArea className="flex-1 px-3 py-4">
             <nav className="space-y-1">
               {navigation.map((item) => (
-                <NavItem key={item.name} item={item} />
+                <NavItem key={item.name} item={item} currentPath={location.pathname} />
               ))}
               
               {/* Admin Navigation */}
@@ -241,7 +241,7 @@ export default function MainLayout() {
                 <>
                   <div className="my-4 border-t border-white/5" />
                   {adminNavigation.map((item) => (
-                    <NavItem key={item.name} item={item} />
+                    <NavItem key={item.name} item={item} currentPath={location.pathname} />
                   ))}
                 </>
               )}
@@ -305,6 +305,8 @@ export default function MainLayout() {
             <BottomNavItem 
               key={item.name} 
               item={item}
+              currentPath={location.pathname}
+              moreMenuOpen={moreMenuOpen}
               onClick={item.isMore ? () => setMoreMenuOpen(true) : undefined}
             />
           ))}
