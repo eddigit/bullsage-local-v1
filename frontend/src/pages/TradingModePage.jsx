@@ -622,7 +622,9 @@ export default function TradingModePage() {
             {/* MACD */}
             <Card className="glass border-white/5">
               <CardContent className="pt-4">
-                <p className="text-xs text-muted-foreground text-center mb-2">MACD</p>
+                <InfoTooltip tooltipKey="macd">
+                  <p className="text-xs text-muted-foreground text-center mb-2">MACD</p>
+                </InfoTooltip>
                 <div className="text-center">
                   <div className={`text-2xl font-bold font-mono ${
                     analysis.indicators.macd.trend === "bullish" ? "text-emerald-500" : "text-rose-500"
@@ -648,7 +650,9 @@ export default function TradingModePage() {
             {/* Bollinger */}
             <Card className="glass border-white/5">
               <CardContent className="pt-4">
-                <p className="text-xs text-muted-foreground text-center mb-2">Bollinger</p>
+                <InfoTooltip tooltipKey="bollinger">
+                  <p className="text-xs text-muted-foreground text-center mb-2">Bollinger</p>
+                </InfoTooltip>
                 <div className="text-center">
                   <div className={`text-lg font-bold ${
                     analysis.indicators.bollinger.position === "oversold" ? "text-emerald-500" :
@@ -672,7 +676,9 @@ export default function TradingModePage() {
             {/* Trend */}
             <Card className="glass border-white/5">
               <CardContent className="pt-4">
-                <p className="text-xs text-muted-foreground text-center mb-2">Tendance MA</p>
+                <InfoTooltip tooltipKey="ma">
+                  <p className="text-xs text-muted-foreground text-center mb-2">Tendance MA</p>
+                </InfoTooltip>
                 <div className="text-center">
                   <div className={`text-lg font-bold ${
                     analysis.indicators.moving_averages.trend.includes("bullish") ? "text-emerald-500" :
