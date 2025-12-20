@@ -434,6 +434,70 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
         </Card>
       </div>
 
+      {/* News Impact Section */}
+      <Card className="glass border-white/5">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Newspaper className="w-4 h-4 text-violet-500" />
+              Actualités Impact Marché
+            </CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={fetchNewsImpact}
+              disabled={loadingNews}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              <RefreshCw className={`w-3 h-3 mr-1 ${loadingNews ? "animate-spin" : ""}`} />
+              Actualiser
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
+          {loadingNews && !newsImpact ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="w-5 h-5 animate-spin text-primary" />
+            </div>
+          ) : newsImpact?.summary?.length > 0 ? (
+            <div className="space-y-2">
+              {newsImpact.summary.map((item, idx) => (
+                <div
+                  key={idx}
+                  className={`p-2.5 rounded-lg flex items-start gap-3 ${
+                    item.impact === "HAUSSIER" ? "bg-emerald-500/5 border border-emerald-500/10" :
+                    item.impact === "BAISSIER" ? "bg-rose-500/5 border border-rose-500/10" :
+                    "bg-white/5 border border-white/5"
+                  }`}
+                >
+                  <div className={`mt-0.5 flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-sm ${
+                    item.impact === "HAUSSIER" ? "bg-emerald-500/20" :
+                    item.impact === "BAISSIER" ? "bg-rose-500/20" :
+                    "bg-yellow-500/20"
+                  }`}>
+                    {item.impact === "HAUSSIER" ? "📈" : item.impact === "BAISSIER" ? "📉" : "➡️"}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm leading-tight">{item.news}</p>
+                    <p className={`text-xs mt-1 font-medium ${
+                      item.impact === "HAUSSIER" ? "text-emerald-400" :
+                      item.impact === "BAISSIER" ? "text-rose-400" :
+                      "text-yellow-400"
+                    }`}>
+                      {item.action}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              Aucune actualité disponible
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Main Watchlist Section */}
       <Card className="glass border-white/5">
         <CardHeader className="pb-2">
