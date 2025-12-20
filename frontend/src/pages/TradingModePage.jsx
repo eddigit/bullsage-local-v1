@@ -460,6 +460,174 @@ export default function TradingModePage() {
         </Card>
       )}
 
+      {/* Global Market Context */}
+      <Card className="glass border-white/5">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Globe className="w-5 h-5 text-blue-500" />
+              Contexte Marché Global
+            </CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={fetchMarketContext}
+              disabled={loadingContext}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <RefreshCw className={`w-4 h-4 ${loadingContext ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
+          <CardDescription>Données économiques réelles influençant les cryptos</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loadingContext && !marketContext ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              {/* Fear & Greed */}
+              <div className="p-3 rounded-lg bg-white/5 text-center">
+                <InfoTooltip tooltipKey="fearGreed">
+                  <p className="text-xs text-muted-foreground mb-1">Fear & Greed</p>
+                </InfoTooltip>
+                {marketContext?.fearGreed ? (
+                  <>
+                    <p className={`text-2xl font-bold font-mono ${
+                      parseInt(marketContext.fearGreed.value) < 30 ? "text-rose-500" :
+                      parseInt(marketContext.fearGreed.value) > 70 ? "text-emerald-500" :
+                      "text-yellow-500"
+                    }`}>
+                      {marketContext.fearGreed.value}
+                    </p>
+                    <p className={`text-xs ${
+                      parseInt(marketContext.fearGreed.value) < 30 ? "text-rose-400" :
+                      parseInt(marketContext.fearGreed.value) > 70 ? "text-emerald-400" :
+                      "text-yellow-400"
+                    }`}>
+                      {marketContext.fearGreed.value_classification}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-muted-foreground">-</p>
+                )}
+              </div>
+
+              {/* VIX */}
+              <div className="p-3 rounded-lg bg-white/5 text-center">
+                <InfoTooltip tooltipKey="vix">
+                  <p className="text-xs text-muted-foreground mb-1">VIX (Volatilité)</p>
+                </InfoTooltip>
+                {marketContext?.macro?.vix ? (
+                  <>
+                    <p className={`text-2xl font-bold font-mono ${
+                      parseFloat(marketContext.macro.vix.value) > 25 ? "text-rose-500" :
+                      parseFloat(marketContext.macro.vix.value) < 15 ? "text-emerald-500" :
+                      "text-yellow-500"
+                    }`}>
+                      {parseFloat(marketContext.macro.vix.value).toFixed(1)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {parseFloat(marketContext.macro.vix.value) > 25 ? "Élevé" :
+                       parseFloat(marketContext.macro.vix.value) < 15 ? "Bas" : "Normal"}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-muted-foreground">-</p>
+                )}
+              </div>
+
+              {/* Fed Rate */}
+              <div className="p-3 rounded-lg bg-white/5 text-center">
+                <InfoTooltip tooltipKey="fedRate">
+                  <p className="text-xs text-muted-foreground mb-1">Taux Fed</p>
+                </InfoTooltip>
+                {marketContext?.macro?.fed_rate ? (
+                  <>
+                    <p className="text-2xl font-bold font-mono text-blue-400">
+                      {parseFloat(marketContext.macro.fed_rate.value).toFixed(2)}%
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {marketContext.macro.fed_rate.date}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-muted-foreground">-</p>
+                )}
+              </div>
+
+              {/* EUR/USD */}
+              <div className="p-3 rounded-lg bg-white/5 text-center">
+                <InfoTooltip tooltipKey="eurusd">
+                  <p className="text-xs text-muted-foreground mb-1">EUR/USD</p>
+                </InfoTooltip>
+                {marketContext?.eurusd ? (
+                  <>
+                    <p className="text-2xl font-bold font-mono text-violet-400">
+                      {parseFloat(marketContext.eurusd["5. Exchange Rate"]).toFixed(4)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Dollar {parseFloat(marketContext.eurusd["5. Exchange Rate"]) > 1.10 ? "faible" : "fort"}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-muted-foreground">-</p>
+                )}
+              </div>
+
+              {/* Unemployment */}
+              <div className="p-3 rounded-lg bg-white/5 text-center">
+                <InfoTooltip tooltipKey="unemployment">
+                  <p className="text-xs text-muted-foreground mb-1">Chômage US</p>
+                </InfoTooltip>
+                {marketContext?.macro?.unemployment ? (
+                  <>
+                    <p className={`text-2xl font-bold font-mono ${
+                      parseFloat(marketContext.macro.unemployment.value) > 5 ? "text-rose-400" :
+                      parseFloat(marketContext.macro.unemployment.value) < 4 ? "text-emerald-400" :
+                      "text-yellow-400"
+                    }`}>
+                      {parseFloat(marketContext.macro.unemployment.value).toFixed(1)}%
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {marketContext.macro.unemployment.date}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-muted-foreground">-</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Market News */}
+          {marketContext?.news?.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-white/5">
+              <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                <Newspaper className="w-3 h-3" />
+                Dernières actualités crypto
+              </p>
+              <div className="space-y-2 max-h-32 overflow-y-auto">
+                {marketContext.news.map((article, idx) => (
+                  <a
+                    key={idx}
+                    href={article.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block text-xs text-muted-foreground hover:text-foreground transition-colors truncate"
+                  >
+                    <span className="text-primary mr-1">•</span>
+                    {article.headline}
+                    <span className="text-muted-foreground/50 ml-2">({article.source})</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Selection Panel */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Coin Selection */}
