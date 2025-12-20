@@ -364,3 +364,42 @@
 ### test_plan:
   needs_retesting: true
   test_priority: "high_first"
+
+## Test Session: 2025-12-20 13:05
+### Implementation: Opportunity Scanner & Final Improvements
+
+**New Features Added:**
+
+1. **Opportunity Scanner** (`/api/trading/scan-opportunities`):
+   - Scans user's watchlist for trading opportunities
+   - Calculates RSI, MACD, Bollinger, MA for each asset
+   - Returns ranked opportunities with buy/sell signals
+   - Shows score, RSI, trend, and signal reasons
+
+2. **Dashboard Scanner Button**:
+   - Purple "Scanner" button in header
+   - Opens dialog with scan results
+   - Shows opportunity cards with emojis, prices, signals
+   - "Re-scanner" and "Analyser en détail" buttons
+
+3. **Enhanced Trading Recommendation**:
+   - Entry/exit levels (Stop Loss, TP1, TP2)
+   - Risk/Reward ratio calculation
+   - Risk factors array
+   - Volume and S/R analysis
+
+**Files Modified:**
+- `/app/backend/server.py` - Added scan-opportunities endpoint
+- `/app/frontend/src/pages/DashboardPage.jsx` - Added Scanner UI
+
+**Testing Status:**
+- ✅ Backend: scan-opportunities endpoint returns data
+- ✅ Frontend: Scanner button and dialog work
+- ⚠️ CoinGecko rate limits may cause $0 prices
+
+### test_plan:
+  needs_retesting: true
+  
+### Credentials:
+- Email: coachdigitalparis@gmail.com
+- Password: $$Reussite888!!
