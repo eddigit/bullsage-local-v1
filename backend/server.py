@@ -176,6 +176,121 @@ class StrategyResponse(BaseModel):
 class WatchlistUpdate(BaseModel):
     symbols: List[str]
 
+# ============== TRADING JOURNAL MODELS ==============
+
+class TradeJournalEntry(BaseModel):
+    id: str
+    user_id: str
+    # Trade info
+    symbol: str
+    symbol_name: str
+    trade_type: str  # BUY or SELL
+    entry_price: float
+    exit_price: Optional[float] = None
+    quantity: float
+    # Timing
+    entry_date: str
+    exit_date: Optional[str] = None
+    timeframe: str
+    # Risk management
+    stop_loss: float
+    take_profit: float
+    risk_reward_ratio: float
+    # Results
+    status: str = "open"  # open, closed_profit, closed_loss, closed_breakeven
+    pnl_amount: Optional[float] = None
+    pnl_percent: Optional[float] = None
+    # Psychology
+    emotion_before: Optional[str] = None  # calm, anxious, excited, fearful, confident
+    emotion_after: Optional[str] = None
+    # Learning
+    strategy_used: Optional[str] = None
+    reason_entry: str
+    reason_exit: Optional[str] = None
+    lessons_learned: Optional[str] = None
+    screenshot_url: Optional[str] = None
+    # Meta
+    created_at: str
+    updated_at: Optional[str] = None
+
+class TradeJournalCreate(BaseModel):
+    symbol: str
+    symbol_name: str
+    trade_type: str
+    entry_price: float
+    quantity: float
+    timeframe: str
+    stop_loss: float
+    take_profit: float
+    emotion_before: Optional[str] = None
+    strategy_used: Optional[str] = None
+    reason_entry: str
+
+class TradeJournalClose(BaseModel):
+    exit_price: float
+    emotion_after: Optional[str] = None
+    reason_exit: Optional[str] = None
+    lessons_learned: Optional[str] = None
+
+# ============== ADVANCED ALERTS MODELS ==============
+
+class SmartAlertCreate(BaseModel):
+    symbol: str
+    symbol_name: str
+    alert_type: str  # price, rsi, macd, support, resistance, custom
+    condition: str  # above, below, crosses_up, crosses_down
+    value: float
+    message: Optional[str] = None
+    sound_enabled: bool = True
+    repeat: bool = False
+
+class SmartAlertResponse(BaseModel):
+    id: str
+    user_id: str
+    symbol: str
+    symbol_name: str
+    alert_type: str
+    condition: str
+    value: float
+    message: str
+    sound_enabled: bool
+    repeat: bool
+    triggered: bool
+    triggered_at: Optional[str] = None
+    created_at: str
+
+# ============== DAILY BRIEFING MODEL ==============
+
+class DailyBriefing(BaseModel):
+    date: str
+    market_sentiment: str  # bullish, bearish, neutral
+    fear_greed: int
+    key_levels: Dict[str, Any]
+    opportunities: List[Dict[str, Any]]
+    risks: List[str]
+    recommended_actions: List[str]
+    ai_summary: str
+
+# ============== TRADING STATS MODEL ==============
+
+class TradingStats(BaseModel):
+    total_trades: int
+    winning_trades: int
+    losing_trades: int
+    win_rate: float
+    total_pnl: float
+    average_win: float
+    average_loss: float
+    best_trade: float
+    worst_trade: float
+    profit_factor: float
+    average_rr: float
+    most_traded_symbol: str
+    best_timeframe: str
+    best_day_of_week: str
+    current_streak: int
+    max_drawdown: float
+
 # ============== AUTH HELPERS ==============
 
 def hash_password(password: str) -> str:
