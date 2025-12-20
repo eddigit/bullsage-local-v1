@@ -24,7 +24,9 @@ import {
   ChevronDown,
   Crosshair,
   Gauge,
-  LineChart
+  LineChart,
+  HelpCircle,
+  Info
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -37,11 +39,98 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../components/ui/tooltip";
+
+// Tooltips content for education
+const TOOLTIPS = {
+  rsi: {
+    title: "RSI (Relative Strength Index)",
+    content: "Mesure la vitesse et l'amplitude des mouvements de prix. RSI < 30 = survente (signal d'achat potentiel). RSI > 70 = surachat (signal de vente potentiel)."
+  },
+  macd: {
+    title: "MACD (Moving Average Convergence Divergence)",
+    content: "Indicateur de momentum qui montre la relation entre deux moyennes mobiles. Un MACD positif indique une tendance haussière, négatif = baissière."
+  },
+  bollinger: {
+    title: "Bandes de Bollinger",
+    content: "Mesure la volatilité du marché. Prix près de la bande haute = surachat. Prix près de la bande basse = survente. Utile pour identifier les retournements."
+  },
+  ma: {
+    title: "Moyennes Mobiles (MA)",
+    content: "Lissent les données de prix. MA20 > MA50 > MA200 = tendance haussière forte. L'inverse = tendance baissière. Croisements = signaux de trading."
+  },
+  support: {
+    title: "Support",
+    content: "Niveau de prix où la demande est suffisamment forte pour empêcher le prix de baisser davantage. Bon niveau pour placer des ordres d'achat."
+  },
+  resistance: {
+    title: "Résistance", 
+    content: "Niveau de prix où l'offre est suffisamment forte pour empêcher le prix de monter davantage. Bon niveau pour prendre des profits."
+  },
+  entry: {
+    title: "Prix d'Entrée",
+    content: "Prix recommandé pour ouvrir votre position. Basé sur l'analyse des niveaux de support/résistance et des indicateurs techniques."
+  },
+  stopLoss: {
+    title: "Stop-Loss (SL)",
+    content: "Niveau de prix où vous devez couper vos pertes. ESSENTIEL pour la gestion du risque. Ne jamais trader sans stop-loss !"
+  },
+  takeProfit: {
+    title: "Take-Profit (TP)",
+    content: "Niveau de prix où vous prenez vos gains. TP1 = objectif conservateur (prendre une partie). TP2 = objectif optimiste (laisser courir)."
+  },
+  scalping: {
+    title: "Scalping (1H)",
+    content: "Trades très courts (minutes à heures). Petits gains fréquents. Nécessite une grande attention et des frais bas. Risque élevé."
+  },
+  intraday: {
+    title: "Intraday (4H)",
+    content: "Positions ouvertes et fermées dans la journée. Équilibre entre fréquence et taille des gains. Bon pour les traders actifs."
+  },
+  swing: {
+    title: "Swing Trading (1D)",
+    content: "Positions tenues plusieurs jours à semaines. Capture les mouvements de prix plus importants. Moins stressant, adapté aux débutants."
+  },
+  confidence: {
+    title: "Niveau de Confiance",
+    content: "HIGH = plusieurs indicateurs alignés, signal fort. MEDIUM = signal modéré, prudence. LOW = signaux contradictoires, attendre."
+  },
+  candlesticks: {
+    title: "Patterns Chandeliers",
+    content: "Formations de prix qui prédisent les mouvements futurs. Doji = indécision. Marteau = retournement haussier. Étoile filante = retournement baissier."
+  }
+};
+
+// Reusable Tooltip component
+const InfoTooltip = ({ tooltipKey, children, className = "" }) => {
+  const tip = TOOLTIPS[tooltipKey];
+  if (!tip) return children;
+  
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className={`inline-flex items-center gap-1 cursor-help ${className}`}>
+          {children}
+          <HelpCircle className="w-3.5 h-3.5 text-muted-foreground/50 hover:text-primary transition-colors" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-xs bg-black/95 border-white/10 p-3">
+        <p className="font-semibold text-primary mb-1">{tip.title}</p>
+        <p className="text-xs text-muted-foreground leading-relaxed">{tip.content}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+};
 
 const TIMEFRAMES = [
-  { value: "1h", label: "1H", description: "Scalping", icon: Zap },
-  { value: "4h", label: "4H", description: "Intraday", icon: Clock },
-  { value: "daily", label: "1D", description: "Swing", icon: Target },
+  { value: "1h", label: "1H", description: "Scalping", icon: Zap, tooltip: "scalping" },
+  { value: "4h", label: "4H", description: "Intraday", icon: Clock, tooltip: "intraday" },
+  { value: "daily", label: "1D", description: "Swing", icon: Target, tooltip: "swing" },
 ];
 
 const TRADING_STYLES = [
