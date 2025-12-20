@@ -283,6 +283,22 @@ export default function TradingModePage() {
       setLoadingContext(false);
     }
   };
+
+  // Fetch news impact
+  const [newsImpact, setNewsImpact] = useState(null);
+  const [loadingNews, setLoadingNews] = useState(false);
+  
+  const fetchNewsImpact = async () => {
+    setLoadingNews(true);
+    try {
+      const response = await axios.get(`${API}/market/news-impact`);
+      setNewsImpact(response.data);
+    } catch (error) {
+      console.error("Error fetching news impact:", error);
+    } finally {
+      setLoadingNews(false);
+    }
+  };
   
   // Fetch watchlist coins
   useEffect(() => {
@@ -306,7 +322,8 @@ export default function TradingModePage() {
     };
     
     fetchMarkets();
-    fetchMarketContext(); // Load market context on mount
+    fetchMarketContext();
+    fetchNewsImpact(); // Load news impact on mount
   }, [user]);
 
   // Filter watchlist coins
