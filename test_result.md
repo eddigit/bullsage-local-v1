@@ -143,3 +143,29 @@
 ### agent_communication:
   - agent: "main"
   - message: "Completed P0 (emoji replacement) and P1 (signal evaluation). Ready for testing."
+
+## Test Session: 2025-12-20 08:00
+### Implementation: Trading Expert Mode
+
+**Backend Additions:**
+- Technical indicators: RSI, MACD, Bollinger Bands, Moving Averages, Support/Resistance, Candlestick patterns
+- `/api/trading/analyze` - Deep technical analysis with AI recommendation
+- `/api/trading/scan-opportunities` - Scan watchlist for trading opportunities
+
+**Frontend:**
+- New page: TradingModePage.jsx
+- Features: Coin selection, Timeframe (1H/4H/1D), Trading style, Sound alerts
+- Displays: RSI gauge, MACD, Bollinger position, MA trend, Price levels
+
+### Credentials:
+- Email: coachdigitalparis@gmail.com
+- Password: $$Reussite888!!
+
+### Tasks to Test:
+1. Navigate to Mode Trading page
+2. Select a crypto from watchlist
+3. Click ANALYSER button
+4. Verify indicators display (RSI, MACD, Bollinger, MA)
+5. Verify price levels (Entry, SL, TP1, TP2)
+6. Test "Scanner Watchlist" button
+7. Test "Sauvegarder Signal" button
