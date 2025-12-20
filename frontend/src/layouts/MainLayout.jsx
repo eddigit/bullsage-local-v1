@@ -54,6 +54,9 @@ const navigation = [
   { name: "Paramètres", href: "/settings", icon: Settings },
 ];
 
+// Smart Invest CTA - Special item
+const smartInvestItem = { name: "Smart Invest", href: "/smart-invest", icon: Zap, highlight: true, special: true };
+
 // Admin navigation
 const adminNavigation = [
   { name: "Administration", href: "/admin", icon: Shield, admin: true },
