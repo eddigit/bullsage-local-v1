@@ -93,6 +93,8 @@ export default function DashboardPage() {
   const [portfolio, setPortfolio] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [newsImpact, setNewsImpact] = useState(null);
+  const [loadingNews, setLoadingNews] = useState(false);
   
   // Analysis state
   const [selectedCoin, setSelectedCoin] = useState(null);
@@ -104,6 +106,18 @@ export default function DashboardPage() {
   // Add to watchlist state
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+
+  const fetchNewsImpact = async () => {
+    setLoadingNews(true);
+    try {
+      const response = await axios.get(`${API}/market/news-impact`);
+      setNewsImpact(response.data);
+    } catch (error) {
+      console.error("Error fetching news impact:", error);
+    } finally {
+      setLoadingNews(false);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -127,6 +141,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchData();
+    fetchNewsImpact();
   }, []);
 
   const handleRefresh = () => {
