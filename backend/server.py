@@ -71,6 +71,24 @@ class UserResponse(BaseModel):
     paper_balance: float = 10000.0
     watchlist: List[str] = []
     is_admin: bool = False
+    onboarding_completed: bool = False
+    preferences: Optional[Dict[str, Any]] = None
+
+class UserPreferences(BaseModel):
+    experience_level: str  # beginner, intermediate, confirmed, expert
+    preferred_markets: List[str]  # crypto, forex, stocks, indices, commodities, defi
+    trading_goals: List[str]  # learn, speculate, invest, automate, analyze
+    favorite_cryptos: List[str] = []
+    favorite_forex: List[str] = []
+    favorite_stocks: List[str] = []
+    favorite_indices: List[str] = []
+    favorite_commodities: List[str] = []
+
+class OnboardingData(BaseModel):
+    experience_level: str
+    preferred_markets: List[str]
+    trading_goals: List[str]
+    favorite_assets: Dict[str, List[str]] = {}
 
 class TokenResponse(BaseModel):
     access_token: str
