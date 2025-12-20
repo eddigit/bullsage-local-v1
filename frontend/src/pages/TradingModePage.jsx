@@ -828,5 +828,6 @@ export default function TradingModePage() {
         </Card>
       )}
     </div>
+    </TooltipProvider>
   );
 }
