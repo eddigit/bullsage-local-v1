@@ -17,6 +17,7 @@ import AdminPage from "./pages/AdminPage";
 import ApiKeysPage from "./pages/ApiKeysPage";
 import MarketIntelligencePage from "./pages/MarketIntelligencePage";
 import SignalsPage from "./pages/SignalsPage";
+import TradingModePage from "./pages/TradingModePage";
 
 // Layout
 import MainLayout from "./layouts/MainLayout";
@@ -172,6 +173,7 @@ function App() {
               <Route path="settings" element={<SettingsPage />} />
               <Route path="intelligence" element={<MarketIntelligencePage />} />
               <Route path="signals" element={<SignalsPage />} />
+              <Route path="trading" element={<TradingModePage />} />
               <Route path="admin" element={<AdminPage />} />
               <Route path="admin/api-keys" element={<ApiKeysPage />} />
             </Route>
