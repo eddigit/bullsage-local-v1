@@ -3316,7 +3316,6 @@ async def complete_lesson(lesson_id: str, current_user: dict = Depends(get_curre
             badges_earned.append("bookworm")
         
         # Update streak
-        today = datetime.now(timezone.utc).date().isoformat()
         last_activity = progress.get("last_activity")
         streak = progress.get("streak_days", 0)
         
@@ -3430,8 +3429,7 @@ async def submit_quiz(module_id: str, submission: QuizSubmission, current_user: 
             "badges": []
         }
     
-    # Award XP only if passed and first time OR better score
-    previous_score = progress.get("quiz_scores", {}).get(module_id)
+    # Award XP only if passed and first time
     is_first_time = module_id not in progress.get("completed_quizzes", [])
     
     if passed:
@@ -3570,7 +3568,7 @@ async def get_leaderboard(current_user: dict = Depends(get_current_user)):
             })
     
     # Find current user's rank if not in top 20
-    current_user_in_list = any(l["is_current_user"] for l in leaderboard)
+    current_user_in_list = any(entry["is_current_user"] for entry in leaderboard)
     current_user_rank = None
     
     if not current_user_in_list:
