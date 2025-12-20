@@ -612,7 +612,9 @@ export default function TradingModePage() {
             {/* RSI */}
             <Card className="glass border-white/5">
               <CardContent className="pt-4">
-                <p className="text-xs text-muted-foreground text-center mb-2">RSI (14)</p>
+                <InfoTooltip tooltipKey="rsi">
+                  <p className="text-xs text-muted-foreground text-center mb-2">RSI (14)</p>
+                </InfoTooltip>
                 <RSIGauge value={analysis.indicators.rsi} />
               </CardContent>
             </Card>
