@@ -176,6 +176,8 @@ function App() {
               <Route path="intelligence" element={<MarketIntelligencePage />} />
               <Route path="signals" element={<SignalsPage />} />
               <Route path="trading" element={<TradingModePage />} />
+              <Route path="journal" element={<JournalPage />} />
+              <Route path="cockpit" element={<CockpitPage />} />
               <Route path="admin" element={<AdminPage />} />
               <Route path="admin/api-keys" element={<ApiKeysPage />} />
             </Route>
