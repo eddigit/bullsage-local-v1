@@ -403,3 +403,36 @@
 ### Credentials:
 - Email: coachdigitalparis@gmail.com
 - Password: $$Reussite888!!
+
+## Test Session: 2025-12-20 13:18
+### Implementation: Paper Trading Stats + Backtesting
+
+**New Features Added:**
+
+1. **Paper Trading Stats** (`/api/paper-trading/stats`):
+   - Total trades, buy/sell counts, total volume
+   - Realized P&L and total P&L with percentages
+   - Best/worst trade tracking
+   - Most traded crypto
+   - Recent trading history
+
+2. **Simple Backtesting** (`/api/trading/backtest`):
+   - RSI oversold/overbought strategies
+   - Moving average crossover
+   - Bollinger bounce
+   - Win rate, total return, trade history
+   - Comparison vs Buy & Hold
+
+3. **Frontend Updates**:
+   - New "Stats" tab in Paper Trading page
+   - Performance cards with P&L, best/worst trades
+   - Recent activity timeline
+
+**Backend Tests:**
+- ✅ Paper trading stats endpoint works
+- ✅ Backtest endpoint returns accurate results
+- ✅ RSI strategy: 18.86% return vs 7.21% B&H (81.8% WR)
+
+### Credentials:
+- Email: coachdigitalparis@gmail.com
+- Password: $$Reussite888!!
