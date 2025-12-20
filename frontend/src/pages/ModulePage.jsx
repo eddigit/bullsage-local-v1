@@ -416,7 +416,7 @@ export default function ModulePage() {
       <div className="text-center py-12">
         <p className="text-muted-foreground">Module non trouvé</p>
         <Button onClick={() => navigate("/academy")} className="mt-4">
-          Retour à l'Académie
+          Retour à l&apos;Académie
         </Button>
       </div>
     );
