@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -1649,7 +1649,7 @@ async def get_daily_briefing(current_user: dict = Depends(get_current_user)):
             fg_response = await client.get("https://api.alternative.me/fng/?limit=1", timeout=10.0)
             if fg_response.status_code == 200:
                 market_data["fear_greed"] = fg_response.json().get("data", [{}])[0]
-        except:
+        except Exception:
             market_data["fear_greed"] = {"value": "50", "value_classification": "Neutral"}
         
         # BTC price and change
@@ -1661,7 +1661,7 @@ async def get_daily_briefing(current_user: dict = Depends(get_current_user)):
             )
             if btc_response.status_code == 200:
                 market_data["prices"] = btc_response.json()
-        except:
+        except Exception:
             market_data["prices"] = {}
     
     # Get user's watchlist performance
@@ -2080,7 +2080,7 @@ async def analyze_for_trading(request: TradingAnalysisRequest, current_user: dic
             
             data = response.json()
             prices = [p[1] for p in data.get("prices", [])]
-            volumes = [v[1] for v in data.get("total_volumes", [])]
+            # Note: volumes available in data but not needed for current analysis
             
             if not prices:
                 raise HTTPException(status_code=404, detail="No price data available")
