@@ -640,30 +640,58 @@ export default function TradingModePage() {
             </div>
           )}
 
-          {/* Market News */}
-          {marketContext?.news?.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-white/5">
-              <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+          {/* News Impact AI Summary */}
+          <div className="mt-4 pt-4 border-t border-white/5">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
                 <Newspaper className="w-3 h-3" />
-                Dernières actualités crypto
+                Actualités Impact (IA)
               </p>
-              <div className="space-y-2 max-h-32 overflow-y-auto">
-                {marketContext.news.map((article, idx) => (
-                  <a
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={fetchNewsImpact}
+                disabled={loadingNews}
+                className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <RefreshCw className={`w-3 h-3 ${loadingNews ? "animate-spin" : ""}`} />
+              </Button>
+            </div>
+            {loadingNews && !newsImpact ? (
+              <div className="flex items-center justify-center py-3">
+                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+              </div>
+            ) : newsImpact?.summary?.length > 0 ? (
+              <div className="space-y-1.5">
+                {newsImpact.summary.slice(0, 4).map((item, idx) => (
+                  <div
                     key={idx}
-                    href={article.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block text-xs text-muted-foreground hover:text-foreground transition-colors truncate"
+                    className={`p-2 rounded text-xs flex items-start gap-2 ${
+                      item.impact === "HAUSSIER" ? "bg-emerald-500/10" :
+                      item.impact === "BAISSIER" ? "bg-rose-500/10" :
+                      "bg-white/5"
+                    }`}
                   >
-                    <span className="text-primary mr-1">•</span>
-                    {article.headline}
-                    <span className="text-muted-foreground/50 ml-2">({article.source})</span>
-                  </a>
+                    <span className="flex-shrink-0">
+                      {item.impact === "HAUSSIER" ? "📈" : item.impact === "BAISSIER" ? "📉" : "➡️"}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="leading-tight">{item.news}</p>
+                      <p className={`text-xs mt-0.5 font-medium ${
+                        item.impact === "HAUSSIER" ? "text-emerald-400" :
+                        item.impact === "BAISSIER" ? "text-rose-400" :
+                        "text-yellow-400"
+                      }`}>
+                        → {item.action}
+                      </p>
+                    </div>
+                  </div>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <p className="text-xs text-muted-foreground text-center py-2">Chargement des actualités...</p>
+            )}
+          </div>
         </CardContent>
       </Card>
 
