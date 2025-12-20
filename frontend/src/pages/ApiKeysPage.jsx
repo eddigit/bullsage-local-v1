@@ -47,11 +47,6 @@ export default function ApiKeysPage() {
   const [visibleKeys, setVisibleKeys] = useState({});
   const [copiedKey, setCopiedKey] = useState(null);
 
-  // Redirect if not admin
-  if (!user?.is_admin) {
-    return <Navigate to="/" replace />;
-  }
-
   const fetchApiKeys = async () => {
     try {
       const response = await axios.get(`${API}/admin/api-keys`);
@@ -65,8 +60,15 @@ export default function ApiKeysPage() {
   };
 
   useEffect(() => {
-    fetchApiKeys();
-  }, []);
+    if (user?.is_admin) {
+      fetchApiKeys();
+    }
+  }, [user?.is_admin]);
+
+  // Redirect if not admin - AFTER all hooks
+  if (!user?.is_admin) {
+    return <Navigate to="/" replace />;
+  }
 
   const toggleVisibility = (key) => {
     setVisibleKeys(prev => ({
