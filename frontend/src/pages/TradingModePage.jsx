@@ -510,7 +510,9 @@ export default function TradingModePage() {
               ))}
             </div>
             <p className="text-xs text-muted-foreground text-center mt-2">
-              {TIMEFRAMES.find(t => t.value === timeframe)?.description}
+              <InfoTooltip tooltipKey={TIMEFRAMES.find(t => t.value === timeframe)?.tooltip || "swing"}>
+                <span>{TIMEFRAMES.find(t => t.value === timeframe)?.description}</span>
+              </InfoTooltip>
             </p>
           </CardContent>
         </Card>
