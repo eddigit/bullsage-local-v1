@@ -2436,68 +2436,66 @@ class TradingAnalysisRequest(BaseModel):
 async def analyze_for_trading(request: TradingAnalysisRequest, current_user: dict = Depends(get_current_user)):
     """
     Deep technical analysis for trading decisions.
-    Uses Binance for historical data (more reliable), CoinGecko as fallback.
+    Uses CryptoCompare as primary (most reliable), with CoinGecko as fallback.
     """
     coin_id = request.coin_id
     timeframe = request.timeframe
     trading_style = request.trading_style
     
-    # Map timeframe to Binance interval and limit
+    # Get crypto symbol from coin_id
+    crypto_symbol = None
+    if coin_id in CRYPTO_MAPPING:
+        crypto_symbol = CRYPTO_MAPPING[coin_id]["binance_symbol"]
+    else:
+        # Try to extract symbol from coin_id
+        crypto_symbol = coin_id.upper()[:4]
+    
+    # Map timeframe to CryptoCompare parameters
     timeframe_map = {
-        "1h": ("1h", 168),    # 7 days of hourly data
-        "4h": ("4h", 168),    # 28 days of 4h data  
-        "daily": ("1d", 30)   # 30 days of daily data
+        "1h": ("histohour", 168),    # 7 days of hourly data
+        "4h": ("histohour", 168),    # Same but we'll aggregate
+        "daily": ("histoday", 30)    # 30 days of daily data
     }
-    interval, limit = timeframe_map.get(timeframe, ("4h", 168))
+    api_type, limit = timeframe_map.get(timeframe, ("histohour", 168))
     
     prices = None
     market_data = {}
     
     try:
         async with httpx.AsyncClient() as client:
-            # Get Binance symbol from coin_id
-            binance_symbol = None
-            if coin_id in CRYPTO_MAPPING:
-                binance_symbol = CRYPTO_MAPPING[coin_id]["symbol"]
-            
-            # Strategy 1: Try Binance first (more reliable)
-            if binance_symbol:
-                try:
-                    response = await client.get(
-                        f"{BINANCE_API_URL}/klines",
-                        params={
-                            "symbol": binance_symbol,
-                            "interval": interval,
-                            "limit": limit
-                        },
-                        timeout=15.0
-                    )
-                    
-                    if response.status_code == 200:
-                        klines = response.json()
-                        # Binance klines: [open_time, open, high, low, close, volume, ...]
-                        prices = [float(k[4]) for k in klines]  # Close prices
-                        logger.info(f"✅ Trading analyze: Got {len(prices)} prices from Binance for {coin_id}")
-                        
-                        # Get current price info from 24hr ticker
-                        ticker_response = await client.get(
-                            f"{BINANCE_API_URL}/ticker/24hr",
-                            params={"symbol": binance_symbol},
-                            timeout=10.0
-                        )
-                        if ticker_response.status_code == 200:
-                            ticker = ticker_response.json()
+            # Strategy 1: Try CryptoCompare first (most reliable)
+            try:
+                response = await client.get(
+                    f"{CRYPTOCOMPARE_API_URL}/{api_type}",
+                    params={
+                        "fsym": crypto_symbol,
+                        "tsym": "USD",
+                        "limit": limit
+                    },
+                    timeout=15.0
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get("Response") == "Success" and "Data" in data:
+                        hist_data = data["Data"].get("Data", data.get("Data", []))
+                        if hist_data and len(hist_data) > 10:
+                            prices = [float(d["close"]) for d in hist_data if d.get("close")]
+                            logger.info(f"✅ Trading analyze: Got {len(prices)} prices from CryptoCompare for {coin_id}")
+                            
+                            # Get current price info
+                            latest = hist_data[-1]
                             market_data = {
-                                "current_price": {"usd": float(ticker["lastPrice"])},
-                                "high_24h": {"usd": float(ticker["highPrice"])},
-                                "low_24h": {"usd": float(ticker["lowPrice"])},
-                                "price_change_percentage_24h": float(ticker["priceChangePercent"]),
-                                "total_volume": {"usd": float(ticker["quoteVolume"])}
+                                "current_price": {"usd": latest.get("close", prices[-1])},
+                                "high_24h": {"usd": latest.get("high", 0)},
+                                "low_24h": {"usd": latest.get("low", 0)},
+                                "price_change_percentage_24h": 0,
+                                "total_volume": {"usd": latest.get("volumeto", 0)}
                             }
-                except Exception as e:
-                    logger.warning(f"Trading analyze: Binance error for {coin_id}: {e}")
+            except Exception as e:
+                logger.warning(f"Trading analyze: CryptoCompare error for {coin_id}: {e}")
             
-            # Strategy 2: Fallback to CoinGecko if Binance failed
+            # Strategy 2: Fallback to CoinGecko if CryptoCompare failed
             if not prices or len(prices) < 10:
                 days_map = {"1h": 1, "4h": 7, "daily": 30}
                 days = days_map.get(timeframe, 7)
