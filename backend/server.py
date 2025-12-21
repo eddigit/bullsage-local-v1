@@ -448,30 +448,132 @@ async def get_me(current_user: dict = Depends(get_current_user)):
 
 # ============== MARKET DATA ROUTES ==============
 
-# Simple in-memory cache for crypto data
+# Robust multi-source cache for crypto data
 _crypto_cache = {
     "data": None,
     "timestamp": None,
-    "ttl": 60  # Cache for 60 seconds
+    "ttl": 300,  # Cache for 5 minutes (300 seconds)
+    "source": None
 }
 
-# Fallback crypto data structure (used only for structure, prices fetched via simple API)
-FALLBACK_CRYPTO_DATA = [
-    {"id": "bitcoin", "symbol": "btc", "name": "Bitcoin", "image": "https://coin-images.coingecko.com/coins/images/1/large/bitcoin.png", "current_price": None, "market_cap": None, "market_cap_rank": 1, "price_change_percentage_24h": None, "high_24h": None, "low_24h": None, "sparkline_in_7d": {"price": []}},
-    {"id": "ethereum", "symbol": "eth", "name": "Ethereum", "image": "https://coin-images.coingecko.com/coins/images/279/large/ethereum.png", "current_price": None, "market_cap": None, "market_cap_rank": 2, "price_change_percentage_24h": None, "high_24h": None, "low_24h": None, "sparkline_in_7d": {"price": []}},
-    {"id": "tether", "symbol": "usdt", "name": "Tether", "image": "https://coin-images.coingecko.com/coins/images/325/large/Tether.png", "current_price": None, "market_cap": None, "market_cap_rank": 3, "price_change_percentage_24h": None, "high_24h": None, "low_24h": None, "sparkline_in_7d": {"price": []}},
-    {"id": "binancecoin", "symbol": "bnb", "name": "BNB", "image": "https://coin-images.coingecko.com/coins/images/825/large/bnb-icon2_2x.png", "current_price": None, "market_cap": None, "market_cap_rank": 4, "price_change_percentage_24h": None, "high_24h": None, "low_24h": None, "sparkline_in_7d": {"price": []}},
-    {"id": "solana", "symbol": "sol", "name": "Solana", "image": "https://coin-images.coingecko.com/coins/images/4128/large/solana.png", "current_price": None, "market_cap": None, "market_cap_rank": 5, "price_change_percentage_24h": None, "high_24h": None, "low_24h": None, "sparkline_in_7d": {"price": []}},
-    {"id": "ripple", "symbol": "xrp", "name": "XRP", "image": "https://coin-images.coingecko.com/coins/images/44/large/xrp-symbol-white-128.png", "current_price": None, "market_cap": None, "market_cap_rank": 6, "price_change_percentage_24h": None, "high_24h": None, "low_24h": None, "sparkline_in_7d": {"price": []}},
-    {"id": "usd-coin", "symbol": "usdc", "name": "USDC", "image": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png", "current_price": None, "market_cap": None, "market_cap_rank": 7, "price_change_percentage_24h": None, "high_24h": None, "low_24h": None, "sparkline_in_7d": {"price": []}},
-    {"id": "cardano", "symbol": "ada", "name": "Cardano", "image": "https://coin-images.coingecko.com/coins/images/975/large/cardano.png", "current_price": None, "market_cap": None, "market_cap_rank": 8, "price_change_percentage_24h": None, "high_24h": None, "low_24h": None, "sparkline_in_7d": {"price": []}},
-    {"id": "dogecoin", "symbol": "doge", "name": "Dogecoin", "image": "https://coin-images.coingecko.com/coins/images/5/large/dogecoin.png", "current_price": None, "market_cap": None, "market_cap_rank": 9, "price_change_percentage_24h": None, "high_24h": None, "low_24h": None, "sparkline_in_7d": {"price": []}},
-    {"id": "avalanche-2", "symbol": "avax", "name": "Avalanche", "image": "https://coin-images.coingecko.com/coins/images/12559/large/Avalanche_Circle_RedWhite_Trans.png", "current_price": None, "market_cap": None, "market_cap_rank": 10, "price_change_percentage_24h": None, "high_24h": None, "low_24h": None, "sparkline_in_7d": {"price": []}},
-]
+# Mapping between CoinGecko IDs and Binance symbols
+CRYPTO_MAPPING = {
+    "bitcoin": {"symbol": "BTCUSDT", "name": "Bitcoin", "binance_symbol": "BTC", "rank": 1, "image": "https://coin-images.coingecko.com/coins/images/1/large/bitcoin.png"},
+    "ethereum": {"symbol": "ETHUSDT", "name": "Ethereum", "binance_symbol": "ETH", "rank": 2, "image": "https://coin-images.coingecko.com/coins/images/279/large/ethereum.png"},
+    "binancecoin": {"symbol": "BNBUSDT", "name": "BNB", "binance_symbol": "BNB", "rank": 3, "image": "https://coin-images.coingecko.com/coins/images/825/large/bnb-icon2_2x.png"},
+    "solana": {"symbol": "SOLUSDT", "name": "Solana", "binance_symbol": "SOL", "rank": 4, "image": "https://coin-images.coingecko.com/coins/images/4128/large/solana.png"},
+    "ripple": {"symbol": "XRPUSDT", "name": "XRP", "binance_symbol": "XRP", "rank": 5, "image": "https://coin-images.coingecko.com/coins/images/44/large/xrp-symbol-white-128.png"},
+    "cardano": {"symbol": "ADAUSDT", "name": "Cardano", "binance_symbol": "ADA", "rank": 6, "image": "https://coin-images.coingecko.com/coins/images/975/large/cardano.png"},
+    "dogecoin": {"symbol": "DOGEUSDT", "name": "Dogecoin", "binance_symbol": "DOGE", "rank": 7, "image": "https://coin-images.coingecko.com/coins/images/5/large/dogecoin.png"},
+    "avalanche-2": {"symbol": "AVAXUSDT", "name": "Avalanche", "binance_symbol": "AVAX", "rank": 8, "image": "https://coin-images.coingecko.com/coins/images/12559/large/Avalanche_Circle_RedWhite_Trans.png"},
+    "polkadot": {"symbol": "DOTUSDT", "name": "Polkadot", "binance_symbol": "DOT", "rank": 9, "image": "https://coin-images.coingecko.com/coins/images/12171/large/polkadot.png"},
+    "chainlink": {"symbol": "LINKUSDT", "name": "Chainlink", "binance_symbol": "LINK", "rank": 10, "image": "https://coin-images.coingecko.com/coins/images/877/large/chainlink-new-logo.png"},
+    "polygon": {"symbol": "MATICUSDT", "name": "Polygon", "binance_symbol": "MATIC", "rank": 11, "image": "https://coin-images.coingecko.com/coins/images/4713/large/polygon.png"},
+    "litecoin": {"symbol": "LTCUSDT", "name": "Litecoin", "binance_symbol": "LTC", "rank": 12, "image": "https://coin-images.coingecko.com/coins/images/2/large/litecoin.png"},
+    "shiba-inu": {"symbol": "SHIBUSDT", "name": "Shiba Inu", "binance_symbol": "SHIB", "rank": 13, "image": "https://coin-images.coingecko.com/coins/images/11939/large/shiba.png"},
+    "uniswap": {"symbol": "UNIUSDT", "name": "Uniswap", "binance_symbol": "UNI", "rank": 14, "image": "https://coin-images.coingecko.com/coins/images/12504/large/uni.jpg"},
+    "near": {"symbol": "NEARUSDT", "name": "NEAR Protocol", "binance_symbol": "NEAR", "rank": 15, "image": "https://coin-images.coingecko.com/coins/images/10365/large/near.jpg"},
+    "tron": {"symbol": "TRXUSDT", "name": "TRON", "binance_symbol": "TRX", "rank": 16, "image": "https://coin-images.coingecko.com/coins/images/1094/large/tron-logo.png"},
+    "stellar": {"symbol": "XLMUSDT", "name": "Stellar", "binance_symbol": "XLM", "rank": 17, "image": "https://coin-images.coingecko.com/coins/images/100/large/Stellar_symbol_black_RGB.png"},
+    "cosmos": {"symbol": "ATOMUSDT", "name": "Cosmos", "binance_symbol": "ATOM", "rank": 18, "image": "https://coin-images.coingecko.com/coins/images/1481/large/cosmos_hub.png"},
+    "ethereum-classic": {"symbol": "ETCUSDT", "name": "Ethereum Classic", "binance_symbol": "ETC", "rank": 19, "image": "https://coin-images.coingecko.com/coins/images/453/large/ethereum-classic-logo.png"},
+    "filecoin": {"symbol": "FILUSDT", "name": "Filecoin", "binance_symbol": "FIL", "rank": 20, "image": "https://coin-images.coingecko.com/coins/images/12817/large/filecoin.png"},
+}
 
-async def fetch_crypto_with_simple_api():
-    """Fetch basic price data using CoinGecko simple/price endpoint (less rate limited)"""
-    coin_ids = ",".join([c["id"] for c in FALLBACK_CRYPTO_DATA])
+async def fetch_crypto_from_binance():
+    """
+    Fetch real-time crypto data from Binance API (PRIMARY SOURCE)
+    Binance has generous rate limits: 1200 requests/minute
+    """
+    try:
+        async with httpx.AsyncClient() as client:
+            # Get 24hr ticker for all symbols we need
+            symbols = [info["symbol"] for info in CRYPTO_MAPPING.values()]
+            
+            # Binance ticker endpoint - very reliable
+            response = await client.get(
+                f"{BINANCE_API_URL}/ticker/24hr",
+                timeout=15.0
+            )
+            
+            if response.status_code != 200:
+                logger.warning(f"Binance API returned {response.status_code}")
+                return None
+            
+            binance_data = response.json()
+            
+            # Create a lookup map
+            binance_lookup = {item["symbol"]: item for item in binance_data}
+            
+            # Build crypto list in CoinGecko-compatible format
+            crypto_list = []
+            for coin_id, info in CRYPTO_MAPPING.items():
+                binance_symbol = info["symbol"]
+                if binance_symbol in binance_lookup:
+                    ticker = binance_lookup[binance_symbol]
+                    crypto_list.append({
+                        "id": coin_id,
+                        "symbol": info["binance_symbol"].lower(),
+                        "name": info["name"],
+                        "image": info["image"],
+                        "current_price": float(ticker["lastPrice"]),
+                        "market_cap": float(ticker["quoteVolume"]) * 100,  # Approximate
+                        "market_cap_rank": info["rank"],
+                        "price_change_percentage_24h": float(ticker["priceChangePercent"]),
+                        "high_24h": float(ticker["highPrice"]),
+                        "low_24h": float(ticker["lowPrice"]),
+                        "total_volume": float(ticker["volume"]),
+                        "sparkline_in_7d": {"price": []},
+                        "source": "binance"
+                    })
+            
+            # Sort by rank
+            crypto_list.sort(key=lambda x: x["market_cap_rank"])
+            
+            logger.info(f"✅ Fetched {len(crypto_list)} cryptos from Binance")
+            return crypto_list
+            
+    except Exception as e:
+        logger.error(f"Binance API error: {e}")
+        return None
+
+async def fetch_crypto_from_coingecko():
+    """
+    Fetch crypto data from CoinGecko API (SECONDARY SOURCE)
+    Has rate limits but provides more detailed data
+    """
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{COINGECKO_API_URL}/coins/markets",
+                params={
+                    "vs_currency": "usd",
+                    "order": "market_cap_desc",
+                    "per_page": 50,
+                    "page": 1,
+                    "sparkline": True,
+                    "price_change_percentage": "24h,7d"
+                },
+                timeout=30.0
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                # Add source marker
+                for item in data:
+                    item["source"] = "coingecko"
+                logger.info(f"✅ Fetched {len(data)} cryptos from CoinGecko")
+                return data
+            elif response.status_code == 429:
+                logger.warning("CoinGecko rate limited")
+                return None
+            else:
+                logger.warning(f"CoinGecko returned {response.status_code}")
+                return None
+                
+    except Exception as e:
+        logger.error(f"CoinGecko API error: {e}")
+        return None
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(
