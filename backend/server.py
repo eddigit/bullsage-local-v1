@@ -679,13 +679,13 @@ async def get_crypto_markets(current_user: dict = Depends(get_current_user)):
             logger.info(f"Returning cached crypto data (source: {_crypto_cache.get('source', 'unknown')})")
             return _crypto_cache["data"]
     
-    # Strategy 1: Try Binance first (most reliable, no rate limits)
-    binance_data = await fetch_crypto_from_binance()
-    if binance_data and len(binance_data) > 0:
-        _crypto_cache["data"] = binance_data
+    # Strategy 1: Try CryptoCompare first (most reliable, no rate limits, no geo-blocking)
+    cryptocompare_data = await fetch_crypto_from_cryptocompare()
+    if cryptocompare_data and len(cryptocompare_data) > 0:
+        _crypto_cache["data"] = cryptocompare_data
         _crypto_cache["timestamp"] = now
-        _crypto_cache["source"] = "binance"
-        return binance_data
+        _crypto_cache["source"] = "cryptocompare"
+        return cryptocompare_data
     
     # Strategy 2: Try CoinGecko as fallback
     coingecko_data = await fetch_crypto_from_coingecko()
@@ -695,7 +695,15 @@ async def get_crypto_markets(current_user: dict = Depends(get_current_user)):
         _crypto_cache["source"] = "coingecko"
         return coingecko_data
     
-    # Strategy 3: Return stale cache if available (real data, just old)
+    # Strategy 3: Try Binance (may be geo-blocked)
+    binance_data = await fetch_crypto_from_binance()
+    if binance_data and len(binance_data) > 0:
+        _crypto_cache["data"] = binance_data
+        _crypto_cache["timestamp"] = now
+        _crypto_cache["source"] = "binance"
+        return binance_data
+    
+    # Strategy 4: Return stale cache if available (real data, just old)
     if _crypto_cache["data"]:
         logger.warning("Returning stale cached data - all APIs unavailable")
         return _crypto_cache["data"]
