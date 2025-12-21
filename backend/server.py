@@ -3777,9 +3777,8 @@ async def smart_invest_analyze(request: SmartInvestRequest, current_user: dict =
                     ma = calculate_moving_averages(prices)
                     sr = calculate_support_resistance(prices)
                     
-                    current_price = prices[-1]
-                    price_data = prices_data.get(coin_id, {})
-                    change_24h = price_data.get("usd_24h_change", 0)
+                    # Use Binance data for current price (already set above)
+                    # current_price and change_24h are from Binance ticker
                     
                     # Calculate composite score
                     score = 0
