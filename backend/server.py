@@ -3789,7 +3789,7 @@ async def analyze_stock_opportunity(client, symbol: str, name: str, stock_type: 
 async def smart_invest_analyze(request: SmartInvestRequest, current_user: dict = Depends(get_current_user)):
     """
     Analyze the market and recommend the best investment opportunity.
-    Uses Binance as primary source (more reliable), CoinGecko as fallback.
+    Uses CryptoCompare as primary (most reliable), with other APIs as fallback.
     Analyzes both crypto AND stocks/indices for the best opportunity.
     """
     if request.investment_amount < 10:
@@ -3806,59 +3806,85 @@ async def smart_invest_analyze(request: SmartInvestRequest, current_user: dict =
     
     try:
         async with httpx.AsyncClient() as client:
-            # ============== STRATEGY 1: BINANCE (PRIMARY) ==============
-            logger.info("Smart Invest: Fetching data from Binance...")
+            # ============== GET CURRENT PRICES FROM CRYPTOCOMPARE ==============
+            logger.info("Smart Invest: Fetching data from CryptoCompare...")
             
-            # Get all 24hr tickers from Binance in one call
-            binance_tickers = {}
+            # Build symbol list
+            symbols = []
+            for coin_id in watchlist[:10]:
+                if coin_id in CRYPTO_MAPPING:
+                    symbols.append(CRYPTO_MAPPING[coin_id]["binance_symbol"])
+            
+            if not symbols:
+                symbols = ["BTC", "ETH", "SOL", "XRP", "ADA"]
+            
+            symbols_str = ",".join(symbols)
+            
+            # Get current prices
+            price_data = {}
             try:
-                ticker_response = await client.get(
-                    f"{BINANCE_API_URL}/ticker/24hr",
+                price_response = await client.get(
+                    f"{CRYPTOCOMPARE_API_URL}/pricemultifull",
+                    params={"fsyms": symbols_str, "tsyms": "USD"},
                     timeout=15.0
                 )
-                if ticker_response.status_code == 200:
-                    for ticker in ticker_response.json():
-                        binance_tickers[ticker["symbol"]] = ticker
-                    logger.info(f"✅ Smart Invest: Got {len(binance_tickers)} tickers from Binance")
+                if price_response.status_code == 200:
+                    data = price_response.json()
+                    if "RAW" in data:
+                        price_data = data["RAW"]
+                        logger.info(f"✅ Smart Invest: Got prices for {len(price_data)} cryptos from CryptoCompare")
             except Exception as e:
-                logger.warning(f"Smart Invest: Binance ticker error: {e}")
+                logger.warning(f"Smart Invest: CryptoCompare price error: {e}")
+            
+            if not price_data:
+                return {"error": "Impossible de récupérer les prix. Réessayez dans 30 secondes."}
             
             analyzed_count = 0
             
             # Analyze each coin
             for coin_id in watchlist[:8]:
                 try:
-                    # Get Binance symbol
+                    # Get coin info from mapping
                     if coin_id not in CRYPTO_MAPPING:
                         continue
                     
                     coin_info = CRYPTO_MAPPING[coin_id]
-                    binance_symbol = coin_info["symbol"]
+                    crypto_symbol = coin_info["binance_symbol"]
                     
-                    # Get current price from Binance
-                    if binance_symbol not in binance_tickers:
+                    # Get current price from CryptoCompare
+                    if crypto_symbol not in price_data or "USD" not in price_data[crypto_symbol]:
                         continue
                     
-                    ticker = binance_tickers[binance_symbol]
-                    current_price = float(ticker["lastPrice"])
-                    change_24h = float(ticker["priceChangePercent"])
+                    usd_data = price_data[crypto_symbol]["USD"]
+                    current_price = usd_data.get("PRICE", 0)
+                    change_24h = usd_data.get("CHANGEPCT24HOUR", 0)
                     
-                    # Get historical klines from Binance
-                    klines_response = await client.get(
-                        f"{BINANCE_API_URL}/klines",
+                    if current_price <= 0:
+                        continue
+                    
+                    # Get historical data from CryptoCompare
+                    hist_response = await client.get(
+                        f"{CRYPTOCOMPARE_API_URL}/histohour",
                         params={
-                            "symbol": binance_symbol,
-                            "interval": "4h",
-                            "limit": 84  # 14 days of 4h data
+                            "fsym": crypto_symbol,
+                            "tsym": "USD",
+                            "limit": 84  # ~3.5 days of hourly data
                         },
                         timeout=10.0
                     )
                     
-                    if klines_response.status_code != 200:
+                    if hist_response.status_code != 200:
                         continue
                     
-                    klines = klines_response.json()
-                    prices = [float(k[4]) for k in klines]  # Close prices
+                    hist_data = hist_response.json()
+                    if hist_data.get("Response") != "Success" or "Data" not in hist_data:
+                        continue
+                    
+                    data_points = hist_data["Data"].get("Data", hist_data.get("Data", []))
+                    if not data_points or len(data_points) < 30:
+                        continue
+                    
+                    prices = [float(d["close"]) for d in data_points if d.get("close")]
                     
                     if len(prices) < 30:
                         continue
