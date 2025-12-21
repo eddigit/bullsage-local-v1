@@ -3881,8 +3881,9 @@ async def smart_invest_analyze(request: SmartInvestRequest, current_user: dict =
                     if hist_data.get("Response") != "Success" or "Data" not in hist_data:
                         continue
                     
-                    data_points = hist_data["Data"].get("Data", hist_data.get("Data", []))
-                    if not data_points or len(data_points) < 30:
+                    # Data is directly an array in CryptoCompare response
+                    data_points = hist_data["Data"]
+                    if not isinstance(data_points, list) or len(data_points) < 30:
                         continue
                     
                     prices = [float(d["close"]) for d in data_points if d.get("close")]
