@@ -3842,30 +3842,9 @@ async def smart_invest_analyze(request: SmartInvestRequest, current_user: dict =
                     take_profit_1 = current_price * 1.08
                     take_profit_2 = min(resistance * 0.98, current_price * 1.15)
                     
-                    # Use local mapping to avoid extra API calls
-                    COIN_NAMES = {
-                        "bitcoin": ("Bitcoin", "BTC"),
-                        "ethereum": ("Ethereum", "ETH"),
-                        "solana": ("Solana", "SOL"),
-                        "ripple": ("XRP", "XRP"),
-                        "cardano": ("Cardano", "ADA"),
-                        "dogecoin": ("Dogecoin", "DOGE"),
-                        "polkadot": ("Polkadot", "DOT"),
-                        "avalanche-2": ("Avalanche", "AVAX"),
-                        "chainlink": ("Chainlink", "LINK"),
-                        "polygon": ("Polygon", "MATIC"),
-                        "litecoin": ("Litecoin", "LTC"),
-                        "uniswap": ("Uniswap", "UNI"),
-                        "cosmos": ("Cosmos", "ATOM"),
-                        "stellar": ("Stellar", "XLM"),
-                        "near": ("NEAR Protocol", "NEAR"),
-                    }
-                    
-                    if coin_id in COIN_NAMES:
-                        coin_name, coin_symbol = COIN_NAMES[coin_id]
-                    else:
-                        coin_name = coin_id.replace("-", " ").title()
-                        coin_symbol = coin_id[:3].upper()
+                    # Use CRYPTO_MAPPING for names
+                    coin_name = coin_info["name"]
+                    coin_symbol = coin_info["binance_symbol"]
                     
                     # Check if this is the best crypto opportunity
                     if score >= 2:
@@ -3894,7 +3873,8 @@ async def smart_invest_analyze(request: SmartInvestRequest, current_user: dict =
                                 "take_profit_1": round(take_profit_1, 2 if take_profit_1 >= 1 else 6),
                                 "take_profit_2": round(take_profit_2, 2 if take_profit_2 >= 1 else 6)
                             },
-                            "reasons": reasons
+                            "reasons": reasons,
+                            "source": "binance"
                         }
                         all_opportunities.append(crypto_opportunity)
                         
