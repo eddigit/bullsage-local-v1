@@ -177,7 +177,7 @@ export default function PaperTradingPage() {
     Object.entries(portfolio.portfolio || {}).forEach(([symbol, holding]) => {
       const coin = markets.find(c => c.id === symbol);
       if (coin) {
-        totalValue += holding.amount * coin.current_price;
+        totalValue += (holding.amount || holding.quantity || 0) * coin.current_price;
       }
     });
     return totalValue;
