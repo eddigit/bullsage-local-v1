@@ -679,16 +679,16 @@ export default function PaperTradingPage() {
                                 {trade.type === "buy" ? "Achat" : "Vente"} {coin?.name || trade.symbol}
                               </p>
                               <p className="text-xs text-muted-foreground">
-                                {new Date(trade.timestamp).toLocaleString("fr-FR")}
+                                {new Date(trade.timestamp || trade.created_at).toLocaleString("fr-FR")}
                               </p>
                             </div>
                           </div>
                           <div className="text-right">
                             <p className="font-mono font-medium">
-                              {trade.amount.toFixed(6)} {trade.symbol.toUpperCase()}
+                              {(trade.amount || trade.quantity || 0).toFixed(6)} {(trade.symbol || trade.coin_id || '').toUpperCase()}
                             </p>
                             <p className="text-sm text-muted-foreground font-mono">
-                              @ {formatPrice(trade.price)}
+                              @ {formatPrice(trade.price || trade.entry_price)}
                             </p>
                           </div>
                         </div>
