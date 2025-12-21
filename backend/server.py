@@ -2290,42 +2290,67 @@ async def analyze_for_trading(request: TradingAnalysisRequest, current_user: dic
     days_map = {"1h": 1, "4h": 7, "daily": 30}
     days = days_map.get(timeframe, 7)
     
-    # Fetch historical price data
+    # Fetch historical price data with retry logic
+    prices = None
+    market_data = {}
+    
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{COINGECKO_API_URL}/coins/{coin_id}/market_chart",
-                params={"vs_currency": "usd", "days": days},
-                timeout=30.0
-            )
+            # Retry logic for CoinGecko rate limiting
+            for attempt in range(3):
+                try:
+                    response = await client.get(
+                        f"{COINGECKO_API_URL}/coins/{coin_id}/market_chart",
+                        params={"vs_currency": "usd", "days": days},
+                        timeout=30.0
+                    )
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        prices = [p[1] for p in data.get("prices", [])]
+                        break
+                    elif response.status_code == 429:
+                        logger.warning(f"Trading analyze: CoinGecko rate limited, attempt {attempt + 1}/3")
+                        if attempt < 2:
+                            await asyncio.sleep(2)
+                        continue
+                    else:
+                        logger.warning(f"Trading analyze: CoinGecko returned {response.status_code}")
+                        if attempt < 2:
+                            await asyncio.sleep(1)
+                        continue
+                except Exception as e:
+                    logger.warning(f"Trading analyze: Fetch error attempt {attempt + 1}: {e}")
+                    if attempt < 2:
+                        await asyncio.sleep(1)
+                    continue
             
-            if response.status_code != 200:
-                # Try cache or return error
-                raise HTTPException(status_code=503, detail="Unable to fetch market data")
+            if not prices or len(prices) < 10:
+                raise HTTPException(
+                    status_code=503, 
+                    detail="L'API CoinGecko est temporairement surchargée. Réessayez dans 30 secondes."
+                )
             
-            data = response.json()
-            prices = [p[1] for p in data.get("prices", [])]
-            # Note: volumes available in data but not needed for current analysis
-            
-            if not prices:
-                raise HTTPException(status_code=404, detail="No price data available")
-            
-            # Get current market info
-            market_response = await client.get(
-                f"{COINGECKO_API_URL}/coins/{coin_id}",
-                params={"localization": False, "tickers": False, "community_data": False, "developer_data": False},
-                timeout=15.0
-            )
-            
-            market_data = {}
-            if market_response.status_code == 200:
-                coin_data = market_response.json()
-                market_data = coin_data.get("market_data", {})
+            # Get current market info (optional, don't fail if unavailable)
+            try:
+                market_response = await client.get(
+                    f"{COINGECKO_API_URL}/coins/{coin_id}",
+                    params={"localization": "false", "tickers": "false", "community_data": "false", "developer_data": "false"},
+                    timeout=15.0
+                )
+                
+                if market_response.status_code == 200:
+                    coin_data = market_response.json()
+                    market_data = coin_data.get("market_data", {})
+            except Exception as e:
+                logger.warning(f"Trading analyze: Could not fetch market info: {e}")
+                # Continue without market_data - not critical
+                
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error fetching data for trading analysis: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch market data")
+        raise HTTPException(status_code=500, detail="Erreur lors de la récupération des données. Réessayez.")
     
     # Calculate all indicators
     indicators = {
