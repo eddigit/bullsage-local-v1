@@ -3419,17 +3419,168 @@ async def get_onboarding_options():
 
 class SmartInvestRequest(BaseModel):
     investment_amount: float
+    include_stocks: bool = True  # Include stocks/indices analysis
 
 class SmartInvestExecute(BaseModel):
-    coin_id: str
+    coin_id: str  # Can be crypto id or stock symbol
+    asset_type: str = "crypto"  # crypto or stock
     amount_usd: float
     entry_price: float
+
+# Stock/Index symbols for Smart Invest analysis
+SMART_INVEST_STOCKS = [
+    {"symbol": "QQQ", "name": "NASDAQ 100 ETF", "type": "index"},
+    {"symbol": "SPY", "name": "S&P 500 ETF", "type": "index"},
+    {"symbol": "AAPL", "name": "Apple", "type": "stock"},
+    {"symbol": "MSFT", "name": "Microsoft", "type": "stock"},
+    {"symbol": "GOOGL", "name": "Google", "type": "stock"},
+    {"symbol": "TSLA", "name": "Tesla", "type": "stock"},
+    {"symbol": "NVDA", "name": "NVIDIA", "type": "stock"},
+    {"symbol": "AMZN", "name": "Amazon", "type": "stock"},
+]
+
+async def analyze_stock_opportunity(client, symbol: str, name: str, stock_type: str, investment_amount: float):
+    """Analyze a stock/index using Alpha Vantage data"""
+    try:
+        # Get daily data
+        response = await client.get(
+            "https://www.alphavantage.co/query",
+            params={
+                "function": "TIME_SERIES_DAILY",
+                "symbol": symbol,
+                "apikey": ALPHA_VANTAGE_API_KEY
+            },
+            timeout=15.0
+        )
+        
+        if response.status_code != 200:
+            return None
+        
+        data = response.json()
+        
+        if "Time Series (Daily)" not in data:
+            return None
+        
+        time_series = data["Time Series (Daily)"]
+        dates = sorted(time_series.keys(), reverse=True)[:30]
+        
+        if len(dates) < 14:
+            return None
+        
+        # Extract prices
+        prices = [float(time_series[d]["4. close"]) for d in reversed(dates)]
+        volumes = [float(time_series[d]["5. volume"]) for d in reversed(dates)]
+        
+        current_price = prices[-1]
+        prev_price = prices[-2] if len(prices) > 1 else current_price
+        change_24h = ((current_price - prev_price) / prev_price) * 100
+        
+        # Calculate indicators
+        rsi = calculate_rsi(prices)
+        macd = calculate_macd(prices)
+        bb = calculate_bollinger_bands(prices)
+        ma = calculate_moving_averages(prices)
+        sr = calculate_support_resistance(prices)
+        
+        # Calculate score
+        score = 0
+        reasons = []
+        
+        # RSI Analysis
+        if rsi < 25:
+            score += 4
+            reasons.append(f"🔥 RSI extrême ({rsi:.1f}) - Excellente opportunité")
+        elif rsi < 30:
+            score += 3
+            reasons.append(f"RSI en survente ({rsi:.1f}) - Signal d'achat fort")
+        elif rsi < 40:
+            score += 2
+            reasons.append(f"RSI favorable ({rsi:.1f}) - Potentiel de rebond")
+        elif rsi > 70:
+            score -= 3
+            reasons.append(f"RSI en surachat ({rsi:.1f})")
+        
+        # Bollinger Analysis
+        if bb.get("position") == "oversold":
+            score += 3
+            reasons.append("💰 Prix sur bande inférieure Bollinger")
+        elif bb.get("position") == "lower_half":
+            score += 1
+        elif bb.get("position") == "overbought":
+            score -= 2
+        
+        # Trend Analysis
+        trend = ma.get("trend", "neutral")
+        if trend == "strong_bullish":
+            score += 3
+            reasons.append("🚀 Tendance fortement haussière")
+        elif trend == "bullish":
+            score += 2
+            reasons.append("📈 Tendance haussière")
+        elif trend == "strong_bearish":
+            score -= 3
+        elif trend == "bearish":
+            score -= 2
+        
+        # MACD Analysis
+        if macd.get("trend") == "bullish":
+            score += 1.5
+            reasons.append("MACD haussier")
+        elif macd.get("trend") == "bearish":
+            score -= 1.5
+        
+        # Volume bonus
+        avg_volume = sum(volumes[:-1]) / len(volumes[:-1]) if len(volumes) > 1 else volumes[-1]
+        if volumes[-1] > avg_volume * 1.5:
+            score += 0.5
+            reasons.append("📊 Volume élevé")
+        
+        # Calculate levels
+        support = sr.get("support", current_price * 0.95)
+        resistance = sr.get("resistance", current_price * 1.10)
+        
+        stop_loss = max(support * 0.98, current_price * 0.95)
+        take_profit_1 = current_price * 1.05
+        take_profit_2 = min(resistance * 0.98, current_price * 1.10)
+        
+        quantity = investment_amount / current_price
+        
+        return {
+            "coin_id": symbol,
+            "name": name,
+            "symbol": symbol,
+            "asset_type": "stock",
+            "stock_type": stock_type,
+            "current_price": current_price,
+            "change_24h": change_24h,
+            "score": round(score, 1),
+            "confidence": "HAUTE" if score >= 5 else "MOYENNE" if score >= 3 else "MODÉRÉE",
+            "quantity_to_buy": quantity,
+            "investment_amount": investment_amount,
+            "indicators": {
+                "rsi": round(rsi, 1),
+                "trend": trend,
+                "bollinger": bb.get("position", "middle"),
+                "macd": macd.get("trend", "neutral")
+            },
+            "levels": {
+                "entry": current_price,
+                "stop_loss": round(stop_loss, 2),
+                "take_profit_1": round(take_profit_1, 2),
+                "take_profit_2": round(take_profit_2, 2)
+            },
+            "reasons": reasons
+        }
+        
+    except Exception as e:
+        logger.warning(f"Error analyzing stock {symbol}: {e}")
+        return None
 
 @api_router.post("/smart-invest/analyze")
 async def smart_invest_analyze(request: SmartInvestRequest, current_user: dict = Depends(get_current_user)):
     """
     Analyze the market and recommend the best investment opportunity.
-    Uses all available indicators to find the most promising asset.
+    Analyzes both crypto AND stocks/indices for the best opportunity.
     """
     if request.investment_amount < 10:
         return {"error": "Montant minimum: 10€"}
@@ -3441,6 +3592,7 @@ async def smart_invest_analyze(request: SmartInvestRequest, current_user: dict =
     
     best_opportunity = None
     best_score = -999
+    all_opportunities = []
     
     try:
         async with httpx.AsyncClient() as client:
