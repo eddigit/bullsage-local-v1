@@ -2341,71 +2341,101 @@ class TradingAnalysisRequest(BaseModel):
 async def analyze_for_trading(request: TradingAnalysisRequest, current_user: dict = Depends(get_current_user)):
     """
     Deep technical analysis for trading decisions.
-    Returns indicators + AI recommendation.
+    Uses Binance for historical data (more reliable), CoinGecko as fallback.
     """
     coin_id = request.coin_id
     timeframe = request.timeframe
     trading_style = request.trading_style
     
-    # Map timeframe to days of data needed
-    days_map = {"1h": 1, "4h": 7, "daily": 30}
-    days = days_map.get(timeframe, 7)
+    # Map timeframe to Binance interval and limit
+    timeframe_map = {
+        "1h": ("1h", 168),    # 7 days of hourly data
+        "4h": ("4h", 168),    # 28 days of 4h data  
+        "daily": ("1d", 30)   # 30 days of daily data
+    }
+    interval, limit = timeframe_map.get(timeframe, ("4h", 168))
     
-    # Fetch historical price data with retry logic
     prices = None
     market_data = {}
     
     try:
         async with httpx.AsyncClient() as client:
-            # Retry logic for CoinGecko rate limiting
-            for attempt in range(3):
+            # Get Binance symbol from coin_id
+            binance_symbol = None
+            if coin_id in CRYPTO_MAPPING:
+                binance_symbol = CRYPTO_MAPPING[coin_id]["symbol"]
+            
+            # Strategy 1: Try Binance first (more reliable)
+            if binance_symbol:
                 try:
                     response = await client.get(
-                        f"{COINGECKO_API_URL}/coins/{coin_id}/market_chart",
-                        params={"vs_currency": "usd", "days": days},
-                        timeout=30.0
+                        f"{BINANCE_API_URL}/klines",
+                        params={
+                            "symbol": binance_symbol,
+                            "interval": interval,
+                            "limit": limit
+                        },
+                        timeout=15.0
                     )
                     
                     if response.status_code == 200:
-                        data = response.json()
-                        prices = [p[1] for p in data.get("prices", [])]
-                        break
-                    elif response.status_code == 429:
-                        logger.warning(f"Trading analyze: CoinGecko rate limited, attempt {attempt + 1}/3")
-                        if attempt < 2:
-                            await asyncio.sleep(2)
-                        continue
-                    else:
-                        logger.warning(f"Trading analyze: CoinGecko returned {response.status_code}")
-                        if attempt < 2:
+                        klines = response.json()
+                        # Binance klines: [open_time, open, high, low, close, volume, ...]
+                        prices = [float(k[4]) for k in klines]  # Close prices
+                        logger.info(f"✅ Trading analyze: Got {len(prices)} prices from Binance for {coin_id}")
+                        
+                        # Get current price info from 24hr ticker
+                        ticker_response = await client.get(
+                            f"{BINANCE_API_URL}/ticker/24hr",
+                            params={"symbol": binance_symbol},
+                            timeout=10.0
+                        )
+                        if ticker_response.status_code == 200:
+                            ticker = ticker_response.json()
+                            market_data = {
+                                "current_price": {"usd": float(ticker["lastPrice"])},
+                                "high_24h": {"usd": float(ticker["highPrice"])},
+                                "low_24h": {"usd": float(ticker["lowPrice"])},
+                                "price_change_percentage_24h": float(ticker["priceChangePercent"]),
+                                "total_volume": {"usd": float(ticker["quoteVolume"])}
+                            }
+                except Exception as e:
+                    logger.warning(f"Trading analyze: Binance error for {coin_id}: {e}")
+            
+            # Strategy 2: Fallback to CoinGecko if Binance failed
+            if not prices or len(prices) < 10:
+                days_map = {"1h": 1, "4h": 7, "daily": 30}
+                days = days_map.get(timeframe, 7)
+                
+                for attempt in range(2):
+                    try:
+                        response = await client.get(
+                            f"{COINGECKO_API_URL}/coins/{coin_id}/market_chart",
+                            params={"vs_currency": "usd", "days": days},
+                            timeout=30.0
+                        )
+                        
+                        if response.status_code == 200:
+                            data = response.json()
+                            prices = [p[1] for p in data.get("prices", [])]
+                            logger.info(f"✅ Trading analyze: Got {len(prices)} prices from CoinGecko for {coin_id}")
+                            break
+                        elif response.status_code == 429:
+                            logger.warning(f"Trading analyze: CoinGecko rate limited, attempt {attempt + 1}/2")
+                            if attempt < 1:
+                                await asyncio.sleep(2)
+                            continue
+                    except Exception as e:
+                        logger.warning(f"Trading analyze: CoinGecko error attempt {attempt + 1}: {e}")
+                        if attempt < 1:
                             await asyncio.sleep(1)
                         continue
-                except Exception as e:
-                    logger.warning(f"Trading analyze: Fetch error attempt {attempt + 1}: {e}")
-                    if attempt < 2:
-                        await asyncio.sleep(1)
-                    continue
             
             if not prices or len(prices) < 10:
                 raise HTTPException(
                     status_code=503, 
-                    detail="L'API CoinGecko est temporairement surchargée. Réessayez dans 30 secondes."
+                    detail="Impossible de récupérer les données historiques. Réessayez dans 30 secondes."
                 )
-            
-            # Get current market info (optional, don't fail if unavailable)
-            try:
-                market_response = await client.get(
-                    f"{COINGECKO_API_URL}/coins/{coin_id}",
-                    params={"localization": "false", "tickers": "false", "community_data": "false", "developer_data": "false"},
-                    timeout=15.0
-                )
-                
-                if market_response.status_code == 200:
-                    coin_data = market_response.json()
-                    market_data = coin_data.get("market_data", {})
-            except Exception as e:
-                logger.warning(f"Trading analyze: Could not fetch market info: {e}")
-                # Continue without market_data - not critical
                 
     except HTTPException:
         raise
