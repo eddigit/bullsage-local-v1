@@ -447,8 +447,9 @@ export default function PaperTradingPage() {
                   <div className="space-y-3">
                     {Object.entries(portfolio.portfolio).map(([symbol, holding]) => {
                       const coin = markets.find(c => c.id === symbol);
-                      const currentValue = coin ? holding.amount * coin.current_price : 0;
-                      const costBasis = holding.amount * holding.avg_price;
+                      const qty = holding.amount || holding.quantity || 0;
+                      const currentValue = coin ? qty * coin.current_price : 0;
+                      const costBasis = qty * holding.avg_price;
                       const pnl = currentValue - costBasis;
                       const pnlPercent = costBasis > 0 ? (pnl / costBasis) * 100 : 0;
 
