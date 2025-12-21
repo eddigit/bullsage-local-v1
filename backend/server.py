@@ -2478,8 +2478,9 @@ async def analyze_for_trading(request: TradingAnalysisRequest, current_user: dic
                 if response.status_code == 200:
                     data = response.json()
                     if data.get("Response") == "Success" and "Data" in data:
-                        hist_data = data["Data"].get("Data", data.get("Data", []))
-                        if hist_data and len(hist_data) > 10:
+                        # Data is directly an array in CryptoCompare response
+                        hist_data = data["Data"]
+                        if isinstance(hist_data, list) and len(hist_data) > 10:
                             prices = [float(d["close"]) for d in hist_data if d.get("close")]
                             logger.info(f"✅ Trading analyze: Got {len(prices)} prices from CryptoCompare for {coin_id}")
                             
