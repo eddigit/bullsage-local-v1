@@ -574,110 +574,50 @@ async def fetch_crypto_from_coingecko():
     except Exception as e:
         logger.error(f"CoinGecko API error: {e}")
         return None
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{COINGECKO_API_URL}/simple/price",
-                params={
-                    "ids": coin_ids,
-                    "vs_currencies": "usd",
-                    "include_24hr_change": "true",
-                    "include_24hr_vol": "true"
-                },
-                timeout=15.0
-            )
-            if response.status_code == 200:
-                prices = response.json()
-                # Update fallback data with real prices
-                updated_data = []
-                for coin in FALLBACK_CRYPTO_DATA:
-                    coin_data = coin.copy()
-                    if coin["id"] in prices:
-                        coin_data["current_price"] = prices[coin["id"]].get("usd", 0)
-                        coin_data["price_change_percentage_24h"] = prices[coin["id"]].get("usd_24h_change", 0)
-                    updated_data.append(coin_data)
-                return updated_data
-    except Exception as e:
-        logger.error(f"Simple price API error: {e}")
-    return None
 
 @api_router.get("/market/crypto")
 async def get_crypto_markets(current_user: dict = Depends(get_current_user)):
-    """Get top cryptocurrencies from CoinGecko - REAL DATA ONLY"""
+    """
+    Get top cryptocurrencies - REAL DATA ONLY
+    Uses Binance as primary source (more reliable), CoinGecko as fallback
+    """
     global _crypto_cache
     
-    # Check cache first (extended TTL to reduce rate limits)
     now = datetime.now(timezone.utc)
+    
+    # Check cache first (5 minutes TTL)
     if _crypto_cache["data"] and _crypto_cache["timestamp"]:
         age = (now - _crypto_cache["timestamp"]).total_seconds()
-        # Extended cache to 120 seconds to reduce API calls
-        if age < 120:
-            logger.info("Returning cached crypto data")
+        if age < _crypto_cache["ttl"]:
+            logger.info(f"Returning cached crypto data (source: {_crypto_cache.get('source', 'unknown')})")
             return _crypto_cache["data"]
     
-    # Try main API with retry
-    for attempt in range(3):
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    f"{COINGECKO_API_URL}/coins/markets",
-                    params={
-                        "vs_currency": "usd",
-                        "order": "market_cap_desc",
-                        "per_page": 50,
-                        "page": 1,
-                        "sparkline": True,
-                        "price_change_percentage": "24h,7d"
-                    },
-                    timeout=30.0
-                )
-                if response.status_code == 200:
-                    data = response.json()
-                    # Update cache
-                    _crypto_cache["data"] = data
-                    _crypto_cache["timestamp"] = now
-                    return data
-                elif response.status_code == 429:
-                    logger.warning(f"CoinGecko rate limited, attempt {attempt + 1}/3")
-                    if attempt < 2:
-                        await asyncio.sleep(2)
-                        continue
-                    # Try simple price API as last resort
-                    simple_data = await fetch_crypto_with_simple_api()
-                    if simple_data:
-                        _crypto_cache["data"] = simple_data
-                        _crypto_cache["timestamp"] = now
-                        return simple_data
-                    # Return stale cache if available (real data, just old)
-                    if _crypto_cache["data"]:
-                        logger.info("Returning stale cached data due to rate limit")
-                        return _crypto_cache["data"]
-                    # No real data available - raise error instead of returning mock
-                    raise HTTPException(
-                        status_code=503,
-                        detail="L'API CoinGecko est temporairement indisponible. Veuillez réessayer dans 1 minute."
-                    )
-                else:
-                    logger.error(f"CoinGecko API error: {response.status_code}")
-                    if _crypto_cache["data"]:
-                        return _crypto_cache["data"]
-                    raise HTTPException(
-                        status_code=503,
-                        detail="Erreur lors de la récupération des données crypto."
-                    )
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Error fetching crypto markets (attempt {attempt + 1}): {e}")
-            if attempt < 2:
-                await asyncio.sleep(1)
-                continue
-            if _crypto_cache["data"]:
-                return _crypto_cache["data"]
-            raise HTTPException(
-                status_code=503,
-                detail="Impossible de récupérer les données. Vérifiez votre connexion."
-            )
+    # Strategy 1: Try Binance first (most reliable, no rate limits)
+    binance_data = await fetch_crypto_from_binance()
+    if binance_data and len(binance_data) > 0:
+        _crypto_cache["data"] = binance_data
+        _crypto_cache["timestamp"] = now
+        _crypto_cache["source"] = "binance"
+        return binance_data
+    
+    # Strategy 2: Try CoinGecko as fallback
+    coingecko_data = await fetch_crypto_from_coingecko()
+    if coingecko_data and len(coingecko_data) > 0:
+        _crypto_cache["data"] = coingecko_data
+        _crypto_cache["timestamp"] = now
+        _crypto_cache["source"] = "coingecko"
+        return coingecko_data
+    
+    # Strategy 3: Return stale cache if available (real data, just old)
+    if _crypto_cache["data"]:
+        logger.warning("Returning stale cached data - all APIs unavailable")
+        return _crypto_cache["data"]
+    
+    # No data available at all
+    raise HTTPException(
+        status_code=503,
+        detail="Les APIs de données crypto sont temporairement indisponibles. Veuillez réessayer dans quelques minutes."
+    )
 
 @api_router.get("/market/crypto/{coin_id}")
 async def get_crypto_detail(coin_id: str, current_user: dict = Depends(get_current_user)):
