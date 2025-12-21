@@ -473,7 +473,7 @@ export default function PaperTradingPage() {
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                             <div>
                               <p className="text-muted-foreground">Quantité</p>
-                              <p className="font-mono font-medium">{holding.amount.toFixed(6)}</p>
+                              <p className="font-mono font-medium">{(holding.amount || holding.quantity || 0).toFixed(6)}</p>
                             </div>
                             <div>
                               <p className="text-muted-foreground">Prix moyen</p>
