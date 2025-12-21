@@ -576,6 +576,92 @@ async def fetch_crypto_from_coingecko():
         logger.error(f"CoinGecko API error: {e}")
         return None
 
+async def fetch_crypto_from_cryptocompare():
+    """
+    Fetch real-time crypto data from CryptoCompare API (RELIABLE FALLBACK)
+    Free tier: 100,000 calls/month, no geographic restrictions
+    """
+    try:
+        # List of top cryptos to fetch
+        symbols = "BTC,ETH,BNB,SOL,XRP,ADA,DOGE,AVAX,DOT,LINK,MATIC,LTC,SHIB,UNI,NEAR,TRX,XLM,ATOM,ETC,FIL"
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{CRYPTOCOMPARE_API_URL}/pricemultifull",
+                params={
+                    "fsyms": symbols,
+                    "tsyms": "USD"
+                },
+                timeout=15.0
+            )
+            
+            if response.status_code != 200:
+                logger.warning(f"CryptoCompare returned {response.status_code}")
+                return None
+            
+            data = response.json()
+            
+            if "RAW" not in data:
+                logger.warning("CryptoCompare: No RAW data in response")
+                return None
+            
+            # Symbol to CoinGecko ID mapping
+            symbol_to_id = {
+                "BTC": "bitcoin", "ETH": "ethereum", "BNB": "binancecoin",
+                "SOL": "solana", "XRP": "ripple", "ADA": "cardano",
+                "DOGE": "dogecoin", "AVAX": "avalanche-2", "DOT": "polkadot",
+                "LINK": "chainlink", "MATIC": "polygon", "LTC": "litecoin",
+                "SHIB": "shiba-inu", "UNI": "uniswap", "NEAR": "near",
+                "TRX": "tron", "XLM": "stellar", "ATOM": "cosmos",
+                "ETC": "ethereum-classic", "FIL": "filecoin"
+            }
+            
+            crypto_list = []
+            rank = 1
+            
+            for symbol, info in data["RAW"].items():
+                if "USD" not in info:
+                    continue
+                    
+                usd_data = info["USD"]
+                coin_id = symbol_to_id.get(symbol, symbol.lower())
+                
+                # Get image from CRYPTO_MAPPING if available
+                image = ""
+                if coin_id in CRYPTO_MAPPING:
+                    image = CRYPTO_MAPPING[coin_id]["image"]
+                
+                crypto_list.append({
+                    "id": coin_id,
+                    "symbol": symbol.lower(),
+                    "name": usd_data.get("FROMSYMBOL", symbol),
+                    "image": image,
+                    "current_price": usd_data.get("PRICE", 0),
+                    "market_cap": usd_data.get("MKTCAP", 0),
+                    "market_cap_rank": rank,
+                    "price_change_percentage_24h": usd_data.get("CHANGEPCT24HOUR", 0),
+                    "high_24h": usd_data.get("HIGH24HOUR", 0),
+                    "low_24h": usd_data.get("LOW24HOUR", 0),
+                    "total_volume": usd_data.get("TOTALVOLUME24HTO", 0),
+                    "sparkline_in_7d": {"price": []},
+                    "source": "cryptocompare"
+                })
+                rank += 1
+            
+            # Sort by market cap
+            crypto_list.sort(key=lambda x: x.get("market_cap", 0), reverse=True)
+            
+            # Re-assign ranks after sorting
+            for i, crypto in enumerate(crypto_list):
+                crypto["market_cap_rank"] = i + 1
+            
+            logger.info(f"✅ Fetched {len(crypto_list)} cryptos from CryptoCompare")
+            return crypto_list
+            
+    except Exception as e:
+        logger.error(f"CryptoCompare API error: {e}")
+        return None
+
 @api_router.get("/market/crypto")
 async def get_crypto_markets(current_user: dict = Depends(get_current_user)):
     """
