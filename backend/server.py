@@ -3482,22 +3482,38 @@ async def smart_invest_analyze(request: SmartInvestRequest, current_user: dict =
             if not prices_data:
                 return {"error": "L'API CoinGecko est temporairement surchargée. Veuillez réessayer dans 30 secondes."}
             
-            prices_data = prices_response.json()
-            
-            # Analyze each coin
+            # Analyze each coin with delay to avoid rate limits
+            analyzed_count = 0
             for coin_id in watchlist[:5]:  # Limit to avoid rate limits
                 try:
-                    # Get historical data
-                    hist_response = await client.get(
-                        f"{COINGECKO_API_URL}/coins/{coin_id}/market_chart",
-                        params={"vs_currency": "usd", "days": 14},
-                        timeout=15.0
-                    )
+                    # Small delay between requests to avoid rate limiting
+                    if analyzed_count > 0:
+                        await asyncio.sleep(0.5)
                     
-                    if hist_response.status_code != 200:
+                    # Get historical data with retry
+                    hist_data = None
+                    for attempt in range(2):
+                        try:
+                            hist_response = await client.get(
+                                f"{COINGECKO_API_URL}/coins/{coin_id}/market_chart",
+                                params={"vs_currency": "usd", "days": 14},
+                                timeout=15.0
+                            )
+                            
+                            if hist_response.status_code == 200:
+                                hist_data = hist_response.json()
+                                break
+                            elif hist_response.status_code == 429:
+                                await asyncio.sleep(2)
+                                continue
+                        except Exception:
+                            if attempt < 1:
+                                await asyncio.sleep(1)
+                            continue
+                    
+                    if not hist_data:
                         continue
                     
-                    hist_data = hist_response.json()
                     prices = [p[1] for p in hist_data.get("prices", [])]
                     
                     if len(prices) < 30:
