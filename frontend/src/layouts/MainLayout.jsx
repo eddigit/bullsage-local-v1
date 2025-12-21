@@ -57,6 +57,9 @@ const navigation = [
 // Smart Invest CTA - Special item
 const smartInvestItem = { name: "Smart Invest", href: "/smart-invest", icon: Zap, highlight: true, special: true };
 
+// Auto Trading CTA - Special item
+const autoTradingItem = { name: "Auto-Trading", href: "/auto-trading", icon: Bot, highlight: true, special: true };
+
 // Admin navigation
 const adminNavigation = [
   { name: "Administration", href: "/admin", icon: Shield, admin: true },
