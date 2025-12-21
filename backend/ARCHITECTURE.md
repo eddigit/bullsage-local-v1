@@ -1,117 +1,79 @@
 # BULL SAGE - Architecture du Backend
 
-## Structure Modulaire (En cours de refactoring)
+## Structure Modulaire
 
 ```
 /app/backend/
-├── server.py              # Serveur principal (monolithique actuel ~3600 lignes)
+├── server.py              # Serveur principal FastAPI (~5000 lignes)
 ├── academy_data.py        # Données des leçons Academy (partie 1)
 ├── academy_data_part2.py  # Données des leçons Academy (partie 2)
 ├── requirements.txt       # Dépendances Python
 ├── .env                   # Variables d'environnement
 │
-├── core/                  # ✅ REFACTORISÉ
+├── core/                  # ✅ Configuration centralisée
 │   ├── __init__.py
-│   ├── config.py         # Configuration MongoDB, JWT, API Keys
-│   └── auth.py           # Authentification (get_current_user, get_admin_user)
+│   ├── config.py         # MongoDB, JWT, API Keys (CryptoCompare, CoinGecko, Binance, Alpha Vantage)
+│   └── auth.py           # Authentification JWT
 │
-├── models/                # ✅ REFACTORISÉ
+├── models/                # ✅ Modèles Pydantic
 │   ├── __init__.py
-│   └── schemas.py        # Modèles Pydantic (User, Signal, Trade, etc.)
+│   └── schemas.py        # User, Signal, Trade, etc.
 │
-├── routes/                # 🔄 PARTIELLEMENT REFACTORISÉ
-│   ├── __init__.py       # Agrégateur de tous les routers
-│   ├── auth.py           # ✅ /auth/* (register, login, me)
-│   ├── health.py         # ✅ /, /health
-│   ├── watchlist.py      # ✅ /watchlist/*
-│   ├── strategies.py     # ✅ /strategies/*
-│   ├── settings.py       # ✅ /settings/*
-│   ├── paper_trading.py  # ✅ /paper-trading/*
-│   ├── alerts.py         # ✅ /alerts/*, /alerts/smart/*
-│   ├── signals.py        # ✅ /signals/*
-│   ├── journal.py        # ✅ /journal/*
-│   ├── onboarding.py     # ✅ /onboarding/*
-│   ├── admin.py          # ✅ /admin/*
-│   ├── market.py         # 📋 À FAIRE - /market/*
-│   ├── trading.py        # 📋 À FAIRE - /trading/*
-│   ├── assistant.py      # 📋 À FAIRE - /assistant/*
-│   └── academy.py        # 📋 À FAIRE - /academy/*
+├── services/              # ✅ NOUVEAU - Services métier réutilisables
+│   ├── __init__.py
+│   ├── market_data.py    # Service de données marché multi-source (CryptoCompare/CoinGecko/Binance)
+│   └── technical_analysis.py  # Service d'analyse technique (RSI, MACD, Bollinger, etc.)
 │
-└── services/              # 📋 À CRÉER
+└── routes/                # Routes modulaires (partiellement utilisées)
     ├── __init__.py
-    ├── market_data.py    # Service de récupération des données marché
-    └── ai_analysis.py    # Service d'analyse IA (GPT)
+    ├── auth.py, market.py, trading.py, etc.
 ```
 
-## Statut du Refactoring
+## Sources de Données Marché
 
-### ✅ Phase 1 : Core & Models (TERMINÉ)
-- Configuration centralisée dans `core/config.py`
-- Authentification extraite dans `core/auth.py`
-- Modèles Pydantic dans `models/schemas.py`
+### Ordre de priorité (fallback automatique)
+1. **CryptoCompare** (Principal) - Gratuit, fiable, pas de rate limit strict, pas de restriction géographique
+2. **CoinGecko** (Fallback) - Gratuit mais rate limited (30 req/min)
+3. **Binance** (Fallback) - Peut être bloqué géographiquement
 
-### ✅ Phase 2 : Routes Simples (TERMINÉ)
-- Auth, Health, Watchlist, Strategies, Settings
-- Paper Trading, Alerts, Signals, Journal
-- Onboarding, Admin
+### Cache
+- TTL de 5 minutes pour les données crypto
+- Cache automatique avec fallback sur données périmées si APIs indisponibles
 
-### 📋 Phase 3 : Routes Complexes (À FAIRE)
-Les routes suivantes contiennent beaucoup de logique métier et nécessitent un travail supplémentaire :
+## Services Créés
 
-1. **Market Routes** (~600 lignes)
-   - Données crypto (CoinGecko)
-   - Données forex/stocks (Alpha Vantage)
-   - Fear & Greed Index
-   - Données économiques (FRED)
+### MarketDataService (`services/market_data.py`)
+- `get_crypto_list()` - Liste des cryptos avec prix temps réel
+- `get_historical_prices(coin_id, days)` - Données historiques pour analyse technique
+- `get_crypto_prices(symbols)` - Prix actuels pour plusieurs symboles
+- `get_stock_data(symbol)` - Données actions via Alpha Vantage
 
-2. **Trading Routes** (~400 lignes)
-   - Analyse technique complète (pandas-ta)
-   - Génération de signaux IA
-   - Morning Briefing
+### TechnicalAnalysisService (`services/technical_analysis.py`)
+- `calculate_rsi(prices)` - Relative Strength Index
+- `calculate_macd(prices)` - Moving Average Convergence Divergence
+- `calculate_bollinger_bands(prices)` - Bandes de Bollinger
+- `calculate_moving_averages(prices)` - MA20, MA50, MA200
+- `calculate_support_resistance(prices)` - Niveaux de support/résistance
+- `generate_trading_signal(prices, current_price)` - Signal complet avec score
 
-3. **Assistant Routes** (~300 lignes)
-   - Chat avec GPT-5.1
-   - Contexte de trading
-   - Historique des conversations
-
-4. **Academy Routes** (~500 lignes)
-   - Modules et leçons
-   - Quiz et scores
-   - XP, badges, niveaux
-   - Leaderboard
-
-## API Endpoints
-
-### Authentification
-- `POST /api/auth/register` - Inscription
-- `POST /api/auth/login` - Connexion
-- `GET /api/auth/me` - Profil utilisateur
+## API Endpoints Principaux
 
 ### Market Data
-- `GET /api/market/crypto` - Liste des cryptos
+- `GET /api/market/crypto` - Liste des 20 top cryptos (CryptoCompare)
 - `GET /api/market/crypto/{coin_id}` - Détail d'une crypto
-- `GET /api/market/intelligence` - Intelligence marché (macro)
-- `GET /api/market/news` - Actualités
+- `GET /api/market/intelligence` - Données macro (Fear&Greed, BTC dominance, etc.)
+- `GET /api/market/news` - Actualités financières
 
 ### Trading
-- `GET /api/trading/analysis/{symbol}` - Analyse technique
-- `POST /api/trading/generate-signal` - Générer un signal IA
-- `GET /api/trading/briefing` - Morning Briefing
+- `POST /api/trading/analyze` - Analyse technique complète d'une crypto
+- `POST /api/smart-invest/analyze` - IA recommande le meilleur investissement
+- `POST /api/smart-invest/execute` - Exécute le trade en Paper Trading
+- `GET /api/trading/briefing` - Morning briefing
+- `GET /api/trading/scan-opportunities` - Scan de la watchlist
 
-### Academy
-- `GET /api/academy/modules` - Liste des modules
-- `GET /api/academy/modules/{id}` - Détail d'un module
-- `GET /api/academy/lessons/{id}` - Contenu d'une leçon
-- `POST /api/academy/lessons/{id}/complete` - Marquer terminé
-- `POST /api/academy/quiz/{module_id}/submit` - Soumettre quiz
-- `GET /api/academy/leaderboard` - Classement
-
-## Notes pour le Développeur
-
-1. **Ne pas casser l'existant** : Le `server.py` actuel fonctionne parfaitement. Le refactoring doit être progressif.
-
-2. **Tester après chaque changement** : Utiliser le testing agent après chaque migration de route.
-
-3. **Priorité** : Commencer par les routes les moins dépendantes des services externes.
-
-4. **Variables d'environnement** : Ne jamais hardcoder les clés API. Utiliser `core/config.py`.
+## Statut
+- ✅ Données temps réel via CryptoCompare (source fiable)
+- ✅ Analyse technique complète
+- ✅ Smart Invest fonctionnel (crypto + stocks)
+- ✅ Aucune donnée mockée
+- ✅ Gestion automatique des fallbacks API
