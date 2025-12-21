@@ -4998,6 +4998,588 @@ async def get_all_badges(current_user: dict = Depends(get_current_user)):
     
     return badges_with_status
 
+# ============== AUTO-TRADING SYSTEM ==============
+
+class AutoTradingConfig(BaseModel):
+    enabled: bool = False
+    max_trade_amount: float = 100  # Maximum per trade
+    min_score: float = 5.0  # Minimum confidence score to trade
+    risk_level: str = "conservative"  # conservative, moderate, aggressive
+    max_daily_trades: int = 5
+    stop_loss_percent: float = 5.0
+    take_profit_percent: float = 10.0
+    assets_to_trade: List[str] = ["bitcoin", "ethereum", "solana", "cardano", "ripple"]
+
+class AutoTrade(BaseModel):
+    coin_id: str
+    action: str  # buy, sell
+    amount: float
+    reason: str
+
+# In-memory store for auto-trading state (per user)
+_auto_trading_state: Dict[str, Dict] = {}
+
+@api_router.get("/auto-trading/config")
+async def get_auto_trading_config(current_user: dict = Depends(get_current_user)):
+    """Get user's auto-trading configuration"""
+    user_id = current_user["id"]
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    
+    config = user.get("auto_trading_config", {
+        "enabled": False,
+        "max_trade_amount": 100,
+        "min_score": 5.0,
+        "risk_level": "conservative",
+        "max_daily_trades": 5,
+        "stop_loss_percent": 5.0,
+        "take_profit_percent": 10.0,
+        "assets_to_trade": ["bitcoin", "ethereum", "solana", "cardano", "ripple"]
+    })
+    
+    # Get today's auto trades count
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_trades = await db.paper_trades.count_documents({
+        "user_id": user_id,
+        "source": "auto_trading",
+        "created_at": {"$gte": today_start.isoformat()}
+    })
+    
+    return {
+        "config": config,
+        "stats": {
+            "today_trades": today_trades,
+            "is_active": _auto_trading_state.get(user_id, {}).get("active", False)
+        }
+    }
+
+@api_router.post("/auto-trading/config")
+async def update_auto_trading_config(config: AutoTradingConfig, current_user: dict = Depends(get_current_user)):
+    """Update user's auto-trading configuration"""
+    user_id = current_user["id"]
+    
+    config_dict = config.dict()
+    
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"auto_trading_config": config_dict}}
+    )
+    
+    # Update in-memory state
+    if user_id not in _auto_trading_state:
+        _auto_trading_state[user_id] = {}
+    
+    _auto_trading_state[user_id]["config"] = config_dict
+    _auto_trading_state[user_id]["active"] = config.enabled
+    
+    return {"success": True, "config": config_dict}
+
+@api_router.post("/auto-trading/start")
+async def start_auto_trading(current_user: dict = Depends(get_current_user)):
+    """Start auto-trading for the user"""
+    user_id = current_user["id"]
+    
+    # Get user config
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    config = user.get("auto_trading_config", {})
+    
+    if not config.get("enabled"):
+        return {"error": "Auto-trading n'est pas activé dans la configuration"}
+    
+    # Check balance
+    balance = user.get("paper_balance", 0)
+    if balance < config.get("max_trade_amount", 100):
+        return {"error": f"Solde insuffisant. Minimum requis: ${config.get('max_trade_amount', 100)}"}
+    
+    # Initialize state
+    _auto_trading_state[user_id] = {
+        "active": True,
+        "config": config,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "trades_today": 0
+    }
+    
+    return {
+        "success": True,
+        "message": "🤖 Auto-Trading démarré! BULL analyse le marché en continu.",
+        "config": config
+    }
+
+@api_router.post("/auto-trading/stop")
+async def stop_auto_trading(current_user: dict = Depends(get_current_user)):
+    """Stop auto-trading for the user"""
+    user_id = current_user["id"]
+    
+    if user_id in _auto_trading_state:
+        _auto_trading_state[user_id]["active"] = False
+    
+    return {"success": True, "message": "Auto-Trading arrêté"}
+
+@api_router.post("/auto-trading/scan")
+async def auto_trading_scan(current_user: dict = Depends(get_current_user)):
+    """
+    Scan the market and execute auto-trades if conditions are met.
+    Only executes trades with HIGH confidence (score >= min_score).
+    """
+    user_id = current_user["id"]
+    
+    # Get user data
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user:
+        return {"error": "Utilisateur non trouvé"}
+    
+    config = user.get("auto_trading_config", {})
+    if not config.get("enabled"):
+        return {"error": "Auto-trading désactivé", "trades": []}
+    
+    balance = user.get("paper_balance", 0)
+    min_score = config.get("min_score", 5.0)
+    max_trade_amount = min(config.get("max_trade_amount", 100), balance * 0.2)  # Max 20% of balance per trade
+    assets_to_trade = config.get("assets_to_trade", ["bitcoin", "ethereum", "solana"])
+    max_daily_trades = config.get("max_daily_trades", 5)
+    
+    # Check daily trade limit
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_trades = await db.paper_trades.count_documents({
+        "user_id": user_id,
+        "source": "auto_trading",
+        "created_at": {"$gte": today_start.isoformat()}
+    })
+    
+    if today_trades >= max_daily_trades:
+        return {
+            "message": f"Limite journalière atteinte ({max_daily_trades} trades)",
+            "trades": [],
+            "opportunities": []
+        }
+    
+    # Scan for opportunities
+    opportunities = []
+    executed_trades = []
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            # Get current prices from CryptoCompare
+            symbols = []
+            for coin_id in assets_to_trade:
+                if coin_id in CRYPTO_MAPPING:
+                    symbols.append(CRYPTO_MAPPING[coin_id]["binance_symbol"])
+            
+            symbols_str = ",".join(symbols)
+            
+            price_response = await client.get(
+                f"{CRYPTOCOMPARE_API_URL}/pricemultifull",
+                params={"fsyms": symbols_str, "tsyms": "USD"},
+                timeout=15.0
+            )
+            
+            if price_response.status_code != 200:
+                return {"error": "Impossible de récupérer les prix", "trades": []}
+            
+            price_data = price_response.json().get("RAW", {})
+            
+            # Analyze each asset
+            for coin_id in assets_to_trade:
+                if today_trades + len(executed_trades) >= max_daily_trades:
+                    break
+                
+                if coin_id not in CRYPTO_MAPPING:
+                    continue
+                
+                coin_info = CRYPTO_MAPPING[coin_id]
+                crypto_symbol = coin_info["binance_symbol"]
+                
+                if crypto_symbol not in price_data or "USD" not in price_data[crypto_symbol]:
+                    continue
+                
+                usd_data = price_data[crypto_symbol]["USD"]
+                current_price = usd_data.get("PRICE", 0)
+                change_24h = usd_data.get("CHANGEPCT24HOUR", 0)
+                
+                if current_price <= 0:
+                    continue
+                
+                # Get historical data
+                hist_response = await client.get(
+                    f"{CRYPTOCOMPARE_API_URL}/histohour",
+                    params={"fsym": crypto_symbol, "tsym": "USD", "limit": 168},
+                    timeout=10.0
+                )
+                
+                if hist_response.status_code != 200:
+                    continue
+                
+                hist_data = hist_response.json()
+                if hist_data.get("Response") != "Success" or "Data" not in hist_data:
+                    continue
+                
+                data_points = hist_data["Data"]
+                if not isinstance(data_points, list) or len(data_points) < 50:
+                    continue
+                
+                prices = [float(d["close"]) for d in data_points if d.get("close")]
+                
+                # Calculate indicators
+                rsi = calculate_rsi(prices)
+                macd = calculate_macd(prices)
+                bb = calculate_bollinger_bands(prices)
+                ma = calculate_moving_averages(prices)
+                sr = calculate_support_resistance(prices)
+                
+                # Calculate score
+                score = 0
+                reasons = []
+                
+                # RSI
+                if rsi < 25:
+                    score += 4
+                    reasons.append(f"RSI extrême ({rsi:.1f})")
+                elif rsi < 30:
+                    score += 3
+                    reasons.append(f"RSI survente ({rsi:.1f})")
+                elif rsi < 40:
+                    score += 2
+                elif rsi > 75:
+                    score -= 4
+                    reasons.append(f"RSI surachat ({rsi:.1f}) - VENTE")
+                elif rsi > 70:
+                    score -= 2
+                
+                # Bollinger
+                if bb.get("position") == "oversold":
+                    score += 3
+                    reasons.append("Bollinger oversold")
+                elif bb.get("position") == "overbought":
+                    score -= 2
+                
+                # Trend
+                trend = ma.get("trend", "neutral")
+                if trend == "strong_bullish":
+                    score += 3
+                    reasons.append("Tendance forte haussière")
+                elif trend == "bullish":
+                    score += 2
+                elif trend == "strong_bearish":
+                    score -= 3
+                    reasons.append("Tendance forte baissière - VENTE")
+                elif trend == "bearish":
+                    score -= 2
+                
+                # MACD
+                if macd.get("trend") == "bullish":
+                    score += 1.5
+                elif macd.get("trend") == "bearish":
+                    score -= 1.5
+                
+                # 24h momentum
+                if change_24h < -5:
+                    score += 1  # Potential reversal
+                    reasons.append(f"Correction récente ({change_24h:.1f}%)")
+                
+                opportunity = {
+                    "coin_id": coin_id,
+                    "name": coin_info["name"],
+                    "symbol": crypto_symbol,
+                    "current_price": current_price,
+                    "change_24h": change_24h,
+                    "score": round(score, 1),
+                    "rsi": round(rsi, 1),
+                    "trend": trend,
+                    "reasons": reasons
+                }
+                
+                # Determine action
+                if score >= min_score:
+                    opportunity["action"] = "BUY"
+                    opportunity["confidence"] = "HAUTE"
+                    opportunities.append(opportunity)
+                    
+                    # Execute trade
+                    if balance >= max_trade_amount:
+                        quantity = max_trade_amount / current_price
+                        
+                        # Calculate levels
+                        stop_loss_pct = config.get("stop_loss_percent", 5.0)
+                        take_profit_pct = config.get("take_profit_percent", 10.0)
+                        
+                        trade = {
+                            "id": f"auto_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}_{coin_id[:3]}",
+                            "user_id": user_id,
+                            "coin_id": coin_id,
+                            "type": "buy",
+                            "source": "auto_trading",
+                            "quantity": quantity,
+                            "entry_price": current_price,
+                            "amount_usd": max_trade_amount,
+                            "stop_loss": current_price * (1 - stop_loss_pct / 100),
+                            "take_profit": current_price * (1 + take_profit_pct / 100),
+                            "score": score,
+                            "reasons": reasons,
+                            "status": "open",
+                            "created_at": datetime.now(timezone.utc).isoformat()
+                        }
+                        
+                        await db.paper_trades.insert_one(trade)
+                        
+                        # Update portfolio
+                        portfolio = user.get("portfolio", [])
+                        existing = next((p for p in portfolio if p["coin_id"] == coin_id), None)
+                        
+                        if existing:
+                            total_qty = existing["quantity"] + quantity
+                            total_cost = (existing["quantity"] * existing["avg_price"]) + max_trade_amount
+                            existing["quantity"] = total_qty
+                            existing["avg_price"] = total_cost / total_qty
+                        else:
+                            portfolio.append({
+                                "coin_id": coin_id,
+                                "symbol": crypto_symbol,
+                                "quantity": quantity,
+                                "avg_price": current_price
+                            })
+                        
+                        # Update balance
+                        balance -= max_trade_amount
+                        
+                        await db.users.update_one(
+                            {"id": user_id},
+                            {"$set": {"paper_balance": balance, "portfolio": portfolio}}
+                        )
+                        
+                        executed_trades.append({
+                            "trade_id": trade["id"],
+                            "coin": coin_info["name"],
+                            "action": "BUY",
+                            "amount": max_trade_amount,
+                            "quantity": quantity,
+                            "price": current_price,
+                            "score": score,
+                            "stop_loss": trade["stop_loss"],
+                            "take_profit": trade["take_profit"]
+                        })
+                        
+                        logger.info(f"Auto-trade executed: BUY {coin_id} for ${max_trade_amount} (score: {score})")
+                
+                elif score <= -min_score:
+                    # Check if we have this asset in portfolio to sell
+                    portfolio = user.get("portfolio", [])
+                    holding = next((p for p in portfolio if p["coin_id"] == coin_id), None)
+                    
+                    if holding and holding["quantity"] > 0:
+                        opportunity["action"] = "SELL"
+                        opportunity["confidence"] = "HAUTE"
+                        opportunities.append(opportunity)
+                        
+                        # Execute sell
+                        sell_quantity = holding["quantity"]
+                        sell_value = sell_quantity * current_price
+                        
+                        trade = {
+                            "id": f"auto_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}_{coin_id[:3]}_sell",
+                            "user_id": user_id,
+                            "coin_id": coin_id,
+                            "type": "sell",
+                            "source": "auto_trading",
+                            "quantity": sell_quantity,
+                            "entry_price": holding["avg_price"],
+                            "exit_price": current_price,
+                            "amount_usd": sell_value,
+                            "profit_loss": sell_value - (sell_quantity * holding["avg_price"]),
+                            "score": score,
+                            "reasons": reasons,
+                            "status": "closed",
+                            "created_at": datetime.now(timezone.utc).isoformat()
+                        }
+                        
+                        await db.paper_trades.insert_one(trade)
+                        
+                        # Remove from portfolio
+                        portfolio = [p for p in portfolio if p["coin_id"] != coin_id]
+                        balance += sell_value
+                        
+                        await db.users.update_one(
+                            {"id": user_id},
+                            {"$set": {"paper_balance": balance, "portfolio": portfolio}}
+                        )
+                        
+                        executed_trades.append({
+                            "trade_id": trade["id"],
+                            "coin": coin_info["name"],
+                            "action": "SELL",
+                            "amount": sell_value,
+                            "quantity": sell_quantity,
+                            "price": current_price,
+                            "profit_loss": trade["profit_loss"],
+                            "score": score
+                        })
+                        
+                        logger.info(f"Auto-trade executed: SELL {coin_id} for ${sell_value:.2f} (score: {score})")
+        
+        return {
+            "success": True,
+            "message": f"Scan terminé. {len(executed_trades)} trade(s) exécuté(s).",
+            "trades": executed_trades,
+            "opportunities": opportunities,
+            "new_balance": balance,
+            "remaining_daily_trades": max_daily_trades - today_trades - len(executed_trades)
+        }
+        
+    except Exception as e:
+        logger.error(f"Auto-trading scan error: {e}")
+        return {"error": f"Erreur lors du scan: {str(e)}", "trades": []}
+
+@api_router.get("/auto-trading/history")
+async def get_auto_trading_history(
+    limit: int = 20,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get history of auto-trades"""
+    user_id = current_user["id"]
+    
+    trades = await db.paper_trades.find(
+        {"user_id": user_id, "source": "auto_trading"},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    
+    # Calculate stats
+    total_trades = len(trades)
+    buy_trades = [t for t in trades if t.get("type") == "buy"]
+    sell_trades = [t for t in trades if t.get("type") == "sell"]
+    
+    total_profit = sum(t.get("profit_loss", 0) for t in sell_trades)
+    winning_trades = [t for t in sell_trades if t.get("profit_loss", 0) > 0]
+    
+    win_rate = (len(winning_trades) / len(sell_trades) * 100) if sell_trades else 0
+    
+    return {
+        "trades": trades,
+        "stats": {
+            "total_trades": total_trades,
+            "buy_trades": len(buy_trades),
+            "sell_trades": len(sell_trades),
+            "total_profit": round(total_profit, 2),
+            "win_rate": round(win_rate, 1),
+            "winning_trades": len(winning_trades),
+            "losing_trades": len(sell_trades) - len(winning_trades)
+        }
+    }
+
+@api_router.post("/auto-trading/check-exits")
+async def check_auto_trading_exits(current_user: dict = Depends(get_current_user)):
+    """
+    Check open auto-trades and close them if stop-loss or take-profit is hit.
+    """
+    user_id = current_user["id"]
+    
+    # Get open auto-trades
+    open_trades = await db.paper_trades.find({
+        "user_id": user_id,
+        "source": "auto_trading",
+        "status": "open"
+    }, {"_id": 0}).to_list(100)
+    
+    if not open_trades:
+        return {"message": "Aucun trade ouvert", "closed_trades": []}
+    
+    closed_trades = []
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    balance = user.get("paper_balance", 0)
+    portfolio = user.get("portfolio", [])
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            # Get current prices
+            coin_ids = list(set(t["coin_id"] for t in open_trades))
+            symbols = [CRYPTO_MAPPING[cid]["binance_symbol"] for cid in coin_ids if cid in CRYPTO_MAPPING]
+            
+            if not symbols:
+                return {"message": "Pas de symboles à vérifier", "closed_trades": []}
+            
+            price_response = await client.get(
+                f"{CRYPTOCOMPARE_API_URL}/pricemultifull",
+                params={"fsyms": ",".join(symbols), "tsyms": "USD"},
+                timeout=15.0
+            )
+            
+            if price_response.status_code != 200:
+                return {"error": "Impossible de récupérer les prix"}
+            
+            price_data = price_response.json().get("RAW", {})
+            
+            for trade in open_trades:
+                coin_id = trade["coin_id"]
+                if coin_id not in CRYPTO_MAPPING:
+                    continue
+                
+                symbol = CRYPTO_MAPPING[coin_id]["binance_symbol"]
+                if symbol not in price_data or "USD" not in price_data[symbol]:
+                    continue
+                
+                current_price = price_data[symbol]["USD"].get("PRICE", 0)
+                entry_price = trade.get("entry_price", 0)
+                stop_loss = trade.get("stop_loss", 0)
+                take_profit = trade.get("take_profit", 0)
+                quantity = trade.get("quantity", 0)
+                
+                should_close = False
+                close_reason = ""
+                
+                # Check stop-loss
+                if stop_loss > 0 and current_price <= stop_loss:
+                    should_close = True
+                    close_reason = "stop_loss"
+                
+                # Check take-profit
+                elif take_profit > 0 and current_price >= take_profit:
+                    should_close = True
+                    close_reason = "take_profit"
+                
+                if should_close:
+                    sell_value = quantity * current_price
+                    profit_loss = sell_value - trade.get("amount_usd", 0)
+                    
+                    # Update trade
+                    await db.paper_trades.update_one(
+                        {"id": trade["id"]},
+                        {"$set": {
+                            "status": "closed",
+                            "exit_price": current_price,
+                            "profit_loss": profit_loss,
+                            "close_reason": close_reason,
+                            "closed_at": datetime.now(timezone.utc).isoformat()
+                        }}
+                    )
+                    
+                    # Update portfolio
+                    portfolio = [p for p in portfolio if p["coin_id"] != coin_id]
+                    balance += sell_value
+                    
+                    closed_trades.append({
+                        "trade_id": trade["id"],
+                        "coin_id": coin_id,
+                        "entry_price": entry_price,
+                        "exit_price": current_price,
+                        "profit_loss": round(profit_loss, 2),
+                        "close_reason": close_reason,
+                        "profit_percent": round((profit_loss / trade.get("amount_usd", 1)) * 100, 2)
+                    })
+            
+            if closed_trades:
+                await db.users.update_one(
+                    {"id": user_id},
+                    {"$set": {"paper_balance": balance, "portfolio": portfolio}}
+                )
+        
+        return {
+            "success": True,
+            "message": f"{len(closed_trades)} trade(s) clôturé(s)",
+            "closed_trades": closed_trades,
+            "new_balance": balance
+        }
+        
+    except Exception as e:
+        logger.error(f"Check exits error: {e}")
+        return {"error": str(e)}
+
 # ============== STARTUP EVENTS ==============
 
 @app.on_event("startup")
