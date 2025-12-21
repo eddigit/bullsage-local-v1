@@ -24,6 +24,7 @@ import AcademyPage from "./pages/AcademyPage";
 import ModulePage from "./pages/ModulePage";
 import OnboardingPage from "./pages/OnboardingPage";
 import SmartInvestPage from "./pages/SmartInvestPage";
+import AutoTradingPage from "./pages/AutoTradingPage";
 
 // Layout
 import MainLayout from "./layouts/MainLayout";
