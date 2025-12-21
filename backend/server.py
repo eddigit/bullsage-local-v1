@@ -3444,20 +3444,43 @@ async def smart_invest_analyze(request: SmartInvestRequest, current_user: dict =
     
     try:
         async with httpx.AsyncClient() as client:
-            # Get prices for all watchlist
+            # Get prices for all watchlist with retry logic
             symbols_str = ",".join(watchlist[:10])
-            prices_response = await client.get(
-                f"{COINGECKO_API_URL}/simple/price",
-                params={
-                    "ids": symbols_str,
-                    "vs_currencies": "usd",
-                    "include_24hr_change": "true"
-                },
-                timeout=15.0
-            )
+            prices_data = None
             
-            if prices_response.status_code != 200:
-                return {"error": "Impossible de récupérer les prix. Réessayez dans 1 minute."}
+            for attempt in range(3):
+                try:
+                    prices_response = await client.get(
+                        f"{COINGECKO_API_URL}/simple/price",
+                        params={
+                            "ids": symbols_str,
+                            "vs_currencies": "usd",
+                            "include_24hr_change": "true"
+                        },
+                        timeout=15.0
+                    )
+                    
+                    if prices_response.status_code == 200:
+                        prices_data = prices_response.json()
+                        break
+                    elif prices_response.status_code == 429:
+                        logger.warning(f"Smart Invest: CoinGecko rate limited, attempt {attempt + 1}/3")
+                        if attempt < 2:
+                            await asyncio.sleep(2)
+                        continue
+                    else:
+                        logger.warning(f"Smart Invest: CoinGecko returned {prices_response.status_code}")
+                        if attempt < 2:
+                            await asyncio.sleep(1)
+                        continue
+                except Exception as e:
+                    logger.warning(f"Smart Invest: Price fetch error attempt {attempt + 1}: {e}")
+                    if attempt < 2:
+                        await asyncio.sleep(1)
+                    continue
+            
+            if not prices_data:
+                return {"error": "L'API CoinGecko est temporairement surchargée. Veuillez réessayer dans 30 secondes."}
             
             prices_data = prices_response.json()
             
