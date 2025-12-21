@@ -255,12 +255,12 @@ export default function MainLayout() {
             </nav>
           </ScrollArea>
 
-          {/* Smart Invest CTA */}
-          <div className="p-4 border-t border-white/5">
+          {/* Smart Invest & Auto Trading CTAs */}
+          <div className="p-4 border-t border-white/5 space-y-2">
             <NavLink
               to="/smart-invest"
               className={`
-                relative overflow-hidden flex items-center gap-3 px-4 py-4 rounded-xl 
+                relative overflow-hidden flex items-center gap-3 px-4 py-3 rounded-xl 
                 bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600
                 hover:from-violet-500 hover:via-purple-500 hover:to-fuchsia-500
                 transition-all duration-300 group
@@ -274,10 +274,34 @@ export default function MainLayout() {
                   <Zap className="w-5 h-5 text-white" />
                 </div>
                 <div className="flex-1">
-                  <p className="font-bold text-white">Smart Invest</p>
-                  <p className="text-xs text-white/70">L&apos;IA trade pour vous</p>
+                  <p className="font-bold text-white text-sm">Smart Invest</p>
+                  <p className="text-xs text-white/70">Investir en 1 clic</p>
                 </div>
-                <ChevronRight className="w-5 h-5 text-white/50 group-hover:text-white group-hover:translate-x-1 transition-all" />
+                <ChevronRight className="w-4 h-4 text-white/50 group-hover:text-white group-hover:translate-x-1 transition-all" />
+              </div>
+            </NavLink>
+            
+            <NavLink
+              to="/auto-trading"
+              className={`
+                relative overflow-hidden flex items-center gap-3 px-4 py-3 rounded-xl 
+                bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600
+                hover:from-emerald-500 hover:via-teal-500 hover:to-cyan-500
+                transition-all duration-300 group
+                ${location.pathname === '/auto-trading' ? 'ring-2 ring-white/30' : ''}
+              `}
+              data-testid="auto-trading-cta"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-emerald-400/20 to-cyan-400/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative flex items-center gap-3 w-full">
+                <div className="p-2 bg-white/20 rounded-lg">
+                  <Bot className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-bold text-white text-sm">Auto-Trading</p>
+                  <p className="text-xs text-white/70">L&apos;IA trade 24/7</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-white/50 group-hover:text-white group-hover:translate-x-1 transition-all" />
               </div>
             </NavLink>
           </div>
