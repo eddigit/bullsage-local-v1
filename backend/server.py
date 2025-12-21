@@ -34,6 +34,7 @@ JWT_EXPIRATION_HOURS = 24
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
 COINGECKO_API_URL = os.environ.get('COINGECKO_API_URL', 'https://api.coingecko.com/api/v3')
 BINANCE_API_URL = "https://api.binance.com/api/v3"
+CRYPTOCOMPARE_API_URL = "https://min-api.cryptocompare.com/data"
 ALPHA_VANTAGE_API_KEY = os.environ.get('ALPHA_VANTAGE_API_KEY')
 FINNHUB_API_KEY = os.environ.get('FINNHUB_API_KEY')
 FRED_API_KEY = os.environ.get('FRED_API_KEY')
