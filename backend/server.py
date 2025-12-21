@@ -3696,6 +3696,7 @@ async def analyze_stock_opportunity(client, symbol: str, name: str, stock_type: 
 async def smart_invest_analyze(request: SmartInvestRequest, current_user: dict = Depends(get_current_user)):
     """
     Analyze the market and recommend the best investment opportunity.
+    Uses Binance as primary source (more reliable), CoinGecko as fallback.
     Analyzes both crypto AND stocks/indices for the best opportunity.
     """
     if request.investment_amount < 10:
@@ -3712,77 +3713,59 @@ async def smart_invest_analyze(request: SmartInvestRequest, current_user: dict =
     
     try:
         async with httpx.AsyncClient() as client:
-            # Get prices for all watchlist with retry logic
-            symbols_str = ",".join(watchlist[:10])
-            prices_data = None
+            # ============== STRATEGY 1: BINANCE (PRIMARY) ==============
+            logger.info("Smart Invest: Fetching data from Binance...")
             
-            for attempt in range(3):
+            # Get all 24hr tickers from Binance in one call
+            binance_tickers = {}
+            try:
+                ticker_response = await client.get(
+                    f"{BINANCE_API_URL}/ticker/24hr",
+                    timeout=15.0
+                )
+                if ticker_response.status_code == 200:
+                    for ticker in ticker_response.json():
+                        binance_tickers[ticker["symbol"]] = ticker
+                    logger.info(f"✅ Smart Invest: Got {len(binance_tickers)} tickers from Binance")
+            except Exception as e:
+                logger.warning(f"Smart Invest: Binance ticker error: {e}")
+            
+            analyzed_count = 0
+            
+            # Analyze each coin
+            for coin_id in watchlist[:8]:
                 try:
-                    prices_response = await client.get(
-                        f"{COINGECKO_API_URL}/simple/price",
+                    # Get Binance symbol
+                    if coin_id not in CRYPTO_MAPPING:
+                        continue
+                    
+                    coin_info = CRYPTO_MAPPING[coin_id]
+                    binance_symbol = coin_info["symbol"]
+                    
+                    # Get current price from Binance
+                    if binance_symbol not in binance_tickers:
+                        continue
+                    
+                    ticker = binance_tickers[binance_symbol]
+                    current_price = float(ticker["lastPrice"])
+                    change_24h = float(ticker["priceChangePercent"])
+                    
+                    # Get historical klines from Binance
+                    klines_response = await client.get(
+                        f"{BINANCE_API_URL}/klines",
                         params={
-                            "ids": symbols_str,
-                            "vs_currencies": "usd",
-                            "include_24hr_change": "true"
+                            "symbol": binance_symbol,
+                            "interval": "4h",
+                            "limit": 84  # 14 days of 4h data
                         },
-                        timeout=15.0
+                        timeout=10.0
                     )
                     
-                    if prices_response.status_code == 200:
-                        prices_data = prices_response.json()
-                        break
-                    elif prices_response.status_code == 429:
-                        logger.warning(f"Smart Invest: CoinGecko rate limited, attempt {attempt + 1}/3")
-                        if attempt < 2:
-                            await asyncio.sleep(2)
-                        continue
-                    else:
-                        logger.warning(f"Smart Invest: CoinGecko returned {prices_response.status_code}")
-                        if attempt < 2:
-                            await asyncio.sleep(1)
-                        continue
-                except Exception as e:
-                    logger.warning(f"Smart Invest: Price fetch error attempt {attempt + 1}: {e}")
-                    if attempt < 2:
-                        await asyncio.sleep(1)
-                    continue
-            
-            if not prices_data:
-                return {"error": "L'API CoinGecko est temporairement surchargée. Veuillez réessayer dans 30 secondes."}
-            
-            # Analyze each coin with delay to avoid rate limits
-            analyzed_count = 0
-            for coin_id in watchlist[:5]:  # Limit to avoid rate limits
-                try:
-                    # Small delay between requests to avoid rate limiting
-                    if analyzed_count > 0:
-                        await asyncio.sleep(0.5)
-                    
-                    # Get historical data with retry
-                    hist_data = None
-                    for attempt in range(2):
-                        try:
-                            hist_response = await client.get(
-                                f"{COINGECKO_API_URL}/coins/{coin_id}/market_chart",
-                                params={"vs_currency": "usd", "days": 14},
-                                timeout=15.0
-                            )
-                            
-                            if hist_response.status_code == 200:
-                                hist_data = hist_response.json()
-                                break
-                            elif hist_response.status_code == 429:
-                                await asyncio.sleep(2)
-                                continue
-                        except Exception:
-                            if attempt < 1:
-                                await asyncio.sleep(1)
-                            continue
-                    
-                    if not hist_data:
+                    if klines_response.status_code != 200:
                         continue
                     
-                    prices = [p[1] for p in hist_data.get("prices", [])]
+                    klines = klines_response.json()
+                    prices = [float(k[4]) for k in klines]  # Close prices
                     
                     if len(prices) < 30:
                         continue
