@@ -3769,15 +3769,15 @@ async def smart_invest_analyze(request: SmartInvestRequest, current_user: dict =
                         coin_name = coin_id.replace("-", " ").title()
                         coin_symbol = coin_id[:3].upper()
                     
-                    # Check if this is the best opportunity
-                    if score > best_score and score >= 2:
-                        best_score = score
+                    # Check if this is the best crypto opportunity
+                    if score >= 2:
                         quantity = request.investment_amount / current_price
                         
-                        best_opportunity = {
+                        crypto_opportunity = {
                             "coin_id": coin_id,
                             "name": coin_name,
                             "symbol": coin_symbol,
+                            "asset_type": "crypto",
                             "current_price": current_price,
                             "change_24h": change_24h,
                             "score": round(score, 1),
@@ -3798,6 +3798,11 @@ async def smart_invest_analyze(request: SmartInvestRequest, current_user: dict =
                             },
                             "reasons": reasons
                         }
+                        all_opportunities.append(crypto_opportunity)
+                        
+                        if score > best_score:
+                            best_score = score
+                            best_opportunity = crypto_opportunity
                     
                     analyzed_count += 1
                     
@@ -3805,16 +3810,47 @@ async def smart_invest_analyze(request: SmartInvestRequest, current_user: dict =
                     logger.warning(f"Error analyzing {coin_id}: {e}")
                     continue
             
+            # ============== ANALYZE STOCKS/INDICES ==============
+            if request.include_stocks and ALPHA_VANTAGE_API_KEY:
+                logger.info("Smart Invest: Analyzing stocks and indices...")
+                
+                for stock_info in SMART_INVEST_STOCKS[:4]:  # Limit to avoid rate limits
+                    await asyncio.sleep(0.3)  # Alpha Vantage rate limit
+                    
+                    stock_result = await analyze_stock_opportunity(
+                        client,
+                        stock_info["symbol"],
+                        stock_info["name"],
+                        stock_info["type"],
+                        request.investment_amount
+                    )
+                    
+                    if stock_result and stock_result["score"] >= 2:
+                        all_opportunities.append(stock_result)
+                        
+                        if stock_result["score"] > best_score:
+                            best_score = stock_result["score"]
+                            best_opportunity = stock_result
+                        
+                        analyzed_count += 1
+            
             if not best_opportunity:
                 if analyzed_count == 0:
                     return {
-                        "error": "Impossible d'analyser les actifs. L'API CoinGecko est surchargée. Réessayez dans 1 minute.",
+                        "error": "Impossible d'analyser les actifs. Les APIs sont surchargées. Réessayez dans 1 minute.",
                         "message": "L'IA n'a pas pu récupérer les données de marché."
                     }
                 return {
                     "error": "Aucune opportunité détectée. Les marchés sont neutres ou en surachat. Réessayez plus tard.",
                     "message": "BULL recommande d'attendre une meilleure opportunité."
                 }
+            
+            # Add info about other opportunities
+            best_opportunity["other_opportunities"] = [
+                {"name": o["name"], "symbol": o["symbol"], "score": o["score"], "asset_type": o.get("asset_type", "crypto")}
+                for o in sorted(all_opportunities, key=lambda x: x["score"], reverse=True)[:5]
+                if o["coin_id"] != best_opportunity["coin_id"]
+            ]
             
             return best_opportunity
             
