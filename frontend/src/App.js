@@ -194,6 +194,7 @@ function App() {
               <Route path="admin" element={<AdminPage />} />
               <Route path="admin/api-keys" element={<ApiKeysPage />} />
               <Route path="smart-invest" element={<SmartInvestPage />} />
+              <Route path="auto-trading" element={<AutoTradingPage />} />
             </Route>
           </Routes>
         </BrowserRouter>
