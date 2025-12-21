@@ -3647,11 +3647,18 @@ async def smart_invest_analyze(request: SmartInvestRequest, current_user: dict =
                             "reasons": reasons
                         }
                     
+                    analyzed_count += 1
+                    
                 except Exception as e:
                     logger.warning(f"Error analyzing {coin_id}: {e}")
                     continue
             
             if not best_opportunity:
+                if analyzed_count == 0:
+                    return {
+                        "error": "Impossible d'analyser les actifs. L'API CoinGecko est surchargée. Réessayez dans 1 minute.",
+                        "message": "L'IA n'a pas pu récupérer les données de marché."
+                    }
                 return {
                     "error": "Aucune opportunité détectée. Les marchés sont neutres ou en surachat. Réessayez plus tard.",
                     "message": "BULL recommande d'attendre une meilleure opportunité."
