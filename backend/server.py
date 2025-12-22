@@ -5878,35 +5878,38 @@ async def check_auto_trading_exits(current_user: dict = Depends(get_current_user
 # ============== STARTUP EVENTS ==============
 
 @app.on_event("startup")
-async def create_admin_user():
-    """Create default admin user on startup"""
-    admin_email = "coachdigitalparis@gmail.com"
-    admin_password = "$$Reussite888!!"
+async def create_admin_users():
+    """Create/promote default admin users on startup"""
+    admin_accounts = [
+        {"email": "coachdigitalparis@gmail.com", "password": "$$Reussite888!!", "name": "Admin Coach Digital"},
+        {"email": "bullsagetrader@gmail.com", "password": "$$Reussit888!!", "name": "Bull Sage Admin"},
+    ]
     
-    existing_admin = await db.users.find_one({"email": admin_email})
-    if not existing_admin:
-        admin_id = str(uuid.uuid4())
-        admin_doc = {
-            "id": admin_id,
-            "email": admin_email,
-            "password": hash_password(admin_password),
-            "name": "Admin Coach Digital",
-            "trading_level": "advanced",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "paper_balance": 10000.0,
-            "watchlist": ["bitcoin", "ethereum", "solana", "cardano", "polkadot"],
-            "portfolio": {},
-            "is_admin": True
-        }
-        await db.users.insert_one(admin_doc)
-        logger.info(f"Admin user created: {admin_email}")
-    else:
-        # Ensure existing user has admin status
-        await db.users.update_one(
-            {"email": admin_email},
-            {"$set": {"is_admin": True}}
-        )
-        logger.info(f"Admin status confirmed for: {admin_email}")
+    for admin in admin_accounts:
+        existing = await db.users.find_one({"email": admin["email"]})
+        if not existing:
+            admin_id = str(uuid.uuid4())
+            admin_doc = {
+                "id": admin_id,
+                "email": admin["email"],
+                "password": hash_password(admin["password"]),
+                "name": admin["name"],
+                "trading_level": "advanced",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "paper_balance": 10000.0,
+                "watchlist": ["bitcoin", "ethereum", "solana", "cardano", "polkadot"],
+                "portfolio": {},
+                "is_admin": True
+            }
+            await db.users.insert_one(admin_doc)
+            logger.info(f"Admin user created: {admin['email']}")
+        else:
+            # Ensure existing user has admin status
+            await db.users.update_one(
+                {"email": admin["email"]},
+                {"$set": {"is_admin": True}}
+            )
+            logger.info(f"Admin status confirmed for: {admin['email']}")
 
 # Create uploads directory if not exists
 UPLOADS_DIR = ROOT_DIR / "uploads"
