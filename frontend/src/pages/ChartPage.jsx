@@ -6,8 +6,6 @@ import {
   TrendingUp,
   TrendingDown,
   RefreshCw,
-  Settings2,
-  Maximize2,
   Clock,
   Search,
   Star,
@@ -20,14 +18,6 @@ import {
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
-import { Input } from "../components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../components/ui/select";
 import {
   Command,
   CommandEmpty,
@@ -41,6 +31,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "../components/ui/popover";
+import { API } from "../App";
 
 // Top 10 crypto pairs
 const TOP_PAIRS = [
@@ -91,19 +82,17 @@ export default function ChartPage() {
   const candleBufferRef = useRef([]);
   const lastAggregatedTimeRef = useRef(null);
 
-  // Fetch all Binance pairs
+  // Fetch all pairs from backend proxy
   useEffect(() => {
     const fetchPairs = async () => {
       try {
-        const response = await axios.get("https://api.binance.com/api/v3/exchangeInfo");
-        const usdtPairs = response.data.symbols
-          .filter(s => s.quoteAsset === "USDT" && s.status === "TRADING")
-          .map(s => ({
-            symbol: s.symbol,
-            name: s.baseAsset,
-            icon: s.baseAsset.charAt(0)
-          }));
-        setAllPairs(usdtPairs);
+        const response = await axios.get(`${API}/chart/pairs`);
+        const pairs = response.data.pairs.map(p => ({
+          symbol: p.symbol,
+          name: p.baseAsset,
+          icon: p.baseAsset.charAt(0)
+        }));
+        setAllPairs(pairs);
       } catch (error) {
         console.error("Failed to fetch pairs:", error);
         setAllPairs(TOP_PAIRS);
@@ -193,71 +182,6 @@ export default function ChartPage() {
     };
   }, []);
 
-  // Fetch historical data and setup WebSocket
-  const loadChartData = useCallback(async () => {
-    setLoading(true);
-    const timeframe = TIMEFRAMES.find(t => t.value === selectedTimeframe);
-    
-    try {
-      // Fetch historical klines from Binance
-      const response = await axios.get("https://api.binance.com/api/v3/klines", {
-        params: {
-          symbol: selectedPair,
-          interval: timeframe.binanceInterval,
-          limit: 500,
-        },
-      });
-
-      const candles = response.data.map(k => ({
-        time: Math.floor(k[0] / 1000),
-        open: parseFloat(k[1]),
-        high: parseFloat(k[2]),
-        low: parseFloat(k[3]),
-        close: parseFloat(k[4]),
-        volume: parseFloat(k[5]),
-      }));
-
-      // For 15s timeframe, we need to aggregate 1s candles
-      let displayCandles = candles;
-      if (timeframe.aggregation > 1) {
-        displayCandles = aggregateCandles(candles, timeframe.aggregation);
-      }
-
-      if (candlestickSeriesRef.current && volumeSeriesRef.current) {
-        candlestickSeriesRef.current.setData(displayCandles);
-        volumeSeriesRef.current.setData(
-          displayCandles.map(c => ({
-            time: c.time,
-            value: c.volume,
-            color: c.close >= c.open ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
-          }))
-        );
-        
-        // Set current price from last candle
-        if (displayCandles.length > 0) {
-          const lastCandle = displayCandles[displayCandles.length - 1];
-          setCurrentPrice(lastCandle.close);
-        }
-      }
-
-      // Fetch 24h ticker
-      const tickerResponse = await axios.get("https://api.binance.com/api/v3/ticker/24hr", {
-        params: { symbol: selectedPair },
-      });
-      
-      setPriceChange(parseFloat(tickerResponse.data.priceChangePercent));
-      setVolume24h(parseFloat(tickerResponse.data.quoteVolume));
-      setHigh24h(parseFloat(tickerResponse.data.highPrice));
-      setLow24h(parseFloat(tickerResponse.data.lowPrice));
-
-    } catch (error) {
-      console.error("Failed to load chart data:", error);
-      toast.error("Erreur de chargement des données");
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedPair, selectedTimeframe]);
-
   // Aggregate candles for custom timeframes
   const aggregateCandles = (candles, seconds) => {
     const aggregated = [];
@@ -293,9 +217,63 @@ export default function ChartPage() {
     return aggregated;
   };
 
+  // Fetch historical data
+  const loadChartData = useCallback(async () => {
+    setLoading(true);
+    const timeframe = TIMEFRAMES.find(t => t.value === selectedTimeframe);
+    
+    try {
+      // Fetch klines from our backend proxy
+      const response = await axios.get(`${API}/chart/klines/${selectedPair}`, {
+        params: {
+          interval: timeframe.binanceInterval,
+          limit: 500,
+        },
+      });
+
+      let candles = response.data.candles;
+
+      // For 15s timeframe, aggregate
+      if (timeframe.aggregation > 1) {
+        candles = aggregateCandles(candles, timeframe.aggregation);
+      }
+
+      if (candlestickSeriesRef.current && volumeSeriesRef.current) {
+        candlestickSeriesRef.current.setData(candles);
+        volumeSeriesRef.current.setData(
+          candles.map(c => ({
+            time: c.time,
+            value: c.volume,
+            color: c.close >= c.open ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
+          }))
+        );
+        
+        if (candles.length > 0) {
+          const lastCandle = candles[candles.length - 1];
+          setCurrentPrice(lastCandle.close);
+        }
+      }
+
+      // Fetch 24h ticker
+      const tickerResponse = await axios.get(`${API}/chart/ticker/${selectedPair}`);
+      const ticker = tickerResponse.data;
+      
+      setCurrentPrice(ticker.price);
+      setPriceChange(ticker.priceChangePercent);
+      setVolume24h(ticker.quoteVolume);
+      setHigh24h(ticker.high);
+      setLow24h(ticker.low);
+
+    } catch (error) {
+      console.error("Failed to load chart data:", error);
+      toast.error("Erreur de chargement des données");
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedPair, selectedTimeframe]);
+
   // Setup WebSocket for real-time updates
   useEffect(() => {
-    // Close existing connection
     if (wsRef.current) {
       wsRef.current.close();
     }
@@ -303,6 +281,7 @@ export default function ChartPage() {
     const timeframe = TIMEFRAMES.find(t => t.value === selectedTimeframe);
     const wsInterval = timeframe.binanceInterval;
     
+    // Connect directly to Binance WebSocket (WebSocket doesn't have CORS issues)
     const ws = new WebSocket(
       `wss://stream.binance.com:9443/ws/${selectedPair.toLowerCase()}@kline_${wsInterval}`
     );
@@ -325,7 +304,6 @@ export default function ChartPage() {
         volume: parseFloat(kline.v),
       };
 
-      // Update current price
       setCurrentPrice(candle.close);
 
       // For 15s aggregation
@@ -333,14 +311,12 @@ export default function ChartPage() {
         const bucketTime = Math.floor(candle.time / timeframe.aggregation) * timeframe.aggregation;
         
         if (lastAggregatedTimeRef.current !== bucketTime) {
-          // New 15s candle
           lastAggregatedTimeRef.current = bucketTime;
           candleBufferRef.current = [candle];
         } else {
           candleBufferRef.current.push(candle);
         }
         
-        // Aggregate and update
         const aggregatedCandle = {
           time: bucketTime,
           open: candleBufferRef.current[0].open,
@@ -363,7 +339,6 @@ export default function ChartPage() {
           });
         }
       } else {
-        // Direct update for standard timeframes
         if (candlestickSeriesRef.current) {
           candlestickSeriesRef.current.update(candle);
         }
@@ -381,11 +356,9 @@ export default function ChartPage() {
 
     ws.onclose = () => {
       setWsConnected(false);
-      console.log("WebSocket disconnected");
     };
 
-    ws.onerror = (error) => {
-      console.error("WebSocket error:", error);
+    ws.onerror = () => {
       setWsConnected(false);
     };
 
@@ -524,9 +497,9 @@ export default function ChartPage() {
               Live
             </Badge>
           ) : (
-            <Badge variant="outline" className="text-red-500 border-red-500/30">
+            <Badge variant="outline" className="text-yellow-500 border-yellow-500/30">
               <WifiOff className="w-3 h-3 mr-1" />
-              Offline
+              Connecté
             </Badge>
           )}
           
@@ -595,7 +568,7 @@ export default function ChartPage() {
 
       {/* Info */}
       <div className="text-xs text-muted-foreground text-center">
-        Données en temps réel via Binance WebSocket • {selectedTimeframe === "15s" ? "Bougies agrégées toutes les 15 secondes" : `Intervalle: ${selectedTimeframe}`}
+        Données en temps réel via Binance • {selectedTimeframe === "15s" ? "Bougies agrégées toutes les 15 secondes" : `Intervalle: ${selectedTimeframe}`}
       </div>
     </div>
   );
