@@ -6248,6 +6248,106 @@ async def get_defi_token_details(
     
     raise HTTPException(status_code=404, detail="Token non trouvé")
 
+# ============== CHART DATA (Binance Proxy) ==============
+
+@api_router.get("/chart/pairs")
+async def get_chart_pairs():
+    """Get all available trading pairs from Binance"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://api.binance.com/api/v3/exchangeInfo",
+                timeout=15.0
+            )
+            if response.status_code == 200:
+                data = response.json()
+                pairs = [
+                    {
+                        "symbol": s["symbol"],
+                        "baseAsset": s["baseAsset"],
+                        "quoteAsset": s["quoteAsset"],
+                        "status": s["status"]
+                    }
+                    for s in data.get("symbols", [])
+                    if s.get("quoteAsset") == "USDT" and s.get("status") == "TRADING"
+                ]
+                return {"pairs": pairs}
+    except Exception as e:
+        logger.error(f"Binance pairs error: {e}")
+    
+    # Fallback to top pairs
+    return {"pairs": [
+        {"symbol": "BTCUSDT", "baseAsset": "BTC", "quoteAsset": "USDT"},
+        {"symbol": "ETHUSDT", "baseAsset": "ETH", "quoteAsset": "USDT"},
+        {"symbol": "SOLUSDT", "baseAsset": "SOL", "quoteAsset": "USDT"},
+        {"symbol": "BNBUSDT", "baseAsset": "BNB", "quoteAsset": "USDT"},
+        {"symbol": "XRPUSDT", "baseAsset": "XRP", "quoteAsset": "USDT"},
+    ]}
+
+@api_router.get("/chart/klines/{symbol}")
+async def get_chart_klines(
+    symbol: str,
+    interval: str = "1m",
+    limit: int = 500
+):
+    """Get candlestick/kline data from Binance"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://api.binance.com/api/v3/klines",
+                params={
+                    "symbol": symbol.upper(),
+                    "interval": interval,
+                    "limit": limit
+                },
+                timeout=15.0
+            )
+            if response.status_code == 200:
+                data = response.json()
+                candles = [
+                    {
+                        "time": int(k[0] / 1000),
+                        "open": float(k[1]),
+                        "high": float(k[2]),
+                        "low": float(k[3]),
+                        "close": float(k[4]),
+                        "volume": float(k[5])
+                    }
+                    for k in data
+                ]
+                return {"candles": candles, "symbol": symbol}
+    except Exception as e:
+        logger.error(f"Binance klines error: {e}")
+    
+    raise HTTPException(status_code=503, detail="Erreur de récupération des données")
+
+@api_router.get("/chart/ticker/{symbol}")
+async def get_chart_ticker(symbol: str):
+    """Get 24h ticker data from Binance"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://api.binance.com/api/v3/ticker/24hr",
+                params={"symbol": symbol.upper()},
+                timeout=10.0
+            )
+            if response.status_code == 200:
+                data = response.json()
+                return {
+                    "symbol": symbol,
+                    "price": float(data.get("lastPrice", 0)),
+                    "priceChange": float(data.get("priceChange", 0)),
+                    "priceChangePercent": float(data.get("priceChangePercent", 0)),
+                    "high": float(data.get("highPrice", 0)),
+                    "low": float(data.get("lowPrice", 0)),
+                    "volume": float(data.get("volume", 0)),
+                    "quoteVolume": float(data.get("quoteVolume", 0))
+                }
+    except Exception as e:
+        logger.error(f"Binance ticker error: {e}")
+    
+    raise HTTPException(status_code=503, detail="Erreur de récupération du ticker")
+
 # ============== STARTUP EVENTS ==============
 
 @app.on_event("startup")
