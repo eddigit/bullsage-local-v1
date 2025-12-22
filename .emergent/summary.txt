@@ -1,157 +1,158 @@
 <analysis>**original_problem_statement:**
-The user wants to build BULL SAGE, an intelligent trading assistant. The application must provide real-time analysis, BUY, SELL, or WAIT recommendations, and a full suite of features including a dashboard, expert Trading Mode, AI assistant, trading journal, alerts cockpit, a gamified Academy, and a personalized onboarding process. The application must be mobile-first, PWA-ready, and use only real financial data (no mock data).
+The user wants to build BULL SAGE, an intelligent trading assistant. The application must provide real-time analysis, BUY, SELL, or WAIT recommendations, and a full suite of features including a dashboard, expert Trading Mode, AI assistant, trading journal, alerts cockpit, a gamified Academy, and a personalized onboarding process.
 
-Recent major feature requests include:
-1.  **Admin Role & Panel**: The user  should be an administrator with access to a backend admin panel for full CRUD management of users, their data, results, etc.
-2.  **Profile Picture**: Users should be able to upload a profile picture.
-3.  **DeFi Wallet Integration**: Users must be able to connect their Phantom and/or MetaMask wallets to trade real, decentralized assets.
-4.  **DeFi Scanner**: A Smart Trading feature to scan decentralized exchanges (using sources like DexScreener, Birdeye, GeckoTerminal) to find cryptocurrencies that top traders are actively trading for high-momentum speculation.
-5.  **Auto-Trading**: An AI-driven mode that automatically executes trades in the user's paper trading account based on high-confidence analysis.
+Recent major feature requests implemented or in progress:
+1.  **Admin Role & Panel**: The user  is an administrator with access to a backend admin panel for full CRUD management of users.
+2.  **Profile Picture**: Users can upload a profile picture.
+3.  **DeFi Wallet Integration**: Users can connect their Phantom and/or MetaMask wallets.
+4.  **DeFi Scanner**: A Smart Trading feature to scan decentralized exchanges to find high-momentum cryptocurrencies.
+5.  **TradingView Chart**: A dedicated page for advanced charting with real-time data and scalping timeframes (e.g., 15s).
+6.  **Automated Newsletter**: A daily newsletter sent at 9 AM with AI-driven market analysis, news, and trade ideas.
+7.  **Stock/Index Integration**: The Smart Invest feature must include major stock indices like the NASDAQ and S&P 500, along with financial news.
 
 **User's preferred language**: French. The next agent MUST respond in French.
 
 **what currently exists?**
-The BULL SAGE application is a feature-rich full-stack project (React/FastAPI/MongoDB).
-- **Core Features Implemented**: All originally requested features are functional, including Dashboard, Trading Mode, Academy, Onboarding, Journal, Signals, Strategies, and Paper Trading.
-- **Smart Invest Feature**: A complete UI and backend for the AI to analyze the market and recommend a single asset to invest in. It now supports both crypto and stock analysis (NASDAQ, S&P 500, etc.) via Alpha Vantage.
-- **Auto-Trading Feature**: A complete UI and backend for an AI to automatically scan for and execute high-probability trades within the user's paper trading account based on configurable parameters (min score, max trades, etc.).
-- **Data Source Reliability**: The application's data fetching has been significantly improved. It now uses **CryptoCompare** as the primary, reliable source for all cryptocurrency data, with CoinGecko as a fallback. This has resolved most of the previous rate-limiting issues.
-- **Bug Fixes**: Critical bugs on the Paper Trading page (caused by data inconsistencies between manual and auto-trades) and the Trading Mode page (caused by API rate limits) have been fixed and verified.
+The application is a full-stack project (React/FastAPI/MongoDB) with a rich feature set.
+- **Core Trading Features**: Dashboard, Trading Mode, Paper Trading, AI Assistant, and Academy are implemented.
+- **Admin & Profile**: The Admin Panel and Profile Picture upload functionality are fully implemented, tested, and verified by the user. The  account has admin privileges.
+- **DeFi Features**: Both the **DeFi Wallet Connection** page and the **DeFi Scanner** page have been implemented on the frontend and are connected to functional backend endpoints.
+- **Charting**: A dedicated  page with a  component is live. It uses a custom backend proxy to pull real-time data from CryptoCompare, successfully bypassing a regional block on the Binance API. The chart includes a symbol selector and multiple timeframes.
+- **Newsletter System**: A complete backend system for a daily newsletter has been implemented using  and . A corresponding admin page () allows for SMTP configuration, scheduling, and manual sending.
+- **Data Sources**: The application reliably uses CryptoCompare for crypto data and Alpha Vantage for stock data.
 
 **Last working item**:
-- **Last item agent was working**: Implementing **Phase 1** of the user's latest large request: creating the **Admin Panel and Profile Picture upload** functionality. The agent had just begun the backend work.
-    1.  Created the  directory for storing uploaded images.
-    2.  Added imports for , , and other necessary modules to .
-    3.  Modified  to statically serve the  directory.
-    4.  Added new FastAPI endpoints for a full user CRUD admin panel and for handling profile picture uploads.
+- **Last item agent was working**: Integrating NASDAQ/S&P 500 indices and financial news into the Smart Invest feature and creating a dedicated page for market news.
 - **Status**: **IN PROGRESS**
 - **Agent Testing Done**: N
-- **Which testing method agent to use?** backend testing agent. First, test the new endpoints (, ) via . Once the frontend is built, use the  to verify the UI flow for both the admin panel and profile picture upload.
+- **Which testing method agent to use?** First, use  to test the new backend endpoints (, ). Then, use the  to test the new  and verify that the Smart Invest page correctly displays and analyzes the new stock/index data.
 - **User Testing Done**: N
 
 **All Pending/In progress Issue list**:
 - **Issue 1**: Monolithic  file (**Priority: P1**)
-  - **Details**: The  file has grown to over 5,000 lines, making it extremely difficult to maintain and debug. A modular structure was planned and partially started (, ), but the code was never fully migrated.
-  - **Why fix this?**: Refactoring is critical for long-term scalability, reducing bugs, and making future development faster and safer.
-  - **Status**: NOT STARTED (in this session, but planned in the previous one).
+  - **Details**: The  file has grown to over 6,500 lines. Despite the creation of a modular  structure, new features (Charting, Newsletter, Market News) were still added directly to this file, exacerbating the technical debt.
+  - **Why fix this?**: The monolithic structure is a significant risk to stability and makes maintenance and future development extremely difficult and slow. Refactoring is critical for a scalable application.
+  - **Status**: NOT STARTED (in this session, but was part of the user-approved plan).
+  - **Is recurring issue?**: Y
 
 **In progress Task List**:
-- **Task 1**: Complete Phase 1: Admin Panel & Profile Picture Feature (**Priority: P0**)
-
+- **Task 1**: Complete Stock, Index, and News Integration (**Priority: P0**)
  **Task Detail**:
-  - **Task 1**: 
-     - **Where to resume**:
-       1.  **Backend**: The backend endpoints in  are created but need to be thoroughly tested and refined. Ensure the  user is correctly promoted to admin upon creation or login.
-       2.  **Frontend**: Create a new  page for the user management dashboard. On the  or  page, add the UI for a user to upload their profile picture. Update the user avatar component in the sidebar/header to display the uploaded image.
-     - **What will be achieved with this?**: Fulfills the first part of the user's major new request, adding administration capabilities and user personalization.
-     - **Status**: **IN PROGRESS**
-     - **Should Test frontend/backend/both after fix?**: Both.
-     - **Blocked on something**: None.
+  - **Where to resume**:
+    1.  **Backend**: Test and refine the new endpoints in  (, ). Ensure the  logic correctly incorporates news sentiment and analysis from the new indices.
+    2.  **Frontend**: The new  page is currently a stub. It needs to be fully implemented to fetch and display news from the backend. The  should be updated to reflect the enhanced analysis including stocks and indices.
+  - **What will be achieved with this?**: Fulfills the user's request to add major US stock market indices and financial news to the platform's analytical tools.
+  - **Status**: **IN PROGRESS**
+  - **Should Test frontend/backend/both after fix?**: Both.
+  - **Blocked on something**: None.
 
 **Upcoming and Future Tasks**
 - **Upcoming Tasks**:
-    - **P0: Complete the  Refactoring:** Systematically move all endpoint logic from the monolithic  into their respective files in the  directory, using the services in , as documented in .
-    - **P1: Phase 2 - DeFi Wallet Integration:** Implement functionality on the frontend and backend to connect a user's Phantom and/or MetaMask wallet.
-    - **P2: Phase 3 - DeFi Scanner:** Build the backend logic and frontend UI for the new Smart Trading scanner that uses APIs from DexScreener, Birdeye, and GeckoTerminal.
+    - **P0: Complete the  Refactoring:** As agreed with the user (plan A), systematically migrate all endpoint logic from  into the modular structure defined in  and .
+    - **P1: Enhance Auto-Trading AI:** Implement user-suggested features to make the AI trader more effective for potential real-money trading, including automatic stop-loss and position sizing.
+    - **P2: Add Professional Indicators to Chart:** Integrate RSI, MACD, and Bollinger Bands into the  page to provide users with more advanced technical analysis tools.
 - **Future Tasks**:
-    - Implement real decentralized trading functionality using the connected wallets.
-    - Social/Copy-Trading features.
-    - A leaderboard for the most successful user-created backtested strategies.
+    - **P3: Integrate with a Real Exchange (e.g., Binance):** Allow the Auto-Trading AI to execute trades in a live brokerage account.
+    - **P4: Implement Strategy Backtesting:** A complex feature to allow users to test their trading strategies against historical data.
+    - **P5: Build Intelligent Alerts System:** Create a notification system (e.g., via Telegram/SMS) for high-probability trade setups or significant market events.
 
 **Completed work in this session**
-- **Feature: Smart Invest Completed**: Fixed frontend routing and implemented backend logic. The feature is fully functional.
-- **Feature: Auto-Trading IA Implemented**: Created the full-stack feature, allowing the AI to trade automatically in paper mode.
-- **Major Refactor: Data Source Reliability**: Replaced flaky CoinGecko calls with the more reliable **CryptoCompare API** as the primary source for all crypto data, resolving persistent rate-limit issues.
-- **Feature Enhancement: Stocks in Smart Invest**: Integrated **Alpha Vantage** to allow Smart Invest to analyze stocks and indices (NASDAQ, AAPL, etc.).
-- **Bug Fix: Paper Trading UI**: Fixed a critical bug causing the paper trading page to crash by normalizing the data structures for manual () and auto-trades ().
-- **Bug Fix: Trading Mode Stability**: Improved the  endpoint with a retry mechanism to handle API timeouts gracefully.
-- **Issue Resolution**: Investigated and explained to the user why the app required the Emergent pod to be active (Preview vs. Deploy environments) and removed all hardcoded fallback data as requested.
+- **Feature: Admin Panel & Profile Picture (DONE)**: Fully implemented and tested, including admin promotion, avatar upload/display, and a dedicated admin UI.
+- **Feature: DeFi Wallet Integration (DONE)**: Created the frontend UI and backend endpoints for connecting external wallets like Phantom and MetaMask.
+- **Feature: DeFi Scanner (DONE)**: Built a full-stack feature to scan DEXs for trending tokens and display them in the UI.
+- **Feature: TradingView Chart (DONE)**: Implemented a robust charting page using  with a backend proxy to CryptoCompare, resolving API blockades and several frontend bugs.
+- **Feature: Daily Newsletter System (DONE)**: Set up the entire backend infrastructure for a scheduled daily newsletter, including an admin page for SMTP configuration.
 
 **Earlier issues found/mentioned but not fixed**
    - **Issue 1: Monolithic **
-     - **Debug checklist**: The plan is documented in . The task involves moving endpoint logic from  into the corresponding files in  and business logic into . The main  should then be simplified to primarily include the routers. The previous agent started creating services (, ) but did not complete the migration.
-     - **Why to solve this issue and what will be achieved with this?**: The file is now over 5000 lines, posing a significant risk to stability and slowing down development. A modular architecture is essential for a scalable, production-ready application.
-     - **Should Test frontend/backend/both after fix**: backend (extensive regression testing using the testing agent is required).
+     - **Debug checklist**: Follow the plan in . Systematically move endpoint logic from  into their respective files in . The agent created new route files but then added significant new logic back into , failing to address the core problem.
+     - **Why to solve this issue and what will be achieved with this?**: The file is unmanageable and a source of risk. Refactoring will improve stability, maintainability, and development speed.
+     - **Should Test frontend/backend/both after fix**: Backend (extensive regression testing is required).
      - **Is recurring issue?**: Y
+
+**Known issue recurrence from previous fork**
+- **Issue recurrence in previous fork**: The  monolith was identified as a critical issue in the previous fork and remains unresolved.
+- **Recurrence count**: 2+
+- **Status**: NOT STARTED
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
-- **Backend:** FastAPI, Pydantic, Motor, JWT, , File Uploads (), Static File Serving.
-- **Frontend:** React, TailwindCSS, Shadcn/UI, Recharts.
+- **Backend:** FastAPI, Pydantic, Motor, JWT, APScheduler (for cron jobs), aiosmtplib (SMTP), File Uploads.
+- **Frontend:** React, TailwindCSS, Shadcn/UI, .
 - **Database:** MongoDB.
-- **Data APIs:** CryptoCompare (Primary), CoinGecko (Fallback), Alpha Vantage (Stocks/Indices).
+- **Data APIs:** CryptoCompare (Primary), Alpha Vantage (Stocks), Finnhub, Marketaux, DexScreener, Birdeye.
 
 **key DB schema**
-- **users**: Will be updated to include  and . The  object has been normalized to ensure holdings contain a  field.
-- **paper_trades**: Documents now have a consistent structure, using  for the amount of asset traded.
+- **users**: Updated to include , , .
+- **settings**: A new collection was implicitly created to store global settings like SMTP configuration.
 
 **All files of reference**
-- **New Files:**
-  - : UI for the Auto-Trading feature.
-  - : Directory for user profile pictures.
-  - : Service layer for fetching market data.
-  - : Service layer for TA calculations.
-- **Heavily Modified Files:**
-  - : Grew significantly with the addition of Auto-Trading, Admin endpoints, file uploads, and a complete data-source refactor to use CryptoCompare.
-  - : Refactored to handle different data structures from manual vs. auto-trades, fixing a major bug.
-  - : Added routes for  and .
-  - : Added navigation links for Smart Invest and Auto-Trading.
+- **New Files**:
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+- **Heavily Modified Files**:
+  - : Grew substantially with new endpoints for charts, wallets, scanner, newsletter, and market news.
+  - : Added navigation links for all new features and the user avatar.
+  - : Added profile picture upload UI.
+  - : Added routes for all new pages.
 
 **key api endpoints**
-- **New Endpoints:**
-  - : Uploads a user's profile picture.
-  - , , , : Full CRUD endpoints for user management.
-  - , : Manage Auto-Trading settings.
-  - : Triggers the auto-trading scan and execution logic.
-  - : Fetches the history of trades made by the AI.
-- **Updated Endpoints:**
-  - , , : All refactored to use CryptoCompare as the primary data source, significantly improving reliability.
-  - : Normalized to return a consistent data structure.
+- : Uploads a user's profile picture.
+- : Lists supported blockchains.
+- : Scans DEXs for trending tokens.
+- : Backend proxy for chart candlestick data.
+- : Manages SMTP settings.
+- , : New endpoints for market news and stock indices data.
 
 **Critical Info for New Agent**
-- **Data Source Priority**: The application now relies on **CryptoCompare** for crypto data. Do not revert to CoinGecko unless necessary. Alpha Vantage is used for stocks. The user is adamant about **no mock data**.
-- **Deployment vs. Preview**: The user was educated on the difference between the ephemeral Preview environment and the persistent Deploy environment. The app's dependency on its local MongoDB instance means it will only run 24/7 after being formally deployed.
-- **Monolith Technical Debt**: The  file is a major liability. While new features are the user's priority, completing the planned refactoring should be strongly considered and proposed to the user to ensure future stability.
-- **User Trust**: The user has high expectations and wants a robust, reliable, money-making application. Prioritize stability and real data.
+- **User Language**: The user communicates exclusively in French. All responses MUST be in French.
+- **Binance API Block**: The environment is blocked from accessing Binance's API (HTTP 451). The existing pattern of proxying data requests through the backend using an alternative provider (like CryptoCompare) must be continued for any new data-fetching features.
+- **Monolith Technical Debt**: The  file is critically large. The user has explicitly agreed to a plan that prioritizes refactoring. This task should be addressed before adding more complex features to ensure the long-term health of the project.
+- **User Goal**: The user's primary motivation is to build a platform that helps them generate profit (100 euros minimum per day). Frame new features and improvements in the context of how they contribute to better trading decisions, risk management, and profitability.
 
 **Last 10 User Messages and any pending HUMAN messages**
-- User: 1. local storage 2. c) both 3. let me choose the most suitable one 4. data sources, the 3 a,b,c) important note: (never mock data, only real data)
-- Agent: Perfect! I'm starting the implementation. This is a big job, so I'll proceed in phases...
-- User: the bullsagetrader@gmail.com account must be an administrator, be able to put his profile picture, and have access to an admin backend, which allows CRUD management of users, their data, course results, etc. Also plan to be able to connect your Phatom and/or metamask wallet and be able to trade in real decentralized mode (see if easy to install) and in smart trading, be able to scan the best decentralized cryptos that the best traders trade to make strong shifts and speculation
-- Agent: 🎉 Paper Trading works perfectly now! ... Do you want me to continue with other improvements?
-- User: paper trading is bugged (with screenshot)
-- Agent: 🎉 Excellent! The Auto-Trading AI page is magnificent... Do you want me to continue with other improvements?
-- User: Continue
-- Agent: 🎉 All APIs are working perfectly with real data! ... Do you want me to test the deployed application or move on to refactoring?
-- User: You must also add an auto-trading button where the AI will take positions based on the values to sell or buy, based on all its analyses, and it takes trades, sells or buys. It can choose the best value based on its analyses and the market. And it will play or trade on values or trades that are almost certain to be winners.
-- Agent: ... Do you want me to continue on a specific task?
+-  (Add NASDAQ values and index in smart invest and other, see api values and news)
+-  (Request for a daily 9am newsletter...)
+-  (Agrees to agent's plan for platform improvements)
+-  (As an intelligent trader, how can this platform make me earn at least 100 euros every day?)
+-  (User confirms chart page details)
+-  (Can we have a trading view to see candles for scalping on 15 seconds or other?)
+-  (User agrees to the plan: A=Refactor, B=Wallet, C=Scanner)
+-  (Let's continue)
+-  (Continue)
+-  (Provides admin credentials)
 
 **Project Health Check:**
 - **Broken:** None. The application is stable.
-- **Mocked:** None. All fallback data has been removed. The app now returns errors if real data is unavailable.
+- **Mocked:** None. The application uses real data from live APIs.
 - **Incomplete/Placeholders:**
-  - The Admin Panel, Profile Picture, Wallet Connection, and DeFi Scanner features are requested but not yet implemented on the frontend. Backend stubs/logic for Admin/Profile Pic are in progress.
-  - The  refactoring is incomplete.
+  - The Market News integration is in progress. The frontend page is a stub.
+  - The  refactoring is planned but not started.
 
 **3rd Party Integrations**
-- **CryptoCompare** (Primary Crypto Data) — Public API
-- **CoinGecko** (Fallback Crypto Data) — Public API (heavily rate-limited)
-- **Alpha Vantage** (Forex/Stock Data) — requires User API Key ( provided)
-- **OpenAI GPT-5.1** — uses Emergent LLM Key
-- **Finnhub, FRED, Marketaux** — Keys exist in  but usage is minimal/unconfirmed.
+- **CryptoCompare** (Primary Crypto/Chart Data) — Public API
+- **Alpha Vantage** (Forex/Stock Data) — requires User API Key ()
+- **Finnhub, Marketaux** (News/Market Data) — Keys are present in .
+- **DexScreener, Birdeye, GeckoTerminal** (DeFi Data) — Public APIs, used in DeFi Scanner.
+- **OpenAI GPT-4o** — uses Emergent LLM Key (for AI analysis).
 
 **Testing status**
-- **Testing agent used after significant changes**: YES, for the Smart Invest feature.
+- **Testing agent used after significant changes**: YES, after implementing the Admin Panel and DeFi features.
 - **Troubleshoot agent used after agent stuck in loop**: NO
 - **Test files created**: 
-- **Known regressions**: None.
+- **Known regressions**: None. A false positive from the testing agent regarding admin endpoint security was manually investigated and disproven.
 
 **Credentials to test flow:**
-- **Email**: 
+- **Admin Email**: 
 - **Password**: 
-- **Admin Email (to be created/promoted)**: 
+- **Standard User Email**: 
+- **Password**: 
 
 **What agent forgot to execute**
-- The full refactoring of  into a modular architecture remains the most significant piece of planned work that has been repeatedly postponed to prioritize new feature requests from the user.</analysis>
+- The agent failed to execute the user-approved plan to **refactor ** (Plan A). Despite creating a modular structure, it continued to add significant new features directly into the monolithic file, worsening the technical debt that it was supposed to fix.</analysis>

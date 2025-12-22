@@ -11,7 +11,7 @@ from datetime import datetime
 import os
 
 class BullSageAPITester:
-    def __init__(self, base_url="https://fintech-advisor-24.preview.emergentagent.com"):
+    def __init__(self, base_url="https://marketoracle-35.preview.emergentagent.com"):
         self.base_url = base_url
         self.admin_token = None
         self.regular_token = None
