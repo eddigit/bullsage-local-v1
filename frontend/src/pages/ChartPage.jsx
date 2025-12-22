@@ -6,14 +6,10 @@ import {
   TrendingUp,
   TrendingDown,
   RefreshCw,
-  Clock,
-  Search,
   Star,
-  Activity,
   Loader2,
   ChevronDown,
-  Wifi,
-  WifiOff
+  Wifi
 } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -33,7 +29,7 @@ import {
 } from "../components/ui/popover";
 import { API } from "../App";
 
-// Top 10 crypto pairs
+// Top crypto pairs
 const TOP_PAIRS = [
   { symbol: "BTCUSDT", name: "Bitcoin", icon: "₿" },
   { symbol: "ETHUSDT", name: "Ethereum", icon: "Ξ" },
@@ -45,17 +41,21 @@ const TOP_PAIRS = [
   { symbol: "AVAXUSDT", name: "Avalanche", icon: "▲" },
   { symbol: "DOTUSDT", name: "Polkadot", icon: "●" },
   { symbol: "MATICUSDT", name: "Polygon", icon: "⬡" },
+  { symbol: "LINKUSDT", name: "Chainlink", icon: "⬢" },
+  { symbol: "LTCUSDT", name: "Litecoin", icon: "Ł" },
+  { symbol: "ATOMUSDT", name: "Cosmos", icon: "⚛" },
+  { symbol: "NEARUSDT", name: "NEAR", icon: "N" },
+  { symbol: "UNIUSDT", name: "Uniswap", icon: "🦄" },
 ];
 
 // Timeframe options
 const TIMEFRAMES = [
-  { value: "15s", label: "15s", binanceInterval: "1s", aggregation: 15 },
-  { value: "1m", label: "1m", binanceInterval: "1m", aggregation: 1 },
-  { value: "5m", label: "5m", binanceInterval: "5m", aggregation: 1 },
-  { value: "15m", label: "15m", binanceInterval: "15m", aggregation: 1 },
-  { value: "1h", label: "1H", binanceInterval: "1h", aggregation: 1 },
-  { value: "4h", label: "4H", binanceInterval: "4h", aggregation: 1 },
-  { value: "1d", label: "1D", binanceInterval: "1d", aggregation: 1 },
+  { value: "1m", label: "1m", interval: "1m", refreshMs: 10000 },
+  { value: "5m", label: "5m", interval: "5m", refreshMs: 30000 },
+  { value: "15m", label: "15m", interval: "15m", refreshMs: 60000 },
+  { value: "1h", label: "1H", interval: "1h", refreshMs: 60000 },
+  { value: "4h", label: "4H", interval: "4h", refreshMs: 120000 },
+  { value: "1d", label: "1D", interval: "1d", refreshMs: 300000 },
 ];
 
 export default function ChartPage() {
@@ -63,43 +63,19 @@ export default function ChartPage() {
   const chartRef = useRef(null);
   const candlestickSeriesRef = useRef(null);
   const volumeSeriesRef = useRef(null);
-  const wsRef = useRef(null);
+  const refreshIntervalRef = useRef(null);
   
   const [selectedPair, setSelectedPair] = useState("BTCUSDT");
   const [selectedTimeframe, setSelectedTimeframe] = useState("1m");
-  const [allPairs, setAllPairs] = useState([]);
   const [pairSearchOpen, setPairSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
-  const [wsConnected, setWsConnected] = useState(false);
   const [currentPrice, setCurrentPrice] = useState(null);
   const [priceChange, setPriceChange] = useState(0);
   const [volume24h, setVolume24h] = useState(0);
   const [high24h, setHigh24h] = useState(0);
   const [low24h, setLow24h] = useState(0);
-  
-  // Buffer for 15s aggregation
-  const candleBufferRef = useRef([]);
-  const lastAggregatedTimeRef = useRef(null);
-
-  // Fetch all pairs from backend proxy
-  useEffect(() => {
-    const fetchPairs = async () => {
-      try {
-        const response = await axios.get(`${API}/chart/pairs`);
-        const pairs = response.data.pairs.map(p => ({
-          symbol: p.symbol,
-          name: p.baseAsset,
-          icon: p.baseAsset.charAt(0)
-        }));
-        setAllPairs(pairs);
-      } catch (error) {
-        console.error("Failed to fetch pairs:", error);
-        setAllPairs(TOP_PAIRS);
-      }
-    };
-    fetchPairs();
-  }, []);
+  const [lastUpdate, setLastUpdate] = useState(null);
 
   // Initialize chart
   useEffect(() => {
@@ -136,12 +112,11 @@ export default function ChartPage() {
       timeScale: {
         borderColor: "rgba(255, 255, 255, 0.1)",
         timeVisible: true,
-        secondsVisible: true,
+        secondsVisible: false,
       },
       handleScroll: { vertTouchDrag: false },
     });
 
-    // Candlestick series
     const candlestickSeries = chart.addCandlestickSeries({
       upColor: "#22c55e",
       downColor: "#ef4444",
@@ -151,7 +126,6 @@ export default function ChartPage() {
       wickDownColor: "#ef4444",
     });
 
-    // Volume series
     const volumeSeries = chart.addHistogramSeries({
       color: "#3b82f6",
       priceFormat: { type: "volume" },
@@ -163,7 +137,6 @@ export default function ChartPage() {
     candlestickSeriesRef.current = candlestickSeries;
     volumeSeriesRef.current = volumeSeries;
 
-    // Handle resize
     const handleResize = () => {
       if (chartContainerRef.current) {
         chart.applyOptions({
@@ -182,63 +155,24 @@ export default function ChartPage() {
     };
   }, []);
 
-  // Aggregate candles for custom timeframes
-  const aggregateCandles = (candles, seconds) => {
-    const aggregated = [];
-    let currentCandle = null;
-    
-    for (const candle of candles) {
-      const bucketTime = Math.floor(candle.time / seconds) * seconds;
-      
-      if (!currentCandle || currentCandle.time !== bucketTime) {
-        if (currentCandle) {
-          aggregated.push(currentCandle);
-        }
-        currentCandle = {
-          time: bucketTime,
-          open: candle.open,
-          high: candle.high,
-          low: candle.low,
-          close: candle.close,
-          volume: candle.volume,
-        };
-      } else {
-        currentCandle.high = Math.max(currentCandle.high, candle.high);
-        currentCandle.low = Math.min(currentCandle.low, candle.low);
-        currentCandle.close = candle.close;
-        currentCandle.volume += candle.volume;
-      }
-    }
-    
-    if (currentCandle) {
-      aggregated.push(currentCandle);
-    }
-    
-    return aggregated;
-  };
-
-  // Fetch historical data
-  const loadChartData = useCallback(async () => {
-    setLoading(true);
+  // Fetch chart data
+  const loadChartData = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     const timeframe = TIMEFRAMES.find(t => t.value === selectedTimeframe);
     
     try {
-      // Fetch klines from our backend proxy
-      const response = await axios.get(`${API}/chart/klines/${selectedPair}`, {
-        params: {
-          interval: timeframe.binanceInterval,
-          limit: 500,
-        },
-      });
+      // Fetch klines
+      const [klinesRes, tickerRes] = await Promise.all([
+        axios.get(`${API}/chart/klines/${selectedPair}`, {
+          params: { interval: timeframe.interval, limit: 200 },
+        }),
+        axios.get(`${API}/chart/ticker/${selectedPair}`)
+      ]);
 
-      let candles = response.data.candles;
+      const candles = klinesRes.data.candles;
+      const ticker = tickerRes.data;
 
-      // For 15s timeframe, aggregate
-      if (timeframe.aggregation > 1) {
-        candles = aggregateCandles(candles, timeframe.aggregation);
-      }
-
-      if (candlestickSeriesRef.current && volumeSeriesRef.current) {
+      if (candlestickSeriesRef.current && volumeSeriesRef.current && candles.length > 0) {
         candlestickSeriesRef.current.setData(candles);
         volumeSeriesRef.current.setData(
           candles.map(c => ({
@@ -247,136 +181,51 @@ export default function ChartPage() {
             color: c.close >= c.open ? "rgba(34, 197, 94, 0.5)" : "rgba(239, 68, 68, 0.5)",
           }))
         );
-        
-        if (candles.length > 0) {
-          const lastCandle = candles[candles.length - 1];
-          setCurrentPrice(lastCandle.close);
-        }
       }
 
-      // Fetch 24h ticker
-      const tickerResponse = await axios.get(`${API}/chart/ticker/${selectedPair}`);
-      const ticker = tickerResponse.data;
-      
       setCurrentPrice(ticker.price);
       setPriceChange(ticker.priceChangePercent);
       setVolume24h(ticker.quoteVolume);
       setHigh24h(ticker.high);
       setLow24h(ticker.low);
+      setLastUpdate(new Date());
 
     } catch (error) {
       console.error("Failed to load chart data:", error);
-      toast.error("Erreur de chargement des données");
+      if (showLoading) {
+        toast.error("Erreur de chargement des données");
+      }
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }, [selectedPair, selectedTimeframe]);
 
-  // Setup WebSocket for real-time updates
+  // Load data on mount and when pair/timeframe changes
   useEffect(() => {
-    if (wsRef.current) {
-      wsRef.current.close();
-    }
-
-    const timeframe = TIMEFRAMES.find(t => t.value === selectedTimeframe);
-    const wsInterval = timeframe.binanceInterval;
-    
-    // Connect directly to Binance WebSocket (WebSocket doesn't have CORS issues)
-    const ws = new WebSocket(
-      `wss://stream.binance.com:9443/ws/${selectedPair.toLowerCase()}@kline_${wsInterval}`
-    );
-
-    ws.onopen = () => {
-      setWsConnected(true);
-      console.log("WebSocket connected");
-    };
-
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      const kline = data.k;
-      
-      const candle = {
-        time: Math.floor(kline.t / 1000),
-        open: parseFloat(kline.o),
-        high: parseFloat(kline.h),
-        low: parseFloat(kline.l),
-        close: parseFloat(kline.c),
-        volume: parseFloat(kline.v),
-      };
-
-      setCurrentPrice(candle.close);
-
-      // For 15s aggregation
-      if (timeframe.aggregation > 1) {
-        const bucketTime = Math.floor(candle.time / timeframe.aggregation) * timeframe.aggregation;
-        
-        if (lastAggregatedTimeRef.current !== bucketTime) {
-          lastAggregatedTimeRef.current = bucketTime;
-          candleBufferRef.current = [candle];
-        } else {
-          candleBufferRef.current.push(candle);
-        }
-        
-        const aggregatedCandle = {
-          time: bucketTime,
-          open: candleBufferRef.current[0].open,
-          high: Math.max(...candleBufferRef.current.map(c => c.high)),
-          low: Math.min(...candleBufferRef.current.map(c => c.low)),
-          close: candle.close,
-          volume: candleBufferRef.current.reduce((sum, c) => sum + c.volume, 0),
-        };
-        
-        if (candlestickSeriesRef.current) {
-          candlestickSeriesRef.current.update(aggregatedCandle);
-        }
-        if (volumeSeriesRef.current) {
-          volumeSeriesRef.current.update({
-            time: aggregatedCandle.time,
-            value: aggregatedCandle.volume,
-            color: aggregatedCandle.close >= aggregatedCandle.open 
-              ? "rgba(34, 197, 94, 0.5)" 
-              : "rgba(239, 68, 68, 0.5)",
-          });
-        }
-      } else {
-        if (candlestickSeriesRef.current) {
-          candlestickSeriesRef.current.update(candle);
-        }
-        if (volumeSeriesRef.current) {
-          volumeSeriesRef.current.update({
-            time: candle.time,
-            value: candle.volume,
-            color: candle.close >= candle.open 
-              ? "rgba(34, 197, 94, 0.5)" 
-              : "rgba(239, 68, 68, 0.5)",
-          });
-        }
-      }
-    };
-
-    ws.onclose = () => {
-      setWsConnected(false);
-    };
-
-    ws.onerror = () => {
-      setWsConnected(false);
-    };
-
-    wsRef.current = ws;
-
-    return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-    };
-  }, [selectedPair, selectedTimeframe]);
-
-  // Load data when pair or timeframe changes
-  useEffect(() => {
-    loadChartData();
+    loadChartData(true);
   }, [loadChartData]);
 
+  // Auto-refresh
+  useEffect(() => {
+    const timeframe = TIMEFRAMES.find(t => t.value === selectedTimeframe);
+    
+    if (refreshIntervalRef.current) {
+      clearInterval(refreshIntervalRef.current);
+    }
+
+    refreshIntervalRef.current = setInterval(() => {
+      loadChartData(false);
+    }, timeframe.refreshMs);
+
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
+    };
+  }, [selectedTimeframe, loadChartData]);
+
   const formatVolume = (vol) => {
+    if (!vol) return "$0";
     if (vol >= 1e9) return `$${(vol / 1e9).toFixed(2)}B`;
     if (vol >= 1e6) return `$${(vol / 1e6).toFixed(2)}M`;
     if (vol >= 1e3) return `$${(vol / 1e3).toFixed(2)}K`;
@@ -392,14 +241,13 @@ export default function ChartPage() {
   };
 
   const filteredPairs = searchQuery
-    ? allPairs.filter(p => 
+    ? TOP_PAIRS.filter(p => 
         p.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.name.toLowerCase().includes(searchQuery.toLowerCase())
-      ).slice(0, 50)
+      )
     : TOP_PAIRS;
 
-  const selectedPairInfo = allPairs.find(p => p.symbol === selectedPair) || 
-    TOP_PAIRS.find(p => p.symbol === selectedPair) ||
+  const selectedPairInfo = TOP_PAIRS.find(p => p.symbol === selectedPair) ||
     { symbol: selectedPair, name: selectedPair.replace("USDT", ""), icon: "●" };
 
   return (
@@ -417,7 +265,7 @@ export default function ChartPage() {
                 <div className="flex items-center gap-2">
                   <span className="text-lg">{selectedPairInfo.icon}</span>
                   <span className="font-bold">{selectedPairInfo.name}</span>
-                  <span className="text-muted-foreground">/USDT</span>
+                  <span className="text-muted-foreground">/USD</span>
                 </div>
                 <ChevronDown className="w-4 h-4 opacity-50" />
               </Button>
@@ -425,14 +273,14 @@ export default function ChartPage() {
             <PopoverContent className="w-[300px] p-0 glass border-white/10" align="start">
               <Command>
                 <CommandInput 
-                  placeholder="Rechercher une paire..." 
+                  placeholder="Rechercher..." 
                   value={searchQuery}
                   onValueChange={setSearchQuery}
                 />
                 <CommandList>
                   <CommandEmpty>Aucune paire trouvée</CommandEmpty>
-                  <CommandGroup heading="Top 10">
-                    {TOP_PAIRS.map(pair => (
+                  <CommandGroup heading="Cryptomonnaies">
+                    {filteredPairs.map(pair => (
                       <CommandItem
                         key={pair.symbol}
                         value={pair.symbol}
@@ -446,32 +294,10 @@ export default function ChartPage() {
                         <Star className={`w-4 h-4 mr-2 ${selectedPair === pair.symbol ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground"}`} />
                         <span className="mr-2">{pair.icon}</span>
                         <span className="font-medium">{pair.name}</span>
-                        <span className="text-muted-foreground ml-1">/USDT</span>
+                        <span className="text-muted-foreground ml-1">/USD</span>
                       </CommandItem>
                     ))}
                   </CommandGroup>
-                  {searchQuery && filteredPairs.length > 0 && (
-                    <CommandGroup heading="Résultats">
-                      {filteredPairs
-                        .filter(p => !TOP_PAIRS.find(tp => tp.symbol === p.symbol))
-                        .map(pair => (
-                          <CommandItem
-                            key={pair.symbol}
-                            value={pair.symbol}
-                            onSelect={() => {
-                              setSelectedPair(pair.symbol);
-                              setPairSearchOpen(false);
-                              setSearchQuery("");
-                            }}
-                            className="cursor-pointer"
-                          >
-                            <span className="mr-2">{pair.icon}</span>
-                            <span className="font-medium">{pair.name}</span>
-                            <span className="text-muted-foreground ml-1">/USDT</span>
-                          </CommandItem>
-                        ))}
-                    </CommandGroup>
-                  )}
                 </CommandList>
               </Command>
             </PopoverContent>
@@ -483,25 +309,28 @@ export default function ChartPage() {
               <span className="text-2xl font-bold">${formatPrice(currentPrice)}</span>
               <Badge className={`${priceChange >= 0 ? "bg-emerald-500/20 text-emerald-500" : "bg-red-500/20 text-red-500"}`}>
                 {priceChange >= 0 ? <TrendingUp className="w-3 h-3 mr-1" /> : <TrendingDown className="w-3 h-3 mr-1" />}
-                {priceChange >= 0 ? "+" : ""}{priceChange.toFixed(2)}%
+                {priceChange >= 0 ? "+" : ""}{priceChange?.toFixed(2) || "0.00"}%
               </Badge>
             </div>
           </div>
         </div>
 
-        {/* Timeframe Selector */}
+        {/* Timeframe & Refresh */}
         <div className="flex items-center gap-2">
-          {wsConnected ? (
-            <Badge variant="outline" className="text-emerald-500 border-emerald-500/30">
-              <Wifi className="w-3 h-3 mr-1" />
-              Live
-            </Badge>
-          ) : (
-            <Badge variant="outline" className="text-yellow-500 border-yellow-500/30">
-              <WifiOff className="w-3 h-3 mr-1" />
-              Connecté
-            </Badge>
-          )}
+          <Badge variant="outline" className="text-emerald-500 border-emerald-500/30">
+            <Wifi className="w-3 h-3 mr-1" />
+            Live
+          </Badge>
+          
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => loadChartData(true)}
+            disabled={loading}
+            className="h-8 w-8"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          </Button>
           
           <div className="flex bg-black/20 rounded-lg p-1">
             {TIMEFRAMES.map(tf => (
@@ -547,7 +376,7 @@ export default function ChartPage() {
           <CardContent className="p-3">
             <p className="text-xs text-muted-foreground">Variation</p>
             <p className={`font-semibold ${priceChange >= 0 ? "text-emerald-500" : "text-red-500"}`}>
-              {priceChange >= 0 ? "+" : ""}{priceChange.toFixed(2)}%
+              {priceChange >= 0 ? "+" : ""}{priceChange?.toFixed(2) || "0.00"}%
             </p>
           </CardContent>
         </Card>
@@ -568,7 +397,8 @@ export default function ChartPage() {
 
       {/* Info */}
       <div className="text-xs text-muted-foreground text-center">
-        Données en temps réel via Binance • {selectedTimeframe === "15s" ? "Bougies agrégées toutes les 15 secondes" : `Intervalle: ${selectedTimeframe}`}
+        Données via CryptoCompare • Intervalle: {selectedTimeframe} • 
+        {lastUpdate && ` Dernière MAJ: ${lastUpdate.toLocaleTimeString("fr-FR")}`}
       </div>
     </div>
   );
