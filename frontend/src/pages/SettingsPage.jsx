@@ -37,7 +37,7 @@ const TRADING_LEVELS = [
   { 
     value: "intermediate", 
     label: "Intermédiaire", 
-    description: "J&apos;ai quelques bases",
+    description: "J'ai quelques bases",
     icon: TrendingUp,
     color: "text-yellow-500"
   },
