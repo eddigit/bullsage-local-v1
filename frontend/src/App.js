@@ -197,6 +197,8 @@ function App() {
               <Route path="admin/api-keys" element={<ApiKeysPage />} />
               <Route path="smart-invest" element={<SmartInvestPage />} />
               <Route path="auto-trading" element={<AutoTradingPage />} />
+              <Route path="wallet" element={<WalletPage />} />
+              <Route path="defi-scanner" element={<DeFiScannerPage />} />
             </Route>
           </Routes>
         </BrowserRouter>
