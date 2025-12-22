@@ -25,7 +25,8 @@ import {
   Home,
   User,
   MoreHorizontal,
-  Bot
+  Bot,
+  Search
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { ScrollArea } from "../components/ui/scroll-area";
@@ -55,6 +56,12 @@ const navigation = [
   { name: "Stratégies", href: "/strategies", icon: Target },
   { name: "Alertes", href: "/alerts", icon: Bell },
   { name: "Paramètres", href: "/settings", icon: Settings },
+];
+
+// DeFi navigation items
+const defiNavigation = [
+  { name: "Wallets DeFi", href: "/wallet", icon: Wallet, highlight: true },
+  { name: "Scanner DeFi", href: "/defi-scanner", icon: Search, highlight: true },
 ];
 
 // Smart Invest CTA - Special item
