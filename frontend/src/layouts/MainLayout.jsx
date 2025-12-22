@@ -320,6 +320,7 @@ export default function MainLayout() {
           <div className="p-4 border-t border-white/5">
             <div className="flex items-center gap-3 mb-4">
               <Avatar className="w-10 h-10">
+                <AvatarImage src={getAvatarUrl()} alt={user?.name} />
                 <AvatarFallback className="bg-secondary">
                   {getInitials(user?.name)}
                 </AvatarFallback>
