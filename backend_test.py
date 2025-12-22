@@ -308,6 +308,100 @@ class BullSageAPITester:
         
         return success
 
+    def test_defi_wallet_endpoints(self):
+        """Test DeFi wallet endpoints"""
+        if not self.admin_token:
+            self.log_result("DeFi Wallet Endpoints", False, "No admin token available")
+            return False
+            
+        headers = {'Authorization': f'Bearer {self.admin_token}'}
+        
+        # Test supported chains endpoint
+        success1, chains_response = self.run_test(
+            "Get Supported Chains",
+            "GET",
+            "wallet/supported-chains",
+            200,
+            headers=headers
+        )
+        
+        if success1 and isinstance(chains_response, list):
+            expected_chains = ['solana', 'ethereum', 'polygon', 'bsc']
+            found_chains = [chain.get('id') for chain in chains_response]
+            missing_chains = [chain for chain in expected_chains if chain not in found_chains]
+            
+            if missing_chains:
+                self.log_result("Supported Chains Content", False, f"Missing chains: {missing_chains}")
+            else:
+                self.log_result("Supported Chains Content", True, f"All 4 chains found: {found_chains}")
+        
+        # Test wallet list endpoint
+        success2, wallets_response = self.run_test(
+            "Get Wallet List",
+            "GET",
+            "wallet/list",
+            200,
+            headers=headers
+        )
+        
+        # Test wallet connect endpoint
+        success3, connect_response = self.run_test(
+            "Connect Wallet",
+            "POST",
+            "wallet/connect",
+            200,
+            data={
+                "wallet_type": "phantom",
+                "address": "7xKXtg2CW3UBuRT88WrVnjRRiAXzFkq4DmTdM2hkHNv",
+                "chain": "solana"
+            },
+            headers=headers
+        )
+        
+        return success1 and success2
+
+    def test_defi_scanner_endpoints(self):
+        """Test DeFi scanner endpoints"""
+        if not self.admin_token:
+            self.log_result("DeFi Scanner Endpoints", False, "No admin token available")
+            return False
+            
+        headers = {'Authorization': f'Bearer {self.admin_token}'}
+        
+        # Test DeFi scanner with different chains
+        chains_to_test = ['solana', 'ethereum']
+        
+        for chain in chains_to_test:
+            success, scanner_response = self.run_test(
+                f"DeFi Scanner - {chain.title()}",
+                "GET",
+                f"defi-scanner/scan?chain={chain}&limit=5&min_liquidity=1000&min_volume=500",
+                200,
+                headers=headers
+            )
+            
+            if success and isinstance(scanner_response, dict):
+                if 'tokens' in scanner_response:
+                    tokens = scanner_response['tokens']
+                    self.log_result(f"DeFi Scanner {chain} - Tokens", True, f"Found {len(tokens)} tokens")
+                    
+                    # Check token structure
+                    if tokens and len(tokens) > 0:
+                        token = tokens[0]
+                        required_fields = ['symbol', 'name', 'price_usd', 'volume_24h', 'liquidity', 'score', 'chain']
+                        missing_fields = [field for field in required_fields if field not in token]
+                        
+                        if missing_fields:
+                            self.log_result(f"DeFi Scanner {chain} - Token Fields", False, f"Missing fields: {missing_fields}")
+                        else:
+                            self.log_result(f"DeFi Scanner {chain} - Token Fields", True, "All required fields present")
+                else:
+                    self.log_result(f"DeFi Scanner {chain} - Response", False, "No 'tokens' field in response")
+            else:
+                self.log_result(f"DeFi Scanner {chain} - Response", False, "Invalid response format")
+        
+        return True
+
     def run_all_tests(self):
         """Run all tests"""
         print("🚀 Starting BULL SAGE Admin Panel & Avatar Upload Tests")
