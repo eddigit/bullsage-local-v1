@@ -602,69 +602,52 @@
   - agent: "main"
   - message: "Phase 1 complete: Admin Panel & Profile Picture. Backend tested via curl. Ready for frontend testing."
 
-## Test Session: 2025-12-22 04:10
-### Implementation: Wallet DeFi + Scanner DeFi
+## Test Session: 2025-12-22 15:55
+### Implementation: NASDAQ/S&P 500 Indices & Market News Integration
 
-**Backend Changes:**
-1. **Wallet Integration** (`/api/wallet/*`)
-   - `POST /api/wallet/connect` - Connect a wallet (Phantom/MetaMask)
-   - `GET /api/wallet/list` - List user's connected wallets
-   - `GET /api/wallet/{id}/balance` - Get wallet balance (real RPC calls)
-   - `DELETE /api/wallet/{id}` - Disconnect wallet
-   - `GET /api/wallet/supported-chains` - List supported blockchains
-   - Supported: Solana, Ethereum, Polygon, BSC
+**Changes Made:**
 
-2. **DeFi Scanner** (`/api/defi-scanner/*`)
-   - `GET /api/defi-scanner/scan` - Scan DEXes for trending tokens
-   - `GET /api/defi-scanner/trending/{chain}` - Get trending tokens per chain
-   - `GET /api/defi-scanner/token/{chain}/{address}` - Token details
-   - Sources: GeckoTerminal, DexScreener
-   - Scoring algorithm based on volume, liquidity, momentum
+1. **Backend Fixes**
+   - Fixed duplicate API key definitions that were overwriting the correct values
+   - Removed old `/api/market/news` endpoint (line 925) that returned wrong format
+   - Removed old `/api/market/economic-calendar` endpoint (line 970) that returned raw array
+   - Now using proper endpoints at lines 6397 and 6596 with correct formats
 
-**Frontend Changes:**
-1. **WalletPage.jsx** - Complete wallet management UI
-   - Connect wallet dialog (select chain, enter address)
-   - Display connected wallets with balance
-   - Copy address, open explorer, disconnect
-   - Info about supported chains (Phantom for Solana, MetaMask for EVM)
+2. **Frontend Route Added**
+   - Added `/market-news` route to `App.js`
+   - Added "Actualités" navigation link to `MainLayout.jsx` with Newspaper icon
 
-2. **DeFiScannerPage.jsx** - Complete DeFi token scanner
-   - Chain filter (Solana, Ethereum, BSC, Polygon)
-   - Volume/Liquidity minimum filters
-   - Score-based ranking (🔥 Hot, 📈 Trending, 👀 Watch)
-   - Real-time data from GeckoTerminal/DexScreener
+3. **API Endpoints Verified via curl:**
+   - ✅ `/api/market/news` - Returns 20+ news from Finnhub/Marketaux
+   - ✅ `/api/market/indices` - Returns NASDAQ 100 ($617.05), Russell 2000 ($250.79)
+   - ✅ `/api/market/economic-calendar` - Returns events array (currently empty)
 
-3. **Navigation Updates**
-   - Added DeFi section in sidebar (Wallets DeFi, Scanner DeFi)
-   - Added routes in App.js (/wallet, /defi-scanner)
-
-**Backend Tests via curl:**
-- ✅ `/api/wallet/supported-chains` returns 4 chains
-- ✅ `/api/defi-scanner/scan?chain=solana` returns 27 tokens
-
-**Files Created:**
-- `/app/backend/routes/wallet.py`
-- `/app/backend/routes/defi_scanner.py`
-- `/app/frontend/src/pages/WalletPage.jsx`
-- `/app/frontend/src/pages/DeFiScannerPage.jsx`
+4. **Frontend Pages Working:**
+   - ✅ `/market-news` - Displays indices cards + news grid + economic calendar tab
+   - ✅ Navigation shows "Actualités" link with highlight
+   - ✅ Dashboard and Intelligence pages load correctly
 
 **Files Modified:**
-- `/app/backend/server.py` - Added wallet and scanner endpoints
-- `/app/backend/routes/__init__.py` - Added new routers
-- `/app/frontend/src/App.js` - Added routes
-- `/app/frontend/src/layouts/MainLayout.jsx` - Added DeFi navigation
+- `/app/backend/server.py` - Removed duplicate endpoints, fixed API key definitions
+- `/app/frontend/src/App.js` - Added market-news route
+- `/app/frontend/src/layouts/MainLayout.jsx` - Added Actualités nav link
 
-### Credentials for Testing:
-- Admin: `bullsagetrader@gmail.com` / `$$Reussit888!!`
+### Credentials:
+- Email: bullsagetrader@gmail.com
+- Password: $$Reussit888!!
 
 ### Tasks to Test:
-1. DeFi Scanner page loads and displays tokens
-2. Filter tokens by chain
-3. Wallet page displays correctly
-4. Connect wallet dialog works
-5. Connect a test wallet address
-6. View wallet balance
+1. Market News page loads at /market-news
+2. Indices display correctly (NASDAQ, S&P, Dow, etc.)
+3. News articles show with images, titles, summaries
+4. Category filter works (General, Forex, Crypto)
+5. Search functionality in news
+6. Economic Calendar tab shows events
 
 ### test_plan:
   needs_retesting: true
   test_priority: "high_first"
+
+### agent_communication:
+  - agent: "main"
+  - message: "Completed NASDAQ/Indices/News integration. Backend endpoints fixed. Frontend route and navigation added. Ready for testing."
