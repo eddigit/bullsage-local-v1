@@ -55,6 +55,7 @@ const navigation = [
   { name: "Mes Signaux", href: "/signals", icon: Signal },
   { name: "Intelligence", href: "/intelligence", icon: Brain },
   { name: "Marchés", href: "/markets", icon: TrendingUp },
+  { name: "Actualités", href: "/market-news", icon: Newspaper, highlight: true },
   { name: "Assistant IA", href: "/assistant", icon: MessageCircle },
   { name: "Paper Trading", href: "/paper-trading", icon: Wallet },
   { name: "Stratégies", href: "/strategies", icon: Target },
