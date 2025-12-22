@@ -6379,7 +6379,178 @@ async def get_chart_ticker(symbol: str):
     
     raise HTTPException(status_code=503, detail="Erreur de récupération du ticker")
 
+# ============== NEWSLETTER ADMIN ==============
+
+class SMTPConfig(BaseModel):
+    host: str = "smtp.gmail.com"
+    port: int = 587
+    username: str
+    password: str
+    from_email: Optional[str] = None
+    enabled: bool = True
+    send_time: str = "09:00"  # Format HH:MM
+
+@api_router.get("/admin/newsletter/config")
+async def get_newsletter_config(admin: dict = Depends(get_admin_user)):
+    """Get current newsletter/SMTP configuration"""
+    config = await db.settings.find_one({"type": "smtp_config"}, {"_id": 0})
+    if config:
+        # Mask password
+        if "password" in config:
+            config["password"] = "••••••••" if config["password"] else ""
+    return config or {"enabled": False, "configured": False}
+
+@api_router.post("/admin/newsletter/config")
+async def save_newsletter_config(
+    config: SMTPConfig,
+    admin: dict = Depends(get_admin_user)
+):
+    """Save newsletter/SMTP configuration"""
+    config_dict = config.dict()
+    config_dict["type"] = "smtp_config"
+    config_dict["updated_at"] = datetime.now(timezone.utc).isoformat()
+    config_dict["updated_by"] = admin["id"]
+    
+    # Don't overwrite password if it's masked
+    if config.password == "••••••••":
+        existing = await db.settings.find_one({"type": "smtp_config"})
+        if existing:
+            config_dict["password"] = existing.get("password", "")
+    
+    await db.settings.update_one(
+        {"type": "smtp_config"},
+        {"$set": config_dict},
+        upsert=True
+    )
+    
+    # Update scheduler if time changed
+    try:
+        hour, minute = config.send_time.split(":")
+        scheduler.reschedule_job(
+            "daily_newsletter",
+            trigger=CronTrigger(hour=int(hour), minute=int(minute), timezone="Europe/Paris")
+        )
+        logger.info(f"Newsletter rescheduled to {config.send_time}")
+    except Exception as e:
+        logger.warning(f"Could not reschedule newsletter: {e}")
+    
+    return {"message": "Configuration sauvegardée", "send_time": config.send_time}
+
+@api_router.post("/admin/newsletter/test")
+async def send_test_newsletter(
+    email: Optional[str] = None,
+    admin: dict = Depends(get_admin_user)
+):
+    """Send a test newsletter to admin email"""
+    from services.newsletter import get_newsletter_service
+    
+    service = get_newsletter_service(db)
+    await service.load_smtp_config()
+    
+    if not service.smtp_config:
+        raise HTTPException(status_code=400, detail="SMTP non configuré")
+    
+    # Generate newsletter content
+    market_data = await service.get_market_data()
+    trending = await service.get_trending_tokens()
+    top_trades = await service.get_top_traders_activity()
+    analysis = await service.generate_ai_analysis(market_data)
+    
+    html_content = service.generate_html_newsletter(
+        market_data, analysis, trending, top_trades
+    )
+    
+    # Send to specified email or admin email
+    target_email = email or admin.get("email")
+    success = await service.send_newsletter(target_email, html_content)
+    
+    if success:
+        return {"message": f"Newsletter de test envoyée à {target_email}"}
+    else:
+        raise HTTPException(status_code=500, detail="Échec de l'envoi. Vérifiez la configuration SMTP.")
+
+@api_router.post("/admin/newsletter/send-now")
+async def send_newsletter_now(admin: dict = Depends(get_admin_user)):
+    """Manually trigger newsletter send to all subscribers"""
+    from services.newsletter import get_newsletter_service
+    
+    service = get_newsletter_service(db)
+    result = await service.send_daily_newsletter()
+    
+    return {
+        "message": "Newsletter envoyée",
+        "sent": result.get("sent", 0),
+        "failed": result.get("failed", 0),
+        "total": result.get("total", 0)
+    }
+
+@api_router.get("/admin/newsletter/logs")
+async def get_newsletter_logs(
+    limit: int = 20,
+    admin: dict = Depends(get_admin_user)
+):
+    """Get newsletter send history"""
+    logs = await db.newsletter_logs.find(
+        {},
+        {"_id": 0}
+    ).sort("sent_at", -1).limit(limit).to_list(limit)
+    return logs
+
+@api_router.get("/admin/newsletter/subscribers")
+async def get_newsletter_subscribers(admin: dict = Depends(get_admin_user)):
+    """Get count of newsletter subscribers"""
+    total_users = await db.users.count_documents({})
+    subscribed = await db.users.count_documents({"newsletter_subscribed": {"$ne": False}})
+    unsubscribed = await db.users.count_documents({"newsletter_subscribed": False})
+    
+    return {
+        "total_users": total_users,
+        "subscribed": subscribed,
+        "unsubscribed": unsubscribed
+    }
+
+# User newsletter subscription
+@api_router.post("/settings/newsletter")
+async def update_newsletter_subscription(
+    subscribed: bool,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update user's newsletter subscription status"""
+    await db.users.update_one(
+        {"id": current_user["id"]},
+        {"$set": {"newsletter_subscribed": subscribed}}
+    )
+    return {"message": "Préférences mises à jour", "subscribed": subscribed}
+
 # ============== STARTUP EVENTS ==============
+
+async def run_daily_newsletter():
+    """Scheduled job to send daily newsletter"""
+    from services.newsletter import get_newsletter_service
+    logger.info("Running scheduled daily newsletter...")
+    service = get_newsletter_service(db)
+    await service.send_daily_newsletter()
+
+@app.on_event("startup")
+async def start_scheduler():
+    """Start the newsletter scheduler"""
+    # Load send time from config
+    config = await db.settings.find_one({"type": "smtp_config"})
+    hour, minute = 9, 0  # Default 9:00
+    if config and config.get("send_time"):
+        try:
+            hour, minute = map(int, config["send_time"].split(":"))
+        except:
+            pass
+    
+    scheduler.add_job(
+        run_daily_newsletter,
+        CronTrigger(hour=hour, minute=minute, timezone="Europe/Paris"),
+        id="daily_newsletter",
+        replace_existing=True
+    )
+    scheduler.start()
+    logger.info(f"Newsletter scheduler started - sends at {hour:02d}:{minute:02d} Europe/Paris")
 
 @app.on_event("startup")
 async def create_admin_users():
