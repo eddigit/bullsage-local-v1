@@ -269,6 +269,30 @@ export default function MainLayout() {
                   ))}
                 </>
               )}
+              
+              {/* DeFi Section */}
+              <div className="pt-4 mt-4 border-t border-white/5">
+                <p className="px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                  DeFi
+                </p>
+                {defiNavigation.map((item) => (
+                  <NavLink
+                    key={item.name}
+                    to={item.href}
+                    className={({ isActive }) => `
+                      flex items-center gap-3 px-4 py-3 rounded-xl min-h-[48px] transition-all
+                      ${isActive 
+                        ? "bg-primary/10 text-primary" 
+                        : "hover:bg-white/5 text-muted-foreground hover:text-foreground"
+                      }
+                    `}
+                    data-testid={`nav-${item.href.slice(1)}`}
+                  >
+                    <item.icon className="w-5 h-5" />
+                    <span className="font-medium">{item.name}</span>
+                  </NavLink>
+                ))}
+              </div>
             </nav>
           </ScrollArea>
 
