@@ -404,7 +404,7 @@ class BullSageAPITester:
 
     def run_all_tests(self):
         """Run all tests"""
-        print("🚀 Starting BULL SAGE Admin Panel & Avatar Upload Tests")
+        print("🚀 Starting BULL SAGE Admin Panel & DeFi Features Tests")
         print("=" * 60)
         
         # Authentication tests
@@ -425,6 +425,11 @@ class BullSageAPITester:
         
         # Settings tests
         self.test_settings_endpoints()
+        
+        # DeFi functionality tests
+        print("\n🔗 Testing DeFi Features...")
+        self.test_defi_wallet_endpoints()
+        self.test_defi_scanner_endpoints()
         
         # Security tests
         if regular_login_success:
