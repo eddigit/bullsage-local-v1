@@ -188,6 +188,13 @@ export default function MainLayout() {
     return name?.split(" ").map(n => n[0]).join("").toUpperCase() || "U";
   };
 
+  const getAvatarUrl = () => {
+    if (user?.avatar) {
+      return `${BACKEND_URL}${user.avatar}`;
+    }
+    return null;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* ===================== MOBILE HEADER ===================== */}
@@ -213,6 +220,7 @@ export default function MainLayout() {
             </Button>
           )}
           <Avatar className="w-8 h-8">
+            <AvatarImage src={getAvatarUrl()} alt={user?.name} />
             <AvatarFallback className="bg-secondary text-sm">
               {getInitials(user?.name)}
             </AvatarFallback>
