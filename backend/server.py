@@ -922,22 +922,7 @@ Maximum 4-5 news les plus importantes. Sois TRÈS concis."""
             "source": "Finnhub (raw)"
         }
 
-@api_router.get("/market/news")
-async def get_market_news(category: str = "general", current_user: dict = Depends(get_current_user)):
-    """Get market news from Finnhub"""
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                "https://finnhub.io/api/v1/news",
-                params={"category": category, "token": FINNHUB_API_KEY},
-                timeout=30.0
-            )
-            if response.status_code == 200:
-                return response.json()[:20]  # Limit to 20 news
-            return []
-    except Exception as e:
-        logger.error(f"Error fetching news: {e}")
-        return []
+# Note: /market/news endpoint is defined later in the file with better format
 
 @api_router.get("/market/news/{symbol}")
 async def get_symbol_news(symbol: str, current_user: dict = Depends(get_current_user)):
