@@ -6285,7 +6285,7 @@ async def get_chart_klines(
     
     # Map interval to CryptoCompare format
     interval_map = {
-        "1s": ("histominute", 1),  # Will aggregate
+        "1s": ("histominute", 1),
         "1m": ("histominute", 1),
         "5m": ("histominute", 5),
         "15m": ("histominute", 15),
@@ -6312,6 +6312,11 @@ async def get_chart_klines(
             if response.status_code == 200:
                 data = response.json()
                 if data.get("Response") == "Success":
+                    # Data can be a list or dict with "Data" key
+                    raw_data = data.get("Data", [])
+                    if isinstance(raw_data, dict):
+                        raw_data = raw_data.get("Data", [])
+                    
                     candles = [
                         {
                             "time": int(d["time"]),
@@ -6321,12 +6326,16 @@ async def get_chart_klines(
                             "close": float(d["close"]),
                             "volume": float(d.get("volumefrom", 0))
                         }
-                        for d in data.get("Data", {}).get("Data", [])
-                        if d.get("open") > 0  # Filter out empty candles
+                        for d in raw_data
+                        if d.get("open", 0) > 0
                     ]
                     return {"candles": candles, "symbol": symbol}
                 else:
                     logger.error(f"CryptoCompare error: {data.get('Message')}")
+    except Exception as e:
+        logger.error(f"Chart klines error: {e}")
+    
+    raise HTTPException(status_code=503, detail="Erreur de récupération des données")
     except Exception as e:
         logger.error(f"Chart klines error: {e}")
     
