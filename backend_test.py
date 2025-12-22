@@ -82,10 +82,10 @@ class BullSageMarketNewsTester:
             self.log_result(name, False, f"Error: {str(e)}")
             return False, {}
 
-    def test_admin_login(self):
-        """Test admin login with bullsagetrader@gmail.com"""
+    def test_login(self):
+        """Test login with provided credentials"""
         success, response = self.run_test(
-            "Admin Login",
+            "User Login",
             "POST",
             "auth/login",
             200,
@@ -96,343 +96,222 @@ class BullSageMarketNewsTester:
         )
         
         if success and 'access_token' in response:
-            self.admin_token = response['access_token']
+            self.token = response['access_token']
             user_data = response.get('user', {})
-            if user_data.get('is_admin'):
-                self.log_result("Admin Status Check", True, "User has admin privileges")
-                return True
-            else:
-                self.log_result("Admin Status Check", False, "User does not have admin privileges")
-                return False
-        return False
-
-    def test_regular_login(self):
-        """Test login with regular admin account"""
-        success, response = self.run_test(
-            "Regular Admin Login",
-            "POST",
-            "auth/login",
-            200,
-            data={
-                "email": "coachdigitalparis@gmail.com",
-                "password": "$$Reussite888!!"
-            }
-        )
-        
-        if success and 'access_token' in response:
-            self.regular_token = response['access_token']
+            self.log_result("Login Success", True, f"Logged in as {user_data.get('name', 'Unknown')}")
             return True
         return False
 
-    def test_admin_stats(self):
-        """Test admin stats endpoint"""
-        if not self.admin_token:
-            self.log_result("Admin Stats", False, "No admin token available")
+    def test_market_news_endpoint(self):
+        """Test market news endpoint"""
+        if not self.token:
+            self.log_result("Market News", False, "No token available")
             return False
             
-        headers = {'Authorization': f'Bearer {self.admin_token}'}
+        headers = {'Authorization': f'Bearer {self.token}'}
         success, response = self.run_test(
-            "Admin Stats",
+            "Market News API",
             "GET",
-            "admin/stats",
+            "market/news?category=general&limit=20",
             200,
             headers=headers
         )
         
         if success:
-            # Check if stats contain expected fields
-            expected_fields = ['users', 'paper_trades', 'ai_chats', 'alerts', 'strategies']
-            missing_fields = [field for field in expected_fields if field not in response]
-            if missing_fields:
-                self.log_result("Admin Stats Fields", False, f"Missing fields: {missing_fields}")
-            else:
-                self.log_result("Admin Stats Fields", True, "All expected fields present")
-        
-        return success
-
-    def test_admin_users_list(self):
-        """Test admin users list endpoint"""
-        if not self.admin_token:
-            self.log_result("Admin Users List", False, "No admin token available")
-            return False
-            
-        headers = {'Authorization': f'Bearer {self.admin_token}'}
-        success, response = self.run_test(
-            "Admin Users List",
-            "GET",
-            "admin/users",
-            200,
-            headers=headers
-        )
-        
-        if success and isinstance(response, list):
-            self.log_result("Admin Users List Format", True, f"Found {len(response)} users")
-            
-            # Check if admin user is in the list
-            admin_found = any(user.get('email') == 'bullsagetrader@gmail.com' for user in response)
-            if admin_found:
-                self.log_result("Admin User in List", True, "Admin user found in users list")
-            else:
-                self.log_result("Admin User in List", False, "Admin user not found in users list")
-        
-        return success
-
-    def test_user_promotion(self):
-        """Test promoting/demoting users to admin"""
-        if not self.admin_token:
-            self.log_result("User Promotion", False, "No admin token available")
-            return False
-            
-        headers = {'Authorization': f'Bearer {self.admin_token}'}
-        
-        # First get users list to find a non-admin user
-        success, users = self.run_test(
-            "Get Users for Promotion Test",
-            "GET",
-            "admin/users",
-            200,
-            headers=headers
-        )
-        
-        if not success:
-            return False
-            
-        # Find a non-admin user (not the current admin)
-        target_user = None
-        for user in users:
-            if user.get('email') != 'bullsagetrader@gmail.com' and not user.get('is_admin', False):
-                target_user = user
-                break
-        
-        if not target_user:
-            self.log_result("User Promotion", False, "No suitable user found for promotion test")
-            return False
-        
-        user_id = target_user['id']
-        
-        # Test promoting to admin
-        success, response = self.run_test(
-            "Promote User to Admin",
-            "PUT",
-            f"admin/users/{user_id}/admin?is_admin=true",
-            200,
-            headers=headers
-        )
-        
-        if success:
-            # Test demoting from admin
-            success2, response2 = self.run_test(
-                "Demote User from Admin",
-                "PUT",
-                f"admin/users/{user_id}/admin?is_admin=false",
-                200,
-                headers=headers
-            )
-            return success2
-        
-        return success
-
-    def test_avatar_upload(self):
-        """Test avatar upload functionality"""
-        if not self.admin_token:
-            self.log_result("Avatar Upload", False, "No admin token available")
-            return False
-        
-        # Create a simple test image file
-        test_image_content = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\tpHYs\x00\x00\x0b\x13\x00\x00\x0b\x13\x01\x00\x9a\x9c\x18\x00\x00\x00\nIDATx\x9cc\xf8\x00\x00\x00\x01\x00\x01\x00\x00\x00\x00IEND\xaeB`\x82'
-        
-        headers = {'Authorization': f'Bearer {self.admin_token}'}
-        files = {'file': ('test_avatar.png', test_image_content, 'image/png')}
-        
-        success, response = self.run_test(
-            "Avatar Upload",
-            "POST",
-            "profile/avatar",
-            200,
-            headers=headers,
-            files=files
-        )
-        
-        if success and 'avatar' in response:
-            avatar_path = response['avatar']
-            self.log_result("Avatar Path Check", True, f"Avatar path: {avatar_path}")
-            
-            # Test avatar deletion
-            success2, response2 = self.run_test(
-                "Avatar Delete",
-                "DELETE",
-                "profile/avatar",
-                200,
-                headers=headers
-            )
-            return success2
-        
-        return success
-
-    def test_settings_endpoints(self):
-        """Test settings related endpoints"""
-        if not self.admin_token:
-            self.log_result("Settings Endpoints", False, "No admin token available")
-            return False
-            
-        headers = {'Authorization': f'Bearer {self.admin_token}'}
-        
-        # Test trading level update
-        success, response = self.run_test(
-            "Update Trading Level",
-            "PUT",
-            "settings/trading-level?level=advanced",
-            200,
-            headers=headers
-        )
-        
-        return success
-
-    def test_non_admin_access(self):
-        """Test that non-admin users cannot access admin endpoints"""
-        if not self.regular_token:
-            self.log_result("Non-Admin Access Test", False, "No regular token available")
-            return False
-            
-        headers = {'Authorization': f'Bearer {self.regular_token}'}
-        
-        # Try to access admin stats (should fail)
-        success, response = self.run_test(
-            "Non-Admin Stats Access",
-            "GET",
-            "admin/stats",
-            403,  # Expecting forbidden
-            headers=headers
-        )
-        
-        return success
-
-    def test_defi_wallet_endpoints(self):
-        """Test DeFi wallet endpoints"""
-        if not self.admin_token:
-            self.log_result("DeFi Wallet Endpoints", False, "No admin token available")
-            return False
-            
-        headers = {'Authorization': f'Bearer {self.admin_token}'}
-        
-        # Test supported chains endpoint
-        success1, chains_response = self.run_test(
-            "Get Supported Chains",
-            "GET",
-            "wallet/supported-chains",
-            200,
-            headers=headers
-        )
-        
-        if success1 and isinstance(chains_response, list):
-            expected_chains = ['solana', 'ethereum', 'polygon', 'bsc']
-            found_chains = [chain.get('id') for chain in chains_response]
-            missing_chains = [chain for chain in expected_chains if chain not in found_chains]
-            
-            if missing_chains:
-                self.log_result("Supported Chains Content", False, f"Missing chains: {missing_chains}")
-            else:
-                self.log_result("Supported Chains Content", True, f"All 4 chains found: {found_chains}")
-        
-        # Test wallet list endpoint
-        success2, wallets_response = self.run_test(
-            "Get Wallet List",
-            "GET",
-            "wallet/list",
-            200,
-            headers=headers
-        )
-        
-        # Test wallet connect endpoint
-        success3, connect_response = self.run_test(
-            "Connect Wallet",
-            "POST",
-            "wallet/connect",
-            200,
-            data={
-                "wallet_type": "phantom",
-                "address": "7xKXtg2CW3UBuRT88WrVnjRRiAXzFkq4DmTdM2hkHNv",
-                "chain": "solana"
-            },
-            headers=headers
-        )
-        
-        return success1 and success2
-
-    def test_defi_scanner_endpoints(self):
-        """Test DeFi scanner endpoints"""
-        if not self.admin_token:
-            self.log_result("DeFi Scanner Endpoints", False, "No admin token available")
-            return False
-            
-        headers = {'Authorization': f'Bearer {self.admin_token}'}
-        
-        # Test DeFi scanner with different chains
-        chains_to_test = ['solana', 'ethereum']
-        
-        for chain in chains_to_test:
-            success, scanner_response = self.run_test(
-                f"DeFi Scanner - {chain.title()}",
-                "GET",
-                f"defi-scanner/scan?chain={chain}&limit=5&min_liquidity=1000&min_volume=500",
-                200,
-                headers=headers
-            )
-            
-            if success and isinstance(scanner_response, dict):
-                if 'tokens' in scanner_response:
-                    tokens = scanner_response['tokens']
-                    self.log_result(f"DeFi Scanner {chain} - Tokens", True, f"Found {len(tokens)} tokens")
+            # Check response structure
+            if 'news' in response and isinstance(response['news'], list):
+                news_count = len(response['news'])
+                self.log_result("Market News Structure", True, f"Found {news_count} news articles")
+                
+                # Check first news item structure
+                if news_count > 0:
+                    news_item = response['news'][0]
+                    required_fields = ['title', 'summary', 'url', 'source', 'published_at']
+                    missing_fields = [field for field in required_fields if field not in news_item]
                     
-                    # Check token structure
-                    if tokens and len(tokens) > 0:
-                        token = tokens[0]
-                        required_fields = ['symbol', 'name', 'price_usd', 'volume_24h', 'liquidity', 'score', 'chain']
-                        missing_fields = [field for field in required_fields if field not in token]
-                        
-                        if missing_fields:
-                            self.log_result(f"DeFi Scanner {chain} - Token Fields", False, f"Missing fields: {missing_fields}")
-                        else:
-                            self.log_result(f"DeFi Scanner {chain} - Token Fields", True, "All required fields present")
-                else:
-                    self.log_result(f"DeFi Scanner {chain} - Response", False, "No 'tokens' field in response")
+                    if missing_fields:
+                        self.log_result("News Item Structure", False, f"Missing fields: {missing_fields}")
+                    else:
+                        self.log_result("News Item Structure", True, "All required fields present")
+                        # Log sample news
+                        print(f"   Sample: {news_item.get('title', '')[:50]}...")
             else:
-                self.log_result(f"DeFi Scanner {chain} - Response", False, "Invalid response format")
+                self.log_result("Market News Structure", False, "Invalid response structure")
+        
+        return success
+
+    def test_market_indices_endpoint(self):
+        """Test market indices endpoint"""
+        if not self.token:
+            self.log_result("Market Indices", False, "No token available")
+            return False
+            
+        headers = {'Authorization': f'Bearer {self.token}'}
+        success, response = self.run_test(
+            "Market Indices API",
+            "GET",
+            "market/indices",
+            200,
+            headers=headers
+        )
+        
+        if success:
+            # Check response structure
+            if 'indices' in response and isinstance(response['indices'], list):
+                indices_count = len(response['indices'])
+                self.log_result("Market Indices Structure", True, f"Found {indices_count} indices")
+                
+                # Check for expected indices
+                expected_symbols = ['QQQ', 'SPY', 'DIA', 'IWM', 'VIX']
+                found_symbols = [idx.get('symbol') for idx in response['indices']]
+                
+                for symbol in expected_symbols:
+                    if symbol in found_symbols:
+                        idx_data = next((idx for idx in response['indices'] if idx.get('symbol') == symbol), None)
+                        if idx_data:
+                            price = idx_data.get('price', 0)
+                            change = idx_data.get('change_percent', 0)
+                            self.log_result(f"Index {symbol}", True, f"Price: ${price:.2f}, Change: {change:.2f}%")
+                    else:
+                        self.log_result(f"Index {symbol}", False, f"Missing {symbol} index")
+                
+                # Check first index structure
+                if indices_count > 0:
+                    index_item = response['indices'][0]
+                    required_fields = ['symbol', 'name', 'price', 'change', 'change_percent']
+                    missing_fields = [field for field in required_fields if field not in index_item]
+                    
+                    if missing_fields:
+                        self.log_result("Index Item Structure", False, f"Missing fields: {missing_fields}")
+                    else:
+                        self.log_result("Index Item Structure", True, "All required fields present")
+            else:
+                self.log_result("Market Indices Structure", False, "Invalid response structure")
+        
+        return success
+
+    def test_economic_calendar_endpoint(self):
+        """Test economic calendar endpoint"""
+        if not self.token:
+            self.log_result("Economic Calendar", False, "No token available")
+            return False
+            
+        headers = {'Authorization': f'Bearer {self.token}'}
+        success, response = self.run_test(
+            "Economic Calendar API",
+            "GET",
+            "market/economic-calendar",
+            200,
+            headers=headers
+        )
+        
+        if success:
+            # Check response structure
+            if 'events' in response and isinstance(response['events'], list):
+                events_count = len(response['events'])
+                self.log_result("Economic Calendar Structure", True, f"Found {events_count} events")
+                
+                # Check event structure if events exist
+                if events_count > 0:
+                    event_item = response['events'][0]
+                    expected_fields = ['event', 'time', 'country', 'impact']
+                    missing_fields = [field for field in expected_fields if field not in event_item]
+                    
+                    if missing_fields:
+                        self.log_result("Event Item Structure", False, f"Missing fields: {missing_fields}")
+                    else:
+                        self.log_result("Event Item Structure", True, "All required fields present")
+                        print(f"   Sample: {event_item.get('event', '')[:50]}...")
+                else:
+                    self.log_result("Economic Calendar Content", True, "No events scheduled (normal)")
+            else:
+                self.log_result("Economic Calendar Structure", False, "Invalid response structure")
+        
+        return success
+
+    def test_news_categories(self):
+        """Test different news categories"""
+        if not self.token:
+            self.log_result("News Categories", False, "No token available")
+            return False
+            
+        headers = {'Authorization': f'Bearer {self.token}'}
+        categories = ['general', 'forex', 'crypto', 'merger']
+        
+        for category in categories:
+            success, response = self.run_test(
+                f"News Category - {category.title()}",
+                "GET",
+                f"market/news?category={category}&limit=5",
+                200,
+                headers=headers
+            )
+            
+            if success and 'news' in response:
+                news_count = len(response['news'])
+                self.log_result(f"Category {category} Content", True, f"Found {news_count} articles")
+            else:
+                self.log_result(f"Category {category} Content", False, "Failed to fetch category news")
+        
+        return True
+
+    def test_market_endpoints_performance(self):
+        """Test market endpoints for performance and reliability"""
+        if not self.token:
+            self.log_result("Performance Test", False, "No token available")
+            return False
+            
+        headers = {'Authorization': f'Bearer {self.token}'}
+        
+        # Test multiple calls to check caching and rate limiting
+        endpoints = [
+            ("market/news?limit=5", "News Performance"),
+            ("market/indices", "Indices Performance"),
+            ("market/economic-calendar", "Calendar Performance")
+        ]
+        
+        for endpoint, test_name in endpoints:
+            start_time = datetime.now()
+            success, response = self.run_test(
+                test_name,
+                "GET",
+                endpoint,
+                200,
+                headers=headers
+            )
+            end_time = datetime.now()
+            
+            if success:
+                duration = (end_time - start_time).total_seconds()
+                if duration < 5.0:  # Should respond within 5 seconds
+                    self.log_result(f"{test_name} Speed", True, f"Response time: {duration:.2f}s")
+                else:
+                    self.log_result(f"{test_name} Speed", False, f"Slow response: {duration:.2f}s")
         
         return True
 
     def run_all_tests(self):
-        """Run all tests"""
-        print("🚀 Starting BULL SAGE Admin Panel & DeFi Features Tests")
+        """Run all Market News tests"""
+        print("🚀 Starting BULL SAGE Market News & Indices Tests")
         print("=" * 60)
         
-        # Authentication tests
-        admin_login_success = self.test_admin_login()
-        regular_login_success = self.test_regular_login()
+        # Authentication test
+        login_success = self.test_login()
         
-        if not admin_login_success:
-            print("\n❌ Admin login failed - cannot proceed with admin tests")
+        if not login_success:
+            print("\n❌ Login failed - cannot proceed with market tests")
             return self.get_summary()
         
-        # Admin functionality tests
-        self.test_admin_stats()
-        self.test_admin_users_list()
-        self.test_user_promotion()
+        # Market News functionality tests
+        print("\n📰 Testing Market News Features...")
+        self.test_market_news_endpoint()
+        self.test_market_indices_endpoint()
+        self.test_economic_calendar_endpoint()
+        self.test_news_categories()
         
-        # Avatar upload tests
-        self.test_avatar_upload()
-        
-        # Settings tests
-        self.test_settings_endpoints()
-        
-        # DeFi functionality tests
-        print("\n🔗 Testing DeFi Features...")
-        self.test_defi_wallet_endpoints()
-        self.test_defi_scanner_endpoints()
-        
-        # Security tests
-        if regular_login_success:
-            self.test_non_admin_access()
+        # Performance tests
+        print("\n⚡ Testing Performance...")
+        self.test_market_endpoints_performance()
         
         return self.get_summary()
 
@@ -452,7 +331,7 @@ class BullSageMarketNewsTester:
             return 1
 
 def main():
-    tester = BullSageAPITester()
+    tester = BullSageMarketNewsTester()
     return tester.run_all_tests()
 
 if __name__ == "__main__":
