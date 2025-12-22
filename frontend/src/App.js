@@ -28,6 +28,7 @@ import AutoTradingPage from "./pages/AutoTradingPage";
 import WalletPage from "./pages/WalletPage";
 import DeFiScannerPage from "./pages/DeFiScannerPage";
 import ChartPage from "./pages/ChartPage";
+import NewsletterAdminPage from "./pages/NewsletterAdminPage";
 
 // Layout
 import MainLayout from "./layouts/MainLayout";
