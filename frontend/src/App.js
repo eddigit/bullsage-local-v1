@@ -27,6 +27,7 @@ import SmartInvestPage from "./pages/SmartInvestPage";
 import AutoTradingPage from "./pages/AutoTradingPage";
 import WalletPage from "./pages/WalletPage";
 import DeFiScannerPage from "./pages/DeFiScannerPage";
+import ChartPage from "./pages/ChartPage";
 
 // Layout
 import MainLayout from "./layouts/MainLayout";
