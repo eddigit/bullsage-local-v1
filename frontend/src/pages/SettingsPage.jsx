@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useAuth, API } from "../App";
 import axios from "axios";
 import { toast } from "sonner";
@@ -6,13 +6,14 @@ import {
   User,
   Shield,
   Bell,
-  Palette,
+  Camera,
   Save,
-  ChevronRight,
+  Trash2,
   GraduationCap,
   TrendingUp,
   Zap,
-  AlertTriangle
+  AlertTriangle,
+  Loader2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -20,14 +21,10 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Badge } from "../components/ui/badge";
 import { Separator } from "../components/ui/separator";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../components/ui/select";
+import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
 import { Switch } from "../components/ui/switch";
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
 const TRADING_LEVELS = [
   { 
@@ -40,7 +37,7 @@ const TRADING_LEVELS = [
   { 
     value: "intermediate", 
     label: "Intermédiaire", 
-    description: "J'ai quelques bases",
+    description: "J&apos;ai quelques bases",
     icon: TrendingUp,
     color: "text-yellow-500"
   },
@@ -57,17 +54,81 @@ export default function SettingsPage() {
   const { user, updateUser } = useAuth();
   const [tradingLevel, setTradingLevel] = useState(user?.trading_level || "beginner");
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const fileInputRef = useRef(null);
   
   // Notification preferences (local state for demo)
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [priceAlerts, setPriceAlerts] = useState(true);
   const [tradingSignals, setTradingSignals] = useState(true);
 
+  const getInitials = (name) => {
+    return name?.split(" ").map(n => n[0]).join("").toUpperCase() || "U";
+  };
+
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (!validTypes.includes(file.type)) {
+      toast.error("Format non supporté. Utilisez JPG, PNG, GIF ou WebP");
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Fichier trop volumineux (max 5MB)");
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await axios.post(`${API}/profile/avatar`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      // Update user context with new avatar
+      const avatarUrl = `${BACKEND_URL}${response.data.avatar}`;
+      updateUser({ ...user, avatar: response.data.avatar });
+      toast.success("Photo de profil mise à jour !");
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast.error(error.response?.data?.detail || "Erreur lors de l&apos;upload");
+    } finally {
+      setUploadingAvatar(false);
+      // Reset input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleDeleteAvatar = async () => {
+    try {
+      await axios.delete(`${API}/profile/avatar`);
+      updateUser({ ...user, avatar: null });
+      toast.success("Photo de profil supprimée");
+    } catch (error) {
+      toast.error("Erreur lors de la suppression");
+    }
+  };
+
   const handleSaveTradingLevel = async () => {
     setSaving(true);
     try {
       await axios.put(`${API}/settings/trading-level?level=${tradingLevel}`);
-      updateUser({ trading_level: tradingLevel });
+      updateUser({ ...user, trading_level: tradingLevel });
       toast.success("Niveau de trading mis à jour");
     } catch (error) {
       toast.error("Erreur lors de la sauvegarde");
@@ -76,7 +137,13 @@ export default function SettingsPage() {
     }
   };
 
-  const currentLevel = TRADING_LEVELS.find(l => l.value === tradingLevel);
+  // Get avatar URL
+  const getAvatarUrl = () => {
+    if (user?.avatar) {
+      return `${BACKEND_URL}${user.avatar}`;
+    }
+    return null;
+  };
 
   return (
     <div className="space-y-6 max-w-3xl" data-testid="settings-page">
@@ -88,7 +155,7 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      {/* Profile Section */}
+      {/* Profile Section with Avatar */}
       <Card className="glass border-white/5">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
@@ -97,7 +164,75 @@ export default function SettingsPage() {
           </CardTitle>
           <CardDescription>Informations de votre compte</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
+          {/* Avatar Section */}
+          <div className="flex flex-col sm:flex-row items-center gap-6">
+            <div className="relative group">
+              <Avatar className="w-24 h-24 border-2 border-white/10">
+                <AvatarImage src={getAvatarUrl()} alt={user?.name} />
+                <AvatarFallback className="bg-secondary text-2xl">
+                  {getInitials(user?.name)}
+                </AvatarFallback>
+              </Avatar>
+              
+              {/* Upload overlay */}
+              <button
+                onClick={handleAvatarClick}
+                disabled={uploadingAvatar}
+                className="absolute inset-0 bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
+              >
+                {uploadingAvatar ? (
+                  <Loader2 className="w-6 h-6 text-white animate-spin" />
+                ) : (
+                  <Camera className="w-6 h-6 text-white" />
+                )}
+              </button>
+              
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+            </div>
+
+            <div className="flex-1 text-center sm:text-left">
+              <h3 className="font-semibold text-lg">{user?.name}</h3>
+              <p className="text-muted-foreground text-sm">{user?.email}</p>
+              <div className="flex flex-wrap gap-2 mt-3 justify-center sm:justify-start">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAvatarClick}
+                  disabled={uploadingAvatar}
+                  className="border-white/10 hover:bg-white/5"
+                >
+                  {uploadingAvatar ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Camera className="w-4 h-4 mr-2" />
+                  )}
+                  Changer la photo
+                </Button>
+                {user?.avatar && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleDeleteAvatar}
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Supprimer
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <Separator className="bg-white/5" />
+
+          {/* User Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Nom</Label>
