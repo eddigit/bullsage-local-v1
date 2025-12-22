@@ -29,7 +29,9 @@ import {
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { ScrollArea } from "../components/ui/scroll-area";
-import { Avatar, AvatarFallback } from "../components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 import {
   Sheet,
   SheetContent,
