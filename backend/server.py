@@ -6336,10 +6336,6 @@ async def get_chart_klines(
         logger.error(f"Chart klines error: {e}")
     
     raise HTTPException(status_code=503, detail="Erreur de récupération des données")
-    except Exception as e:
-        logger.error(f"Chart klines error: {e}")
-    
-    raise HTTPException(status_code=503, detail="Erreur de récupération des données")
 
 @api_router.get("/chart/ticker/{symbol}")
 async def get_chart_ticker(symbol: str):
