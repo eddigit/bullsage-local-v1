@@ -5875,6 +5875,379 @@ async def check_auto_trading_exits(current_user: dict = Depends(get_current_user
         logger.error(f"Check exits error: {e}")
         return {"error": str(e)}
 
+# ============== WALLET INTEGRATION (DeFi) ==============
+
+CHAIN_CONFIG = {
+    "solana": {
+        "rpc_url": "https://api.mainnet-beta.solana.com",
+        "native_symbol": "SOL",
+        "explorer": "https://solscan.io",
+        "decimals": 9
+    },
+    "ethereum": {
+        "rpc_url": "https://eth.llamarpc.com",
+        "native_symbol": "ETH",
+        "explorer": "https://etherscan.io",
+        "decimals": 18
+    },
+    "polygon": {
+        "rpc_url": "https://polygon-rpc.com",
+        "native_symbol": "MATIC",
+        "explorer": "https://polygonscan.com",
+        "decimals": 18
+    },
+    "bsc": {
+        "rpc_url": "https://bsc-dataseed.binance.org",
+        "native_symbol": "BNB",
+        "explorer": "https://bscscan.com",
+        "decimals": 18
+    }
+}
+
+class WalletConnect(BaseModel):
+    wallet_type: str  # 'phantom' or 'metamask'
+    address: str
+    chain: str = "solana"
+
+@api_router.post("/wallet/connect")
+async def connect_wallet(
+    wallet_data: WalletConnect,
+    current_user: dict = Depends(get_current_user)
+):
+    """Connect a DeFi wallet to user account"""
+    if wallet_data.wallet_type not in ["phantom", "metamask"]:
+        raise HTTPException(status_code=400, detail="Type de wallet non supporté")
+    
+    if wallet_data.chain not in CHAIN_CONFIG:
+        raise HTTPException(status_code=400, detail=f"Chain non supportée")
+    
+    existing = await db.wallets.find_one({
+        "user_id": current_user["id"],
+        "address": wallet_data.address.lower()
+    })
+    
+    if existing:
+        raise HTTPException(status_code=400, detail="Ce wallet est déjà connecté")
+    
+    wallet_count = await db.wallets.count_documents({"user_id": current_user["id"]})
+    
+    wallet_doc = {
+        "id": str(uuid.uuid4()),
+        "user_id": current_user["id"],
+        "wallet_type": wallet_data.wallet_type,
+        "address": wallet_data.address.lower(),
+        "chain": wallet_data.chain,
+        "connected_at": datetime.now(timezone.utc).isoformat(),
+        "is_primary": wallet_count == 0
+    }
+    
+    await db.wallets.insert_one(wallet_doc)
+    logger.info(f"Wallet connected: {wallet_data.wallet_type} for user {current_user['id']}")
+    
+    return {"message": "Wallet connecté avec succès", "wallet": {k: v for k, v in wallet_doc.items() if k != "_id"}}
+
+@api_router.get("/wallet/list")
+async def list_wallets(current_user: dict = Depends(get_current_user)):
+    """List all connected wallets"""
+    wallets = await db.wallets.find(
+        {"user_id": current_user["id"]},
+        {"_id": 0}
+    ).to_list(100)
+    return wallets
+
+@api_router.get("/wallet/{wallet_id}/balance")
+async def get_wallet_balance(wallet_id: str, current_user: dict = Depends(get_current_user)):
+    """Get balance for a connected wallet"""
+    wallet = await db.wallets.find_one({
+        "id": wallet_id,
+        "user_id": current_user["id"]
+    }, {"_id": 0})
+    
+    if not wallet:
+        raise HTTPException(status_code=404, detail="Wallet non trouvé")
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            config = CHAIN_CONFIG.get(wallet["chain"])
+            
+            if wallet["chain"] == "solana":
+                response = await client.post(
+                    config["rpc_url"],
+                    json={
+                        "jsonrpc": "2.0",
+                        "id": 1,
+                        "method": "getBalance",
+                        "params": [wallet["address"]]
+                    },
+                    timeout=10.0
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    if "result" in data:
+                        lamports = data["result"]["value"]
+                        balance = lamports / 1e9
+                        
+                        price_resp = await client.get(
+                            f"{CRYPTOCOMPARE_API_URL}/price?fsym=SOL&tsyms=USD",
+                            timeout=5.0
+                        )
+                        price = price_resp.json().get("USD", 0) if price_resp.status_code == 200 else 0
+                        
+                        return {
+                            "wallet_id": wallet_id,
+                            "address": wallet["address"],
+                            "chain": wallet["chain"],
+                            "native_balance": balance,
+                            "native_symbol": "SOL",
+                            "usd_value": balance * price
+                        }
+            else:
+                response = await client.post(
+                    config["rpc_url"],
+                    json={
+                        "jsonrpc": "2.0",
+                        "id": 1,
+                        "method": "eth_getBalance",
+                        "params": [wallet["address"], "latest"]
+                    },
+                    timeout=10.0
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    if "result" in data:
+                        wei = int(data["result"], 16)
+                        balance = wei / (10 ** config["decimals"])
+                        
+                        symbol = config["native_symbol"]
+                        price_resp = await client.get(
+                            f"{CRYPTOCOMPARE_API_URL}/price?fsym={symbol}&tsyms=USD",
+                            timeout=5.0
+                        )
+                        price = price_resp.json().get("USD", 0) if price_resp.status_code == 200 else 0
+                        
+                        return {
+                            "wallet_id": wallet_id,
+                            "address": wallet["address"],
+                            "chain": wallet["chain"],
+                            "native_balance": balance,
+                            "native_symbol": symbol,
+                            "usd_value": balance * price
+                        }
+    except Exception as e:
+        logger.error(f"Wallet balance error: {e}")
+    
+    raise HTTPException(status_code=503, detail="Impossible de récupérer le solde")
+
+@api_router.delete("/wallet/{wallet_id}")
+async def disconnect_wallet(wallet_id: str, current_user: dict = Depends(get_current_user)):
+    """Disconnect a wallet"""
+    result = await db.wallets.delete_one({
+        "id": wallet_id,
+        "user_id": current_user["id"]
+    })
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Wallet non trouvé")
+    
+    return {"message": "Wallet déconnecté"}
+
+@api_router.get("/wallet/supported-chains")
+async def get_supported_chains():
+    """Get list of supported chains"""
+    chains = []
+    for chain_id, config in CHAIN_CONFIG.items():
+        chains.append({
+            "id": chain_id,
+            "name": chain_id.capitalize(),
+            "native_symbol": config["native_symbol"],
+            "explorer": config["explorer"],
+            "wallet_type": "phantom" if chain_id == "solana" else "metamask"
+        })
+    return chains
+
+# ============== DEFI SCANNER ==============
+
+@api_router.get("/defi-scanner/scan")
+async def scan_defi_tokens(
+    chain: Optional[str] = None,
+    limit: int = 20,
+    min_liquidity: float = 10000,
+    min_volume: float = 5000,
+    current_user: dict = Depends(get_current_user)
+):
+    """Scan DEXes for trending tokens"""
+    all_tokens = []
+    
+    chain_map = {
+        "solana": "solana",
+        "ethereum": "eth",
+        "bsc": "bsc",
+        "polygon": "polygon_pos"
+    }
+    network = chain_map.get(chain, "solana") if chain else "solana"
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            # GeckoTerminal trending pools
+            url = f"https://api.geckoterminal.com/api/v2/networks/{network}/trending_pools"
+            response = await client.get(url, timeout=15.0)
+            
+            if response.status_code == 200:
+                data = response.json()
+                pools = data.get("data", [])
+                
+                for pool in pools[:limit * 2]:
+                    attrs = pool.get("attributes", {})
+                    
+                    liquidity = float(attrs.get("reserve_in_usd", 0) or 0)
+                    volume = float(attrs.get("volume_usd", {}).get("h24", 0) or 0)
+                    
+                    if liquidity < min_liquidity or volume < min_volume:
+                        continue
+                    
+                    change_24h = float(attrs.get("price_change_percentage", {}).get("h24", 0) or 0)
+                    change_1h = float(attrs.get("price_change_percentage", {}).get("h1", 0) or 0)
+                    
+                    # Calculate score
+                    score = 0
+                    if volume > 1000000: score += 25
+                    elif volume > 100000: score += 20
+                    elif volume > 10000: score += 10
+                    
+                    if liquidity > 500000: score += 25
+                    elif liquidity > 100000: score += 20
+                    elif liquidity > 10000: score += 10
+                    
+                    if 10 < change_24h < 100: score += 20
+                    elif 5 < change_24h <= 10: score += 15
+                    
+                    if change_1h and 2 < change_1h < 20: score += 10
+                    
+                    all_tokens.append({
+                        "address": attrs.get("address", ""),
+                        "symbol": attrs.get("name", "?").split("/")[0] if "/" in attrs.get("name", "") else attrs.get("name", "?"),
+                        "name": attrs.get("name", "Unknown"),
+                        "chain": chain or "solana",
+                        "price_usd": float(attrs.get("base_token_price_usd", 0) or 0),
+                        "price_change_24h": change_24h,
+                        "price_change_1h": change_1h,
+                        "volume_24h": volume,
+                        "liquidity": liquidity,
+                        "fdv": float(attrs.get("fdv_usd", 0) or 0),
+                        "source": "geckoterminal",
+                        "dex": attrs.get("dex_id", "unknown"),
+                        "score": min(score, 100)
+                    })
+            
+            # Also try DexScreener for boosted tokens
+            try:
+                dex_url = "https://api.dexscreener.com/token-boosts/latest/v1"
+                dex_resp = await client.get(dex_url, timeout=10.0)
+                if dex_resp.status_code == 200:
+                    boosted = dex_resp.json()
+                    for item in boosted[:10]:
+                        chain_id = item.get("chainId", "")
+                        if chain and chain.lower() != chain_id.lower():
+                            continue
+                        
+                        token_addr = item.get("tokenAddress", "")
+                        pair_url = f"https://api.dexscreener.com/latest/dex/tokens/{token_addr}"
+                        pair_resp = await client.get(pair_url, timeout=8.0)
+                        if pair_resp.status_code == 200:
+                            pair_data = pair_resp.json()
+                            pairs = pair_data.get("pairs", [])
+                            if pairs:
+                                pair = pairs[0]
+                                liq = float(pair.get("liquidity", {}).get("usd", 0) or 0)
+                                vol = float(pair.get("volume", {}).get("h24", 0) or 0)
+                                
+                                if liq >= min_liquidity and vol >= min_volume:
+                                    all_tokens.append({
+                                        "address": token_addr,
+                                        "symbol": pair.get("baseToken", {}).get("symbol", "?"),
+                                        "name": pair.get("baseToken", {}).get("name", "Unknown"),
+                                        "chain": chain_id,
+                                        "price_usd": float(pair.get("priceUsd", 0) or 0),
+                                        "price_change_24h": float(pair.get("priceChange", {}).get("h24", 0) or 0),
+                                        "volume_24h": vol,
+                                        "liquidity": liq,
+                                        "source": "dexscreener",
+                                        "dex": pair.get("dexId", "unknown"),
+                                        "score": 75  # Boosted tokens get bonus
+                                    })
+            except Exception as e:
+                logger.warning(f"DexScreener error: {e}")
+    
+    except Exception as e:
+        logger.error(f"DeFi scan error: {e}")
+    
+    # Sort by score
+    all_tokens.sort(key=lambda x: x.get("score", 0), reverse=True)
+    
+    # Remove duplicates
+    seen = set()
+    unique_tokens = []
+    for t in all_tokens:
+        addr = t.get("address", "").lower()
+        if addr not in seen:
+            seen.add(addr)
+            unique_tokens.append(t)
+    
+    return {
+        "tokens": unique_tokens[:limit],
+        "scan_time": datetime.now(timezone.utc).isoformat(),
+        "chain": chain or "all",
+        "total_found": len(unique_tokens)
+    }
+
+@api_router.get("/defi-scanner/trending/{chain}")
+async def get_trending_defi_tokens(
+    chain: str,
+    limit: int = 10,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get trending tokens for a specific chain"""
+    return await scan_defi_tokens(chain=chain, limit=limit, current_user=current_user)
+
+@api_router.get("/defi-scanner/token/{chain}/{address}")
+async def get_defi_token_details(
+    chain: str,
+    address: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get detailed info about a token"""
+    chain_map = {
+        "solana": "solana",
+        "ethereum": "eth",
+        "bsc": "bsc",
+        "polygon": "polygon_pos"
+    }
+    network = chain_map.get(chain.lower(), chain)
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"https://api.geckoterminal.com/api/v2/networks/{network}/tokens/{address}"
+            response = await client.get(url, timeout=15.0)
+            
+            if response.status_code == 200:
+                data = response.json()
+                token_data = data.get("data", {}).get("attributes", {})
+                
+                return {
+                    "address": address,
+                    "chain": chain,
+                    "name": token_data.get("name", "Unknown"),
+                    "symbol": token_data.get("symbol", "?"),
+                    "price_usd": float(token_data.get("price_usd", 0) or 0),
+                    "fdv": float(token_data.get("fdv_usd", 0) or 0),
+                    "market_cap": float(token_data.get("market_cap_usd", 0) or 0),
+                    "total_supply": token_data.get("total_supply", "0")
+                }
+    except Exception as e:
+        logger.error(f"Token detail error: {e}")
+    
+    raise HTTPException(status_code=404, detail="Token non trouvé")
+
 # ============== STARTUP EVENTS ==============
 
 @app.on_event("startup")
