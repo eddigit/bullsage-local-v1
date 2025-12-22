@@ -3680,15 +3680,28 @@ class SmartInvestExecute(BaseModel):
 
 # Stock/Index symbols for Smart Invest analysis
 SMART_INVEST_STOCKS = [
+    # Indices majeurs
     {"symbol": "QQQ", "name": "NASDAQ 100 ETF", "type": "index"},
     {"symbol": "SPY", "name": "S&P 500 ETF", "type": "index"},
+    {"symbol": "DIA", "name": "Dow Jones ETF", "type": "index"},
+    {"symbol": "IWM", "name": "Russell 2000 ETF", "type": "index"},
+    # Tech Giants
     {"symbol": "AAPL", "name": "Apple", "type": "stock"},
     {"symbol": "MSFT", "name": "Microsoft", "type": "stock"},
     {"symbol": "GOOGL", "name": "Google", "type": "stock"},
     {"symbol": "TSLA", "name": "Tesla", "type": "stock"},
     {"symbol": "NVDA", "name": "NVIDIA", "type": "stock"},
     {"symbol": "AMZN", "name": "Amazon", "type": "stock"},
+    {"symbol": "META", "name": "Meta", "type": "stock"},
+    {"symbol": "AMD", "name": "AMD", "type": "stock"},
+    # Crypto-related stocks
+    {"symbol": "COIN", "name": "Coinbase", "type": "stock"},
+    {"symbol": "MSTR", "name": "MicroStrategy", "type": "stock"},
 ]
+
+# News API keys
+FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY", "")
+MARKETAUX_API_KEY = os.environ.get("MARKETAUX_API_KEY", "")
 
 async def analyze_stock_opportunity(client, symbol: str, name: str, stock_type: str, investment_amount: float):
     """Analyze a stock/index using Alpha Vantage data"""
