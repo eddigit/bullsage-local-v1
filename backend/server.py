@@ -4566,6 +4566,265 @@ async def get_api_keys(admin: dict = Depends(get_admin_user)):
         "emergent_llm": {**mask_key(EMERGENT_LLM_KEY), "name": "Emergent LLM", "usage": "IA GPT-5.1"}
     }
 
+# ============== PROFILE & AVATAR UPLOAD ==============
+
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+
+@api_router.post("/profile/avatar")
+async def upload_avatar(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """Upload profile avatar"""
+    # Validate file extension
+    ext = Path(file.filename).suffix.lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"Format non supporté. Utilisez: {', '.join(ALLOWED_EXTENSIONS)}")
+    
+    # Read file and check size
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail="Fichier trop volumineux (max 5MB)")
+    
+    # Generate unique filename
+    filename = f"{current_user['id']}_{uuid.uuid4().hex[:8]}{ext}"
+    filepath = AVATARS_DIR / filename
+    
+    # Delete old avatar if exists
+    user = await db.users.find_one({"id": current_user["id"]})
+    if user and user.get("avatar"):
+        old_path = AVATARS_DIR / Path(user["avatar"]).name
+        if old_path.exists():
+            old_path.unlink()
+    
+    # Save new file
+    with open(filepath, "wb") as f:
+        f.write(content)
+    
+    # Update user record
+    avatar_url = f"/uploads/avatars/{filename}"
+    await db.users.update_one(
+        {"id": current_user["id"]},
+        {"$set": {"avatar": avatar_url}}
+    )
+    
+    return {"avatar": avatar_url, "message": "Photo de profil mise à jour"}
+
+@api_router.delete("/profile/avatar")
+async def delete_avatar(current_user: dict = Depends(get_current_user)):
+    """Delete profile avatar"""
+    user = await db.users.find_one({"id": current_user["id"]})
+    if user and user.get("avatar"):
+        filepath = AVATARS_DIR / Path(user["avatar"]).name
+        if filepath.exists():
+            filepath.unlink()
+    
+    await db.users.update_one(
+        {"id": current_user["id"]},
+        {"$unset": {"avatar": ""}}
+    )
+    
+    return {"message": "Photo supprimée"}
+
+@api_router.put("/profile")
+async def update_profile(
+    name: Optional[str] = None,
+    email: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update user profile"""
+    updates = {}
+    if name:
+        updates["name"] = name
+    if email and email != current_user["email"]:
+        # Check if email is already taken
+        existing = await db.users.find_one({"email": email})
+        if existing:
+            raise HTTPException(status_code=400, detail="Email déjà utilisé")
+        updates["email"] = email
+    
+    if updates:
+        await db.users.update_one({"id": current_user["id"]}, {"$set": updates})
+    
+    return {"message": "Profil mis à jour", "updates": updates}
+
+# ============== ADMIN CRUD ENDPOINTS ==============
+
+@api_router.get("/admin/users/{user_id}")
+async def admin_get_user_detail(user_id: str, admin: dict = Depends(get_admin_user)):
+    """Get detailed user info (admin only)"""
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Get user statistics
+    trades_count = await db.paper_trades.count_documents({"user_id": user_id})
+    strategies_count = await db.strategies.count_documents({"user_id": user_id})
+    alerts_count = await db.alerts.count_documents({"user_id": user_id})
+    
+    user["stats"] = {
+        "trades": trades_count,
+        "strategies": strategies_count,
+        "alerts": alerts_count
+    }
+    
+    return user
+
+@api_router.put("/admin/users/{user_id}")
+async def admin_update_user(
+    user_id: str,
+    name: Optional[str] = None,
+    email: Optional[str] = None,
+    is_admin: Optional[bool] = None,
+    paper_balance: Optional[float] = None,
+    academy_xp: Optional[int] = None,
+    admin: dict = Depends(get_admin_user)
+):
+    """Update user data (admin only)"""
+    updates = {}
+    if name is not None:
+        updates["name"] = name
+    if email is not None:
+        updates["email"] = email
+    if is_admin is not None and user_id != admin["id"]:
+        updates["is_admin"] = is_admin
+    if paper_balance is not None:
+        updates["paper_balance"] = paper_balance
+    if academy_xp is not None:
+        updates["academy_xp"] = academy_xp
+    
+    if not updates:
+        raise HTTPException(status_code=400, detail="No updates provided")
+    
+    result = await db.users.update_one({"id": user_id}, {"$set": updates})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {"message": "User updated", "updates": updates}
+
+@api_router.get("/admin/trades")
+async def admin_get_all_trades(
+    limit: int = 100,
+    user_id: Optional[str] = None,
+    admin: dict = Depends(get_admin_user)
+):
+    """Get all trades (admin only)"""
+    query = {}
+    if user_id:
+        query["user_id"] = user_id
+    
+    trades = await db.paper_trades.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    return trades
+
+@api_router.get("/admin/academy/progress")
+async def admin_get_academy_progress(admin: dict = Depends(get_admin_user)):
+    """Get all users' academy progress (admin only)"""
+    users = await db.users.find(
+        {},
+        {"_id": 0, "id": 1, "name": 1, "email": 1, "academy_xp": 1, "completed_lessons": 1, "badges": 1}
+    ).to_list(1000)
+    
+    # Sort by XP
+    users.sort(key=lambda x: x.get("academy_xp", 0), reverse=True)
+    
+    return users
+
+@api_router.put("/admin/academy/user/{user_id}")
+async def admin_update_user_academy(
+    user_id: str,
+    xp: Optional[int] = None,
+    add_badge: Optional[str] = None,
+    remove_badge: Optional[str] = None,
+    reset_progress: bool = False,
+    admin: dict = Depends(get_admin_user)
+):
+    """Update user's academy progress (admin only)"""
+    updates = {}
+    
+    if reset_progress:
+        updates["academy_xp"] = 0
+        updates["completed_lessons"] = []
+        updates["badges"] = []
+    else:
+        if xp is not None:
+            updates["academy_xp"] = xp
+    
+    if updates:
+        await db.users.update_one({"id": user_id}, {"$set": updates})
+    
+    if add_badge:
+        await db.users.update_one(
+            {"id": user_id},
+            {"$addToSet": {"badges": add_badge}}
+        )
+    
+    if remove_badge:
+        await db.users.update_one(
+            {"id": user_id},
+            {"$pull": {"badges": remove_badge}}
+        )
+    
+    return {"message": "Academy progress updated"}
+
+@api_router.get("/admin/dashboard")
+async def admin_dashboard(admin: dict = Depends(get_admin_user)):
+    """Get comprehensive admin dashboard data"""
+    # User stats
+    total_users = await db.users.count_documents({})
+    admin_users = await db.users.count_documents({"is_admin": True})
+    
+    # Get users created in last 7 days
+    week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+    new_users_week = await db.users.count_documents({
+        "created_at": {"$gte": week_ago.isoformat()}
+    })
+    
+    # Trading stats
+    total_trades = await db.paper_trades.count_documents({})
+    auto_trades = await db.paper_trades.count_documents({"source": "auto_trading"})
+    smart_invest_trades = await db.paper_trades.count_documents({"source": "smart_invest"})
+    
+    # Academy stats
+    total_xp = 0
+    users_with_xp = await db.users.find({"academy_xp": {"$gt": 0}}, {"academy_xp": 1}).to_list(1000)
+    for u in users_with_xp:
+        total_xp += u.get("academy_xp", 0)
+    
+    avg_xp = total_xp / len(users_with_xp) if users_with_xp else 0
+    
+    # Top users
+    top_traders = await db.users.find(
+        {},
+        {"_id": 0, "id": 1, "name": 1, "email": 1, "paper_balance": 1}
+    ).sort("paper_balance", -1).limit(5).to_list(5)
+    
+    top_learners = await db.users.find(
+        {},
+        {"_id": 0, "id": 1, "name": 1, "email": 1, "academy_xp": 1}
+    ).sort("academy_xp", -1).limit(5).to_list(5)
+    
+    return {
+        "users": {
+            "total": total_users,
+            "admins": admin_users,
+            "new_this_week": new_users_week
+        },
+        "trading": {
+            "total_trades": total_trades,
+            "auto_trades": auto_trades,
+            "smart_invest_trades": smart_invest_trades
+        },
+        "academy": {
+            "total_xp_earned": total_xp,
+            "average_xp": round(avg_xp, 1),
+            "active_learners": len(users_with_xp)
+        },
+        "top_traders": top_traders,
+        "top_learners": top_learners,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
 # ============== ACADEMY ENDPOINTS ==============
 
 from academy_data import ACADEMY_MODULES, BADGES, LEVEL_THRESHOLDS, XP_REWARDS
