@@ -202,6 +202,7 @@ function App() {
               <Route path="wallet" element={<WalletPage />} />
               <Route path="defi-scanner" element={<DeFiScannerPage />} />
               <Route path="chart" element={<ChartPage />} />
+              <Route path="admin/newsletter" element={<NewsletterAdminPage />} />
             </Route>
           </Routes>
         </BrowserRouter>
