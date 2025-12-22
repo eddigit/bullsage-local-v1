@@ -45,6 +45,7 @@ import {
 // Main navigation items
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  { name: "Graphique", href: "/chart", icon: CandlestickChart, highlight: true },
   { name: "Académie", href: "/academy", icon: GraduationCap, highlight: true },
   { name: "Cockpit", href: "/cockpit", icon: Sun },
   { name: "Mode Trading", href: "/trading", icon: Crosshair },
