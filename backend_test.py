@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-BULL SAGE Admin Panel & Avatar Upload Testing
-Tests admin functionality and profile picture upload features
+BULL SAGE Market News & Indices Testing
+Tests market news integration with NASDAQ/S&P 500 indices and financial news functionality
 """
 
 import requests
