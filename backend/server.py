@@ -3699,9 +3699,8 @@ SMART_INVEST_STOCKS = [
     {"symbol": "MSTR", "name": "MicroStrategy", "type": "stock"},
 ]
 
-# News API keys
-FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY", "")
-MARKETAUX_API_KEY = os.environ.get("MARKETAUX_API_KEY", "")
+# News API keys - already defined at top of file, don't redefine
+# FINNHUB_API_KEY and MARKETAUX_API_KEY are set at module level
 
 async def analyze_stock_opportunity(client, symbol: str, name: str, stock_type: str, investment_amount: float):
     """Analyze a stock/index using Alpha Vantage data"""
