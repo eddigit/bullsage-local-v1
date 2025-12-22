@@ -29,6 +29,7 @@ import WalletPage from "./pages/WalletPage";
 import DeFiScannerPage from "./pages/DeFiScannerPage";
 import ChartPage from "./pages/ChartPage";
 import NewsletterAdminPage from "./pages/NewsletterAdminPage";
+import MarketNewsPage from "./pages/MarketNewsPage";
 
 // Layout
 import MainLayout from "./layouts/MainLayout";
