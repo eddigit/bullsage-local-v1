@@ -200,6 +200,7 @@ function App() {
               <Route path="auto-trading" element={<AutoTradingPage />} />
               <Route path="wallet" element={<WalletPage />} />
               <Route path="defi-scanner" element={<DeFiScannerPage />} />
+              <Route path="chart" element={<ChartPage />} />
             </Route>
           </Routes>
         </BrowserRouter>
