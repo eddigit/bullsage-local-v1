@@ -17,6 +17,8 @@ import jwt
 import bcrypt
 import httpx
 import numpy as np
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 
 ROOT_DIR = Path(__file__).parent
@@ -26,6 +28,9 @@ load_dotenv(ROOT_DIR / '.env')
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
+
+# Scheduler for newsletter
+scheduler = AsyncIOScheduler(timezone="Europe/Paris")
 
 # JWT Configuration
 JWT_SECRET = os.environ.get('JWT_SECRET', 'bullsage_secret_key')
