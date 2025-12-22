@@ -967,27 +967,7 @@ async def get_sentiment(symbol: str, current_user: dict = Depends(get_current_us
         logger.error(f"Error fetching sentiment: {e}")
         return {}
 
-@api_router.get("/market/economic-calendar")
-async def get_economic_calendar(current_user: dict = Depends(get_current_user)):
-    """Get economic calendar events from Finnhub"""
-    try:
-        today = datetime.now(timezone.utc)
-        from_date = today.strftime("%Y-%m-%d")
-        to_date = (today + timedelta(days=14)).strftime("%Y-%m-%d")
-        
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                "https://finnhub.io/api/v1/calendar/economic",
-                params={"from": from_date, "to": to_date, "token": FINNHUB_API_KEY},
-                timeout=30.0
-            )
-            if response.status_code == 200:
-                data = response.json()
-                return data.get("economicCalendar", [])[:30]
-            return []
-    except Exception as e:
-        logger.error(f"Error fetching economic calendar: {e}")
-        return []
+# Note: /market/economic-calendar endpoint is defined later in the file with better format
 
 # ============== ALPHA VANTAGE ROUTES (FOREX, STOCKS, INDICATORS) ==============
 
