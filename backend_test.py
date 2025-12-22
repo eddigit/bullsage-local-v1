@@ -1,545 +1,361 @@
 #!/usr/bin/env python3
 """
-BULL SAGE Backend API Testing Suite
-Tests all endpoints including auth, markets, AI assistant, paper trading, etc.
+BULL SAGE Admin Panel & Avatar Upload Testing
+Tests admin functionality and profile picture upload features
 """
 
 import requests
 import sys
 import json
 from datetime import datetime
-from typing import Dict, Any, Optional
+import os
 
 class BullSageAPITester:
     def __init__(self, base_url="https://fintech-advisor-24.preview.emergentagent.com"):
         self.base_url = base_url
-        self.api_url = f"{base_url}/api"
-        self.token = None
         self.admin_token = None
-        self.user_id = None
-        self.admin_user_id = None
+        self.regular_token = None
         self.tests_run = 0
         self.tests_passed = 0
-        self.failed_tests = []
-        self.session = requests.Session()
-        self.session.timeout = 30
+        self.results = []
 
-    def log(self, message: str, level: str = "INFO"):
-        """Log test messages"""
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        print(f"[{timestamp}] {level}: {message}")
-
-    def run_test(self, name: str, method: str, endpoint: str, expected_status: int, 
-                 data: Optional[Dict] = None, headers: Optional[Dict] = None, 
-                 use_admin: bool = False) -> tuple[bool, Dict]:
-        """Run a single API test"""
-        url = f"{self.api_url}/{endpoint}"
-        test_headers = {'Content-Type': 'application/json'}
-        
-        # Add auth token if available
-        token = self.admin_token if use_admin and self.admin_token else self.token
-        if token:
-            test_headers['Authorization'] = f'Bearer {token}'
-        
-        if headers:
-            test_headers.update(headers)
-
+    def log_result(self, test_name, success, message="", response_data=None):
+        """Log test result"""
         self.tests_run += 1
-        self.log(f"Testing {name}...")
+        if success:
+            self.tests_passed += 1
+            print(f"✅ {test_name}: {message}")
+        else:
+            print(f"❌ {test_name}: {message}")
+        
+        self.results.append({
+            "test": test_name,
+            "success": success,
+            "message": message,
+            "response_data": response_data
+        })
+
+    def run_test(self, name, method, endpoint, expected_status, data=None, headers=None, files=None):
+        """Run a single API test"""
+        url = f"{self.base_url}/api/{endpoint}"
+        
+        # Default headers
+        default_headers = {'Content-Type': 'application/json'}
+        if headers:
+            default_headers.update(headers)
+        
+        # Remove Content-Type for file uploads
+        if files:
+            default_headers.pop('Content-Type', None)
+
+        print(f"\n🔍 Testing {name}...")
+        print(f"   URL: {url}")
         
         try:
             if method == 'GET':
-                response = self.session.get(url, headers=test_headers)
+                response = requests.get(url, headers=default_headers, timeout=30)
             elif method == 'POST':
-                response = self.session.post(url, json=data, headers=test_headers)
+                if files:
+                    response = requests.post(url, files=files, headers=default_headers, timeout=30)
+                else:
+                    response = requests.post(url, json=data, headers=default_headers, timeout=30)
             elif method == 'PUT':
-                response = self.session.put(url, json=data, headers=test_headers)
+                response = requests.put(url, json=data, headers=default_headers, timeout=30)
             elif method == 'DELETE':
-                response = self.session.delete(url, headers=test_headers)
-            else:
-                raise ValueError(f"Unsupported method: {method}")
+                response = requests.delete(url, headers=default_headers, timeout=30)
 
             success = response.status_code == expected_status
+            response_data = None
             
+            try:
+                response_data = response.json()
+            except:
+                response_data = {"text": response.text[:200]}
+
             if success:
-                self.tests_passed += 1
-                self.log(f"✅ {name} - Status: {response.status_code}")
-                try:
-                    return True, response.json()
-                except:
-                    return True, {"message": "Success"}
+                self.log_result(name, True, f"Status: {response.status_code}", response_data)
             else:
-                self.log(f"❌ {name} - Expected {expected_status}, got {response.status_code}")
-                try:
-                    error_data = response.json()
-                    self.log(f"   Error: {error_data}")
-                except:
-                    self.log(f"   Error: {response.text}")
-                
-                self.failed_tests.append({
-                    "test": name,
-                    "expected": expected_status,
-                    "actual": response.status_code,
-                    "endpoint": endpoint
-                })
-                return False, {}
+                self.log_result(name, False, f"Expected {expected_status}, got {response.status_code}. Response: {response.text[:200]}", response_data)
+
+            return success, response_data
 
         except Exception as e:
-            self.log(f"❌ {name} - Exception: {str(e)}", "ERROR")
-            self.failed_tests.append({
-                "test": name,
-                "error": str(e),
-                "endpoint": endpoint
-            })
+            self.log_result(name, False, f"Error: {str(e)}")
             return False, {}
 
-    def test_health_check(self):
-        """Test basic health endpoints"""
-        self.log("=== HEALTH CHECK TESTS ===")
-        self.run_test("API Root", "GET", "", 200)
-        self.run_test("Health Check", "GET", "health", 200)
-
-    def test_user_registration(self):
-        """Test user registration"""
-        self.log("=== USER REGISTRATION TEST ===")
-        timestamp = datetime.now().strftime("%H%M%S")
-        test_user_data = {
-            "name": f"Test User {timestamp}",
-            "email": f"testuser{timestamp}@example.com",
-            "password": "TestPassword123!",
-            "trading_level": "beginner"
-        }
-        
-        success, response = self.run_test(
-            "User Registration", 
-            "POST", 
-            "auth/register", 
-            200, 
-            test_user_data
-        )
-        
-        if success and 'access_token' in response:
-            self.token = response['access_token']
-            self.user_id = response['user']['id']
-            self.log(f"✅ User registered with ID: {self.user_id}")
-            return True
-        return False
-
     def test_admin_login(self):
-        """Test admin login with provided credentials"""
-        self.log("=== ADMIN LOGIN TEST ===")
-        admin_credentials = {
-            "email": "coachdigitalparis@gmail.com",
-            "password": "$$Reussite888!!"
-        }
-        
+        """Test admin login with bullsagetrader@gmail.com"""
         success, response = self.run_test(
             "Admin Login",
             "POST",
             "auth/login",
             200,
-            admin_credentials
+            data={
+                "email": "bullsagetrader@gmail.com",
+                "password": "$$Reussit888!!"
+            }
         )
         
         if success and 'access_token' in response:
             self.admin_token = response['access_token']
-            self.admin_user_id = response['user']['id']
-            admin_status = response['user'].get('is_admin', False)
-            self.log(f"✅ Admin logged in - Admin status: {admin_status}")
-            return admin_status
+            user_data = response.get('user', {})
+            if user_data.get('is_admin'):
+                self.log_result("Admin Status Check", True, "User has admin privileges")
+                return True
+            else:
+                self.log_result("Admin Status Check", False, "User does not have admin privileges")
+                return False
         return False
 
-    def test_user_login(self):
-        """Test user login"""
-        self.log("=== USER LOGIN TEST ===")
-        # First register a user if we don't have one
-        if not self.token:
-            if not self.test_user_registration():
-                return False
+    def test_regular_login(self):
+        """Test login with regular admin account"""
+        success, response = self.run_test(
+            "Regular Admin Login",
+            "POST",
+            "auth/login",
+            200,
+            data={
+                "email": "coachdigitalparis@gmail.com",
+                "password": "$$Reussite888!!"
+            }
+        )
         
-        # Test /auth/me endpoint
-        success, response = self.run_test("Get Current User", "GET", "auth/me", 200)
+        if success and 'access_token' in response:
+            self.regular_token = response['access_token']
+            return True
+        return False
+
+    def test_admin_stats(self):
+        """Test admin stats endpoint"""
+        if not self.admin_token:
+            self.log_result("Admin Stats", False, "No admin token available")
+            return False
+            
+        headers = {'Authorization': f'Bearer {self.admin_token}'}
+        success, response = self.run_test(
+            "Admin Stats",
+            "GET",
+            "admin/stats",
+            200,
+            headers=headers
+        )
+        
+        if success:
+            # Check if stats contain expected fields
+            expected_fields = ['users', 'paper_trades', 'ai_chats', 'alerts', 'strategies']
+            missing_fields = [field for field in expected_fields if field not in response]
+            if missing_fields:
+                self.log_result("Admin Stats Fields", False, f"Missing fields: {missing_fields}")
+            else:
+                self.log_result("Admin Stats Fields", True, "All expected fields present")
+        
         return success
 
-    def test_market_endpoints(self):
-        """Test market data endpoints"""
-        self.log("=== MARKET DATA TESTS ===")
-        
-        # Test crypto markets
-        success1, markets = self.run_test("Get Crypto Markets", "GET", "market/crypto", 200)
-        
-        # Test trending
-        success2, _ = self.run_test("Get Trending", "GET", "market/trending", 200)
-        
-        # Test specific coin detail if we have markets data
-        if success1 and markets and len(markets) > 0:
-            coin_id = markets[0].get('id', 'bitcoin')
-            self.run_test("Get Coin Detail", "GET", f"market/crypto/{coin_id}", 200)
-            self.run_test("Get Coin Chart", "GET", f"market/crypto/{coin_id}/chart", 200)
-        
-        return success1 and success2
-
-    def test_ai_assistant(self):
-        """Test AI assistant endpoints"""
-        self.log("=== AI ASSISTANT TESTS ===")
-        
-        # Test chat
-        chat_data = {
-            "message": "Bonjour BULL SAGE, peux-tu me donner une analyse rapide du marché Bitcoin?",
-            "context": {}
-        }
-        
-        success1, _ = self.run_test("AI Chat", "POST", "assistant/chat", 200, chat_data)
-        
-        # Test chat history
-        success2, _ = self.run_test("Get Chat History", "GET", "assistant/history", 200)
-        
-        return success1 and success2
-
-    def test_paper_trading(self):
-        """Test paper trading endpoints"""
-        self.log("=== PAPER TRADING TESTS ===")
-        
-        # Get portfolio
-        success1, portfolio = self.run_test("Get Portfolio", "GET", "paper-trading/portfolio", 200)
-        
-        # Get trades history
-        success2, _ = self.run_test("Get Trades", "GET", "paper-trading/trades", 200)
-        
-        # Test a buy trade
-        trade_data = {
-            "symbol": "bitcoin",
-            "type": "buy",
-            "amount": 0.001,
-            "price": 50000
-        }
-        success3, _ = self.run_test("Execute Buy Trade", "POST", "paper-trading/trade", 200, trade_data)
-        
-        # Test a sell trade (should work if we have holdings)
-        sell_data = {
-            "symbol": "bitcoin", 
-            "type": "sell",
-            "amount": 0.0005,
-            "price": 50000
-        }
-        # This might fail if no holdings, that's ok
-        self.run_test("Execute Sell Trade", "POST", "paper-trading/trade", 200, sell_data)
-        
-        return success1 and success2 and success3
-
-    def test_watchlist(self):
-        """Test watchlist endpoints"""
-        self.log("=== WATCHLIST TESTS ===")
-        
-        # Add to watchlist
-        success1, _ = self.run_test("Add to Watchlist", "POST", "watchlist/ethereum", 200)
-        
-        # Update watchlist
-        watchlist_data = {"symbols": ["bitcoin", "ethereum", "solana"]}
-        success2, _ = self.run_test("Update Watchlist", "PUT", "watchlist", 200, watchlist_data)
-        
-        # Remove from watchlist
-        success3, _ = self.run_test("Remove from Watchlist", "DELETE", "watchlist/solana", 200)
-        
-        return success1 and success2 and success3
-
-    def test_alerts(self):
-        """Test alerts endpoints"""
-        self.log("=== ALERTS TESTS ===")
-        
-        # Create alert
-        alert_data = {
-            "symbol": "bitcoin",
-            "target_price": 60000,
-            "condition": "above",
-            "name": "BTC Alert Test"
-        }
-        success1, alert_response = self.run_test("Create Alert", "POST", "alerts", 200, alert_data)
-        
-        # Get alerts
-        success2, _ = self.run_test("Get Alerts", "GET", "alerts", 200)
-        
-        # Delete alert if created
-        if success1 and 'id' in alert_response:
-            alert_id = alert_response['id']
-            success3, _ = self.run_test("Delete Alert", "DELETE", f"alerts/{alert_id}", 200)
-            return success1 and success2 and success3
-        
-        return success1 and success2
-
-    def test_signals(self):
-        """Test trading signals endpoints with new performance metrics"""
-        self.log("=== SIGNALS TESTS ===")
-        
-        # Create a test signal
-        signal_data = {
-            "symbol": "bitcoin",
-            "symbol_name": "Bitcoin",
-            "signal_type": "BUY",
-            "entry_price": 50000,
-            "stop_loss": 48000,
-            "take_profit_1": 52000,
-            "take_profit_2": 55000,
-            "timeframe": "4h",
-            "confidence": "high",
-            "reason": "RSI oversold + MACD bullish cross",
-            "price_at_signal": 49500
-        }
-        success1, signal_response = self.run_test("Create Signal", "POST", "signals", 200, signal_data)
-        
-        # Get signals
-        success2, _ = self.run_test("Get Signals", "GET", "signals", 200)
-        
-        # Test NEW signals stats endpoint with enhanced metrics
-        success3, stats_response = self.run_test("Get Signal Stats", "GET", "signals/stats", 200)
-        
-        if success3 and stats_response:
-            # Verify new metrics are present
-            required_metrics = [
-                'total_pnl', 'profit_factor', 'avg_win', 'avg_loss', 
-                'current_streak', 'max_streak', 'by_symbol', 'monthly_performance'
-            ]
-            missing_metrics = [metric for metric in required_metrics if metric not in stats_response]
-            if missing_metrics:
-                self.log(f"❌ Missing new metrics in signals stats: {missing_metrics}")
-                self.failed_tests.append({
-                    "test": "Signal Stats New Metrics",
-                    "error": f"Missing metrics: {missing_metrics}",
-                    "endpoint": "signals/stats"
-                })
-            else:
-                self.log("✅ All new signal metrics present")
-        
-        # Test signal evaluation
-        success4, _ = self.run_test("Evaluate Signals", "POST", "signals/evaluate", 200)
-        
-        # Delete signal if created
-        if success1 and 'id' in signal_response:
-            signal_id = signal_response['id']
-            success5, _ = self.run_test("Delete Signal", "DELETE", f"signals/{signal_id}", 200)
-            return success1 and success2 and success3 and success4 and success5
-        
-        return success1 and success2 and success3 and success4
-
-    def test_strategies(self):
-        """Test strategies endpoints"""
-        self.log("=== STRATEGIES TESTS ===")
-        
-        # Create strategy
-        strategy_data = {
-            "name": "Test Strategy",
-            "description": "A test trading strategy",
-            "indicators": ["RSI", "MACD"],
-            "entry_rules": "RSI < 30 and MACD bullish cross",
-            "exit_rules": "RSI > 70 or 5% profit",
-            "risk_percentage": 2.0
-        }
-        success1, strategy_response = self.run_test("Create Strategy", "POST", "strategies", 200, strategy_data)
-        
-        # Get strategies
-        success2, _ = self.run_test("Get Strategies", "GET", "strategies", 200)
-        
-        # Delete strategy if created
-        if success1 and 'id' in strategy_response:
-            strategy_id = strategy_response['id']
-            success3, _ = self.run_test("Delete Strategy", "DELETE", f"strategies/{strategy_id}", 200)
-            return success1 and success2 and success3
-        
-        return success1 and success2
-
-    def test_trading_mode(self):
-        """Test trading mode endpoints"""
-        self.log("=== TRADING MODE TESTS ===")
-        
-        # Test trading analysis
-        analysis_data = {
-            "coin_id": "bitcoin",
-            "timeframe": "4h",
-            "trading_style": "swing"
-        }
-        success1, _ = self.run_test("Trading Analysis", "POST", "trading/analyze", 200, analysis_data)
-        
-        # Test scan opportunities
-        success2, _ = self.run_test("Scan Opportunities", "GET", "trading/scan-opportunities", 200)
-        
-        return success1 and success2
-
-    def test_academy(self):
-        """Test academy endpoints"""
-        self.log("=== ACADEMY TESTS ===")
-        
-        # Get academy progress
-        success1, _ = self.run_test("Get Academy Progress", "GET", "academy/progress", 200)
-        
-        # Get lessons
-        success2, _ = self.run_test("Get Lessons", "GET", "academy/lessons", 200)
-        
-        # Complete a lesson
-        lesson_data = {"lesson_id": "basics_intro"}
-        success3, _ = self.run_test("Complete Lesson", "POST", "academy/complete-lesson", 200, lesson_data)
-        
-        return success1 and success2 and success3
-
-    def test_market_context(self):
-        """Test market context endpoints for Trading Mode"""
-        self.log("=== MARKET CONTEXT TESTS ===")
-        
-        # Test Fear & Greed Index
-        success1, _ = self.run_test("Fear & Greed Index", "GET", "market/fear-greed", 200)
-        
-        # Test News Impact
-        success2, _ = self.run_test("News Impact", "GET", "market/news-impact", 200)
-        
-        # Test Macro Overview
-        success3, _ = self.run_test("Macro Overview", "GET", "market/macro-overview", 200)
-        
-        # Test Forex data
-        success4, _ = self.run_test("EUR/USD Rate", "GET", "market/forex/EUR/USD", 200)
-        
-        return success1 and success2 and success3 and success4
-
-    def test_admin_endpoints(self):
-        """Test admin-only endpoints"""
-        self.log("=== ADMIN ENDPOINTS TESTS ===")
-        
+    def test_admin_users_list(self):
+        """Test admin users list endpoint"""
         if not self.admin_token:
-            self.log("❌ No admin token available, skipping admin tests")
+            self.log_result("Admin Users List", False, "No admin token available")
+            return False
+            
+        headers = {'Authorization': f'Bearer {self.admin_token}'}
+        success, response = self.run_test(
+            "Admin Users List",
+            "GET",
+            "admin/users",
+            200,
+            headers=headers
+        )
+        
+        if success and isinstance(response, list):
+            self.log_result("Admin Users List Format", True, f"Found {len(response)} users")
+            
+            # Check if admin user is in the list
+            admin_found = any(user.get('email') == 'bullsagetrader@gmail.com' for user in response)
+            if admin_found:
+                self.log_result("Admin User in List", True, "Admin user found in users list")
+            else:
+                self.log_result("Admin User in List", False, "Admin user not found in users list")
+        
+        return success
+
+    def test_user_promotion(self):
+        """Test promoting/demoting users to admin"""
+        if not self.admin_token:
+            self.log_result("User Promotion", False, "No admin token available")
+            return False
+            
+        headers = {'Authorization': f'Bearer {self.admin_token}'}
+        
+        # First get users list to find a non-admin user
+        success, users = self.run_test(
+            "Get Users for Promotion Test",
+            "GET",
+            "admin/users",
+            200,
+            headers=headers
+        )
+        
+        if not success:
+            return False
+            
+        # Find a non-admin user (not the current admin)
+        target_user = None
+        for user in users:
+            if user.get('email') != 'bullsagetrader@gmail.com' and not user.get('is_admin', False):
+                target_user = user
+                break
+        
+        if not target_user:
+            self.log_result("User Promotion", False, "No suitable user found for promotion test")
             return False
         
-        # Test admin stats
-        success1, _ = self.run_test("Admin Stats", "GET", "admin/stats", 200, use_admin=True)
+        user_id = target_user['id']
         
-        # Test admin users list
-        success2, _ = self.run_test("Admin Users List", "GET", "admin/users", 200, use_admin=True)
+        # Test promoting to admin
+        success, response = self.run_test(
+            "Promote User to Admin",
+            "PUT",
+            f"admin/users/{user_id}/admin?is_admin=true",
+            200,
+            headers=headers
+        )
         
-        return success1 and success2
-
-    def test_settings(self):
-        """Test user settings endpoints"""
-        self.log("=== SETTINGS TESTS ===")
+        if success:
+            # Test demoting from admin
+            success2, response2 = self.run_test(
+                "Demote User from Admin",
+                "PUT",
+                f"admin/users/{user_id}/admin?is_admin=false",
+                200,
+                headers=headers
+            )
+            return success2
         
-        # Update trading level
-        success, _ = self.run_test("Update Trading Level", "PUT", "settings/trading-level?level=intermediate", 200)
         return success
 
-    def test_smart_invest(self):
-        """Test Smart Invest endpoints"""
-        self.log("=== SMART INVEST TESTS ===")
+    def test_avatar_upload(self):
+        """Test avatar upload functionality"""
+        if not self.admin_token:
+            self.log_result("Avatar Upload", False, "No admin token available")
+            return False
         
-        # Test market analysis
-        analysis_data = {
-            "investment_amount": 100.0
-        }
-        success1, analysis_response = self.run_test("Smart Invest Analysis", "POST", "smart-invest/analyze", 200, analysis_data)
+        # Create a simple test image file
+        test_image_content = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\tpHYs\x00\x00\x0b\x13\x00\x00\x0b\x13\x01\x00\x9a\x9c\x18\x00\x00\x00\nIDATx\x9cc\xf8\x00\x00\x00\x01\x00\x01\x00\x00\x00\x00IEND\xaeB`\x82'
         
-        # Test with invalid amount (too low)
-        invalid_data = {
-            "investment_amount": 5.0
-        }
-        success2, error_response = self.run_test("Smart Invest Invalid Amount", "POST", "smart-invest/analyze", 200, invalid_data)
+        headers = {'Authorization': f'Bearer {self.admin_token}'}
+        files = {'file': ('test_avatar.png', test_image_content, 'image/png')}
         
-        # Check if error response contains expected error message
-        if success2 and error_response.get("error"):
-            self.log("✅ Correctly handled invalid amount")
-        else:
-            self.log("❌ Should return error for amount < 10€")
-            self.failed_tests.append({
-                "test": "Smart Invest Invalid Amount Validation",
-                "error": "Should return error for amount < 10€",
-                "endpoint": "smart-invest/analyze"
-            })
+        success, response = self.run_test(
+            "Avatar Upload",
+            "POST",
+            "profile/avatar",
+            200,
+            headers=headers,
+            files=files
+        )
         
-        # Test execution if analysis was successful
-        execution_success = False
-        if success1 and analysis_response and not analysis_response.get("error"):
-            execute_data = {
-                "coin_id": analysis_response.get("coin_id", "bitcoin"),
-                "amount_usd": 50.0,
-                "entry_price": analysis_response.get("current_price", 50000)
-            }
-            execution_success, _ = self.run_test("Smart Invest Execute", "POST", "smart-invest/execute", 200, execute_data)
-        else:
-            # If analysis failed, test with fallback data
-            execute_data = {
-                "coin_id": "bitcoin",
-                "amount_usd": 50.0,
-                "entry_price": 50000
-            }
-            execution_success, _ = self.run_test("Smart Invest Execute (Fallback)", "POST", "smart-invest/execute", 200, execute_data)
+        if success and 'avatar' in response:
+            avatar_path = response['avatar']
+            self.log_result("Avatar Path Check", True, f"Avatar path: {avatar_path}")
+            
+            # Test avatar deletion
+            success2, response2 = self.run_test(
+                "Avatar Delete",
+                "DELETE",
+                "profile/avatar",
+                200,
+                headers=headers
+            )
+            return success2
         
-        return success1 and execution_success
+        return success
+
+    def test_settings_endpoints(self):
+        """Test settings related endpoints"""
+        if not self.admin_token:
+            self.log_result("Settings Endpoints", False, "No admin token available")
+            return False
+            
+        headers = {'Authorization': f'Bearer {self.admin_token}'}
+        
+        # Test trading level update
+        success, response = self.run_test(
+            "Update Trading Level",
+            "PUT",
+            "settings/trading-level?level=advanced",
+            200,
+            headers=headers
+        )
+        
+        return success
+
+    def test_non_admin_access(self):
+        """Test that non-admin users cannot access admin endpoints"""
+        if not self.regular_token:
+            self.log_result("Non-Admin Access Test", False, "No regular token available")
+            return False
+            
+        headers = {'Authorization': f'Bearer {self.regular_token}'}
+        
+        # Try to access admin stats (should fail)
+        success, response = self.run_test(
+            "Non-Admin Stats Access",
+            "GET",
+            "admin/stats",
+            403,  # Expecting forbidden
+            headers=headers
+        )
+        
+        return success
 
     def run_all_tests(self):
-        """Run all test suites"""
-        self.log("🚀 Starting BULL SAGE API Tests")
-        self.log(f"Testing against: {self.base_url}")
-        
-        # Health checks first
-        self.test_health_check()
+        """Run all tests"""
+        print("🚀 Starting BULL SAGE Admin Panel & Avatar Upload Tests")
+        print("=" * 60)
         
         # Authentication tests
-        user_reg_success = self.test_user_registration()
         admin_login_success = self.test_admin_login()
-        user_auth_success = self.test_user_login()
+        regular_login_success = self.test_regular_login()
         
-        if not user_auth_success:
-            self.log("❌ User authentication failed, stopping tests")
-            return False
+        if not admin_login_success:
+            print("\n❌ Admin login failed - cannot proceed with admin tests")
+            return self.get_summary()
         
-        # Core functionality tests (require auth)
-        self.test_market_endpoints()
-        self.test_market_context()
-        self.test_ai_assistant()
-        self.test_paper_trading()
-        self.test_signals()
-        self.test_trading_mode()
-        self.test_academy()
-        self.test_watchlist()
-        self.test_alerts()
-        self.test_strategies()
-        self.test_settings()
-        self.test_smart_invest()  # Add Smart Invest tests
+        # Admin functionality tests
+        self.test_admin_stats()
+        self.test_admin_users_list()
+        self.test_user_promotion()
         
-        # Admin tests (if admin login successful)
-        if admin_login_success:
-            self.test_admin_endpoints()
+        # Avatar upload tests
+        self.test_avatar_upload()
         
-        return True
+        # Settings tests
+        self.test_settings_endpoints()
+        
+        # Security tests
+        if regular_login_success:
+            self.test_non_admin_access()
+        
+        return self.get_summary()
 
-    def print_summary(self):
-        """Print test summary"""
-        self.log("=" * 50)
-        self.log("🏁 TEST SUMMARY")
-        self.log(f"Total tests: {self.tests_run}")
-        self.log(f"Passed: {self.tests_passed}")
-        self.log(f"Failed: {len(self.failed_tests)}")
-        self.log(f"Success rate: {(self.tests_passed/self.tests_run*100):.1f}%")
+    def get_summary(self):
+        """Get test summary"""
+        print("\n" + "=" * 60)
+        print(f"📊 Test Summary: {self.tests_passed}/{self.tests_run} tests passed")
         
-        if self.failed_tests:
-            self.log("\n❌ FAILED TESTS:")
-            for test in self.failed_tests:
-                error_msg = test.get('error', f"Expected {test.get('expected')}, got {test.get('actual')}")
-                self.log(f"  - {test['test']}: {error_msg}")
-        
-        return len(self.failed_tests) == 0
+        if self.tests_passed == self.tests_run:
+            print("🎉 All tests passed!")
+            return 0
+        else:
+            failed_tests = [r for r in self.results if not r['success']]
+            print(f"\n❌ Failed tests ({len(failed_tests)}):")
+            for test in failed_tests:
+                print(f"   - {test['test']}: {test['message']}")
+            return 1
 
 def main():
-    """Main test execution"""
     tester = BullSageAPITester()
-    
-    try:
-        success = tester.run_all_tests()
-        tester.print_summary()
-        
-        # Return appropriate exit code
-        return 0 if success else 1
-        
-    except KeyboardInterrupt:
-        tester.log("Tests interrupted by user")
-        return 1
-    except Exception as e:
-        tester.log(f"Unexpected error: {e}", "ERROR")
-        return 1
+    return tester.run_all_tests()
 
 if __name__ == "__main__":
     sys.exit(main())
