@@ -5649,8 +5649,17 @@ async def create_admin_user():
         )
         logger.info(f"Admin status confirmed for: {admin_email}")
 
+# Create uploads directory if not exists
+UPLOADS_DIR = ROOT_DIR / "uploads"
+AVATARS_DIR = UPLOADS_DIR / "avatars"
+UPLOADS_DIR.mkdir(exist_ok=True)
+AVATARS_DIR.mkdir(exist_ok=True)
+
 # Include the router in the main app
 app.include_router(api_router)
+
+# Mount static files for uploads
+app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,
