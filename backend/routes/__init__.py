@@ -16,6 +16,8 @@ from .watchlist import router as watchlist_router
 from .strategies import router as strategies_router
 from .settings import router as settings_router
 from .health import router as health_router
+from .wallet import router as wallet_router
+from .defi_scanner import router as defi_scanner_router
 
 # Create main API router
 api_router = APIRouter(prefix="/api")
@@ -36,3 +38,5 @@ api_router.include_router(watchlist_router)
 api_router.include_router(strategies_router)
 api_router.include_router(settings_router)
 api_router.include_router(health_router)
+api_router.include_router(wallet_router)
+api_router.include_router(defi_scanner_router)
