@@ -237,7 +237,11 @@ export default function ChartPage() {
     if (price < 0.001) return price.toFixed(8);
     if (price < 1) return price.toFixed(6);
     if (price < 100) return price.toFixed(4);
-    return price.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    try {
+      return price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    } catch {
+      return price.toFixed(2);
+    }
   };
 
   const filteredPairs = searchQuery
