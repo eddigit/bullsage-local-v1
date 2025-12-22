@@ -75,6 +75,7 @@ const autoTradingItem = { name: "Auto-Trading", href: "/auto-trading", icon: Bot
 // Admin navigation
 const adminNavigation = [
   { name: "Administration", href: "/admin", icon: Shield, admin: true },
+  { name: "Newsletter", href: "/admin/newsletter", icon: Mail, admin: true },
   { name: "Clés API", href: "/admin/api-keys", icon: Key, admin: true },
 ];
 
