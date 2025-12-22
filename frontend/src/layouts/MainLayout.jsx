@@ -28,7 +28,8 @@ import {
   Bot,
   Search,
   CandlestickChart,
-  Mail
+  Mail,
+  Newspaper
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { ScrollArea } from "../components/ui/scroll-area";
