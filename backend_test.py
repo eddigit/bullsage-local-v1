@@ -10,11 +10,10 @@ import json
 from datetime import datetime
 import os
 
-class BullSageAPITester:
+class BullSageMarketNewsTester:
     def __init__(self, base_url="https://marketoracle-35.preview.emergentagent.com"):
         self.base_url = base_url
-        self.admin_token = None
-        self.regular_token = None
+        self.token = None
         self.tests_run = 0
         self.tests_passed = 0
         self.results = []
