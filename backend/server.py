@@ -6248,41 +6248,30 @@ async def get_defi_token_details(
     
     raise HTTPException(status_code=404, detail="Token non trouvé")
 
-# ============== CHART DATA (Binance Proxy) ==============
+# ============== CHART DATA (CryptoCompare Proxy) ==============
 
 @api_router.get("/chart/pairs")
 async def get_chart_pairs():
-    """Get all available trading pairs from Binance"""
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                "https://api.binance.com/api/v3/exchangeInfo",
-                timeout=15.0
-            )
-            if response.status_code == 200:
-                data = response.json()
-                pairs = [
-                    {
-                        "symbol": s["symbol"],
-                        "baseAsset": s["baseAsset"],
-                        "quoteAsset": s["quoteAsset"],
-                        "status": s["status"]
-                    }
-                    for s in data.get("symbols", [])
-                    if s.get("quoteAsset") == "USDT" and s.get("status") == "TRADING"
-                ]
-                return {"pairs": pairs}
-    except Exception as e:
-        logger.error(f"Binance pairs error: {e}")
-    
-    # Fallback to top pairs
-    return {"pairs": [
-        {"symbol": "BTCUSDT", "baseAsset": "BTC", "quoteAsset": "USDT"},
-        {"symbol": "ETHUSDT", "baseAsset": "ETH", "quoteAsset": "USDT"},
-        {"symbol": "SOLUSDT", "baseAsset": "SOL", "quoteAsset": "USDT"},
-        {"symbol": "BNBUSDT", "baseAsset": "BNB", "quoteAsset": "USDT"},
-        {"symbol": "XRPUSDT", "baseAsset": "XRP", "quoteAsset": "USDT"},
-    ]}
+    """Get available trading pairs"""
+    # Return popular crypto pairs since we use CryptoCompare
+    pairs = [
+        {"symbol": "BTCUSDT", "baseAsset": "BTC", "quoteAsset": "USD"},
+        {"symbol": "ETHUSDT", "baseAsset": "ETH", "quoteAsset": "USD"},
+        {"symbol": "SOLUSDT", "baseAsset": "SOL", "quoteAsset": "USD"},
+        {"symbol": "BNBUSDT", "baseAsset": "BNB", "quoteAsset": "USD"},
+        {"symbol": "XRPUSDT", "baseAsset": "XRP", "quoteAsset": "USD"},
+        {"symbol": "ADAUSDT", "baseAsset": "ADA", "quoteAsset": "USD"},
+        {"symbol": "DOGEUSDT", "baseAsset": "DOGE", "quoteAsset": "USD"},
+        {"symbol": "AVAXUSDT", "baseAsset": "AVAX", "quoteAsset": "USD"},
+        {"symbol": "DOTUSDT", "baseAsset": "DOT", "quoteAsset": "USD"},
+        {"symbol": "MATICUSDT", "baseAsset": "MATIC", "quoteAsset": "USD"},
+        {"symbol": "LINKUSDT", "baseAsset": "LINK", "quoteAsset": "USD"},
+        {"symbol": "LTCUSDT", "baseAsset": "LTC", "quoteAsset": "USD"},
+        {"symbol": "ATOMUSDT", "baseAsset": "ATOM", "quoteAsset": "USD"},
+        {"symbol": "NEARUSDT", "baseAsset": "NEAR", "quoteAsset": "USD"},
+        {"symbol": "UNIUSDT", "baseAsset": "UNI", "quoteAsset": "USD"},
+    ]
+    return {"pairs": pairs}
 
 @api_router.get("/chart/klines/{symbol}")
 async def get_chart_klines(
@@ -6290,61 +6279,93 @@ async def get_chart_klines(
     interval: str = "1m",
     limit: int = 500
 ):
-    """Get candlestick/kline data from Binance"""
+    """Get candlestick/kline data from CryptoCompare"""
+    # Extract base asset (remove USDT suffix)
+    base_asset = symbol.upper().replace("USDT", "").replace("USD", "")
+    
+    # Map interval to CryptoCompare format
+    interval_map = {
+        "1s": ("histominute", 1),  # Will aggregate
+        "1m": ("histominute", 1),
+        "5m": ("histominute", 5),
+        "15m": ("histominute", 15),
+        "1h": ("histohour", 1),
+        "4h": ("histohour", 4),
+        "1d": ("histoday", 1),
+    }
+    
+    endpoint, aggregate = interval_map.get(interval, ("histominute", 1))
+    
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                "https://api.binance.com/api/v3/klines",
+                f"{CRYPTOCOMPARE_API_URL}/{endpoint}",
                 params={
-                    "symbol": symbol.upper(),
-                    "interval": interval,
-                    "limit": limit
+                    "fsym": base_asset,
+                    "tsym": "USD",
+                    "limit": limit,
+                    "aggregate": aggregate
                 },
                 timeout=15.0
             )
+            
             if response.status_code == 200:
                 data = response.json()
-                candles = [
-                    {
-                        "time": int(k[0] / 1000),
-                        "open": float(k[1]),
-                        "high": float(k[2]),
-                        "low": float(k[3]),
-                        "close": float(k[4]),
-                        "volume": float(k[5])
-                    }
-                    for k in data
-                ]
-                return {"candles": candles, "symbol": symbol}
+                if data.get("Response") == "Success":
+                    candles = [
+                        {
+                            "time": int(d["time"]),
+                            "open": float(d["open"]),
+                            "high": float(d["high"]),
+                            "low": float(d["low"]),
+                            "close": float(d["close"]),
+                            "volume": float(d.get("volumefrom", 0))
+                        }
+                        for d in data.get("Data", {}).get("Data", [])
+                        if d.get("open") > 0  # Filter out empty candles
+                    ]
+                    return {"candles": candles, "symbol": symbol}
+                else:
+                    logger.error(f"CryptoCompare error: {data.get('Message')}")
     except Exception as e:
-        logger.error(f"Binance klines error: {e}")
+        logger.error(f"Chart klines error: {e}")
     
     raise HTTPException(status_code=503, detail="Erreur de récupération des données")
 
 @api_router.get("/chart/ticker/{symbol}")
 async def get_chart_ticker(symbol: str):
-    """Get 24h ticker data from Binance"""
+    """Get current ticker data from CryptoCompare"""
+    base_asset = symbol.upper().replace("USDT", "").replace("USD", "")
+    
     try:
         async with httpx.AsyncClient() as client:
+            # Get current price and 24h data
             response = await client.get(
-                "https://api.binance.com/api/v3/ticker/24hr",
-                params={"symbol": symbol.upper()},
+                f"{CRYPTOCOMPARE_API_URL}/pricemultifull",
+                params={
+                    "fsyms": base_asset,
+                    "tsyms": "USD"
+                },
                 timeout=10.0
             )
+            
             if response.status_code == 200:
                 data = response.json()
-                return {
-                    "symbol": symbol,
-                    "price": float(data.get("lastPrice", 0)),
-                    "priceChange": float(data.get("priceChange", 0)),
-                    "priceChangePercent": float(data.get("priceChangePercent", 0)),
-                    "high": float(data.get("highPrice", 0)),
-                    "low": float(data.get("lowPrice", 0)),
-                    "volume": float(data.get("volume", 0)),
-                    "quoteVolume": float(data.get("quoteVolume", 0))
-                }
+                raw = data.get("RAW", {}).get(base_asset, {}).get("USD", {})
+                
+                if raw:
+                    return {
+                        "symbol": symbol,
+                        "price": float(raw.get("PRICE", 0)),
+                        "priceChange": float(raw.get("CHANGE24HOUR", 0)),
+                        "priceChangePercent": float(raw.get("CHANGEPCT24HOUR", 0)),
+                        "high": float(raw.get("HIGH24HOUR", 0)),
+                        "low": float(raw.get("LOW24HOUR", 0)),
+                        "volume": float(raw.get("VOLUME24HOUR", 0)),
+                        "quoteVolume": float(raw.get("VOLUME24HOURTO", 0))
+                    }
     except Exception as e:
-        logger.error(f"Binance ticker error: {e}")
+        logger.error(f"Chart ticker error: {e}")
     
     raise HTTPException(status_code=503, detail="Erreur de récupération du ticker")
 
