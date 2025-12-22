@@ -204,6 +204,7 @@ function App() {
               <Route path="defi-scanner" element={<DeFiScannerPage />} />
               <Route path="chart" element={<ChartPage />} />
               <Route path="admin/newsletter" element={<NewsletterAdminPage />} />
+              <Route path="market-news" element={<MarketNewsPage />} />
             </Route>
           </Routes>
         </BrowserRouter>
