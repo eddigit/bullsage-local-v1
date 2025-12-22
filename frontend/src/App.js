@@ -25,6 +25,8 @@ import ModulePage from "./pages/ModulePage";
 import OnboardingPage from "./pages/OnboardingPage";
 import SmartInvestPage from "./pages/SmartInvestPage";
 import AutoTradingPage from "./pages/AutoTradingPage";
+import WalletPage from "./pages/WalletPage";
+import DeFiScannerPage from "./pages/DeFiScannerPage";
 
 // Layout
 import MainLayout from "./layouts/MainLayout";
