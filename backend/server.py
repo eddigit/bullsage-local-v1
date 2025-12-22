@@ -6392,6 +6392,257 @@ async def get_chart_ticker(symbol: str):
     
     raise HTTPException(status_code=503, detail="Erreur de récupération du ticker")
 
+# ============== MARKET NEWS & INDICES ==============
+
+@api_router.get("/market/news")
+async def get_market_news(
+    category: str = "general",
+    limit: int = 20,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get latest market news from multiple sources"""
+    news = []
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            # Try Finnhub first
+            if FINNHUB_API_KEY:
+                try:
+                    response = await client.get(
+                        "https://finnhub.io/api/v1/news",
+                        params={
+                            "category": category,
+                            "token": FINNHUB_API_KEY
+                        },
+                        timeout=10.0
+                    )
+                    if response.status_code == 200:
+                        data = response.json()
+                        for item in data[:limit]:
+                            news.append({
+                                "id": item.get("id", ""),
+                                "title": item.get("headline", ""),
+                                "summary": item.get("summary", "")[:200] + "..." if len(item.get("summary", "")) > 200 else item.get("summary", ""),
+                                "source": item.get("source", ""),
+                                "url": item.get("url", ""),
+                                "image": item.get("image", ""),
+                                "published_at": datetime.fromtimestamp(item.get("datetime", 0)).isoformat() if item.get("datetime") else "",
+                                "category": item.get("category", category),
+                                "related": item.get("related", ""),
+                                "sentiment": None
+                            })
+                        logger.info(f"Got {len(news)} news from Finnhub")
+                except Exception as e:
+                    logger.warning(f"Finnhub news error: {e}")
+            
+            # Try Marketaux as fallback/supplement
+            if MARKETAUX_API_KEY and len(news) < limit:
+                try:
+                    response = await client.get(
+                        "https://api.marketaux.com/v1/news/all",
+                        params={
+                            "api_token": MARKETAUX_API_KEY,
+                            "language": "en",
+                            "filter_entities": "true",
+                            "limit": limit - len(news)
+                        },
+                        timeout=10.0
+                    )
+                    if response.status_code == 200:
+                        data = response.json()
+                        for item in data.get("data", []):
+                            news.append({
+                                "id": item.get("uuid", ""),
+                                "title": item.get("title", ""),
+                                "summary": item.get("description", "")[:200] + "..." if len(item.get("description", "")) > 200 else item.get("description", ""),
+                                "source": item.get("source", ""),
+                                "url": item.get("url", ""),
+                                "image": item.get("image_url", ""),
+                                "published_at": item.get("published_at", ""),
+                                "category": "market",
+                                "related": ",".join([e.get("symbol", "") for e in item.get("entities", [])[:3]]),
+                                "sentiment": item.get("sentiment_score", None)
+                            })
+                        logger.info(f"Added {len(data.get('data', []))} news from Marketaux")
+                except Exception as e:
+                    logger.warning(f"Marketaux news error: {e}")
+    
+    except Exception as e:
+        logger.error(f"News fetch error: {e}")
+    
+    return {"news": news[:limit], "count": len(news)}
+
+@api_router.get("/market/indices")
+async def get_market_indices(current_user: dict = Depends(get_current_user)):
+    """Get major market indices data"""
+    indices = []
+    
+    indices_to_fetch = [
+        {"symbol": "QQQ", "name": "NASDAQ 100", "icon": "📈"},
+        {"symbol": "SPY", "name": "S&P 500", "icon": "📊"},
+        {"symbol": "DIA", "name": "Dow Jones", "icon": "🏛️"},
+        {"symbol": "IWM", "name": "Russell 2000", "icon": "📉"},
+        {"symbol": "VIX", "name": "VIX (Volatility)", "icon": "⚡"},
+    ]
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            for idx in indices_to_fetch:
+                try:
+                    response = await client.get(
+                        "https://www.alphavantage.co/query",
+                        params={
+                            "function": "GLOBAL_QUOTE",
+                            "symbol": idx["symbol"],
+                            "apikey": ALPHA_VANTAGE_API_KEY
+                        },
+                        timeout=10.0
+                    )
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        quote = data.get("Global Quote", {})
+                        
+                        if quote:
+                            price = float(quote.get("05. price", 0))
+                            change = float(quote.get("09. change", 0))
+                            change_pct = float(quote.get("10. change percent", "0").replace("%", ""))
+                            
+                            indices.append({
+                                "symbol": idx["symbol"],
+                                "name": idx["name"],
+                                "icon": idx["icon"],
+                                "price": price,
+                                "change": change,
+                                "change_percent": change_pct,
+                                "high": float(quote.get("03. high", price)),
+                                "low": float(quote.get("04. low", price)),
+                                "volume": int(quote.get("06. volume", 0)),
+                                "last_updated": quote.get("07. latest trading day", "")
+                            })
+                    
+                    await asyncio.sleep(0.3)  # Rate limit
+                    
+                except Exception as e:
+                    logger.warning(f"Index {idx['symbol']} fetch error: {e}")
+    
+    except Exception as e:
+        logger.error(f"Indices fetch error: {e}")
+    
+    return {"indices": indices}
+
+@api_router.get("/market/stocks/{symbol}")
+async def get_stock_quote(symbol: str, current_user: dict = Depends(get_current_user)):
+    """Get detailed stock quote"""
+    try:
+        async with httpx.AsyncClient() as client:
+            # Get quote
+            quote_response = await client.get(
+                "https://www.alphavantage.co/query",
+                params={
+                    "function": "GLOBAL_QUOTE",
+                    "symbol": symbol.upper(),
+                    "apikey": ALPHA_VANTAGE_API_KEY
+                },
+                timeout=10.0
+            )
+            
+            if quote_response.status_code == 200:
+                data = quote_response.json()
+                quote = data.get("Global Quote", {})
+                
+                if quote:
+                    return {
+                        "symbol": quote.get("01. symbol", symbol),
+                        "price": float(quote.get("05. price", 0)),
+                        "open": float(quote.get("02. open", 0)),
+                        "high": float(quote.get("03. high", 0)),
+                        "low": float(quote.get("04. low", 0)),
+                        "volume": int(quote.get("06. volume", 0)),
+                        "last_trading_day": quote.get("07. latest trading day", ""),
+                        "previous_close": float(quote.get("08. previous close", 0)),
+                        "change": float(quote.get("09. change", 0)),
+                        "change_percent": float(quote.get("10. change percent", "0").replace("%", ""))
+                    }
+    except Exception as e:
+        logger.error(f"Stock quote error: {e}")
+    
+    raise HTTPException(status_code=404, detail="Stock non trouvé")
+
+@api_router.get("/market/stock-news/{symbol}")
+async def get_stock_news(symbol: str, current_user: dict = Depends(get_current_user)):
+    """Get news for a specific stock"""
+    news = []
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            if FINNHUB_API_KEY:
+                # Get date range
+                today = datetime.now()
+                week_ago = today - timedelta(days=7)
+                
+                response = await client.get(
+                    "https://finnhub.io/api/v1/company-news",
+                    params={
+                        "symbol": symbol.upper(),
+                        "from": week_ago.strftime("%Y-%m-%d"),
+                        "to": today.strftime("%Y-%m-%d"),
+                        "token": FINNHUB_API_KEY
+                    },
+                    timeout=10.0
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    for item in data[:10]:
+                        news.append({
+                            "id": item.get("id", ""),
+                            "title": item.get("headline", ""),
+                            "summary": item.get("summary", "")[:300],
+                            "source": item.get("source", ""),
+                            "url": item.get("url", ""),
+                            "image": item.get("image", ""),
+                            "published_at": datetime.fromtimestamp(item.get("datetime", 0)).isoformat() if item.get("datetime") else ""
+                        })
+    except Exception as e:
+        logger.error(f"Stock news error: {e}")
+    
+    return {"symbol": symbol, "news": news}
+
+@api_router.get("/market/economic-calendar")
+async def get_economic_calendar(current_user: dict = Depends(get_current_user)):
+    """Get upcoming economic events"""
+    events = []
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            if FINNHUB_API_KEY:
+                response = await client.get(
+                    "https://finnhub.io/api/v1/calendar/economic",
+                    params={"token": FINNHUB_API_KEY},
+                    timeout=10.0
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    for event in data.get("economicCalendar", [])[:20]:
+                        events.append({
+                            "country": event.get("country", ""),
+                            "event": event.get("event", ""),
+                            "time": event.get("time", ""),
+                            "impact": event.get("impact", ""),
+                            "actual": event.get("actual", ""),
+                            "estimate": event.get("estimate", ""),
+                            "previous": event.get("prev", ""),
+                            "unit": event.get("unit", "")
+                        })
+    except Exception as e:
+        logger.error(f"Economic calendar error: {e}")
+    
+    return {"events": events}
+    
+    raise HTTPException(status_code=503, detail="Erreur de récupération du ticker")
+
 # ============== NEWSLETTER ADMIN ==============
 
 class SMTPConfig(BaseModel):
