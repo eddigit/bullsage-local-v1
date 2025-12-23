@@ -6879,19 +6879,6 @@ async def get_chart_ticker(symbol: str):
                     }
     except Exception as e:
         logger.warning(f"CryptoCompare ticker error: {e}")
-                            
-                            return {
-                                "symbol": symbol,
-                                "price": price,
-                                "priceChange": change,
-                                "priceChangePercent": change_pct,
-                                "high": high,
-                                "low": low,
-                                "volume": volume,
-                                "quoteVolume": volume * price
-                            }
-    except Exception as e:
-        logger.warning(f"Kraken ticker error: {e}")
     
     raise HTTPException(status_code=503, detail="Erreur de récupération du ticker")
 
