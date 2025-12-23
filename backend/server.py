@@ -4805,7 +4805,7 @@ async def unified_opportunity_scanner(
                 for o in top_opportunities[:5]
             ])
             
-            chat = LlmChat(api_key=EMERGENT_LLM_KEY, model="gpt-4o")
+            chat = LlmChat(api_key=EMERGENT_LLM_KEY)
             ai_response = await asyncio.to_thread(
                 chat.generate_response,
                 f"""Tu es un expert trader. Analyse ces opportunités de trading du jour et donne ta recommandation:
