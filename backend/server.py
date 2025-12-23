@@ -4547,6 +4547,329 @@ async def scan_trading_opportunities(current_user: dict = Depends(get_current_us
 
 # ============== HEALTH CHECK ==============
 
+# ============== UNIFIED AI OPPORTUNITY SCANNER ==============
+
+class UnifiedScanRequest(BaseModel):
+    include_crypto: bool = True
+    include_stocks: bool = True
+    include_indices: bool = True
+    max_results: int = 10
+
+# Top assets to scan
+SCAN_CRYPTOS = ["bitcoin", "ethereum", "solana", "ripple", "cardano", "dogecoin", "avalanche-2", "polkadot", "chainlink", "litecoin"]
+SCAN_STOCKS = ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "AMD", "COIN", "MSTR"]
+SCAN_INDICES = ["QQQ", "SPY", "DIA", "IWM"]
+
+@api_router.post("/scanner/unified")
+async def unified_opportunity_scanner(
+    request: UnifiedScanRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    🔍 Scanner IA Unifié - Analyse TOUS les marchés (crypto + actions + indices)
+    Utilise l'IA pour trouver les meilleures opportunités de trading du jour.
+    """
+    all_opportunities = []
+    errors = []
+    
+    async with httpx.AsyncClient() as client:
+        # ============== 1. SCAN CRYPTOS via Kraken ==============
+        if request.include_crypto:
+            try:
+                kraken_pairs = "XBTUSD,ETHUSD,SOLUSD,XRPUSD,ADAUSD,DOGEUSD,AVAXUSD,DOTUSD,LINKUSD,LTCUSD"
+                response = await client.get(
+                    "https://api.kraken.com/0/public/Ticker",
+                    params={"pair": kraken_pairs},
+                    timeout=15.0
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    result = data.get("result", {})
+                    
+                    crypto_mapping = {
+                        "XXBTZUSD": ("bitcoin", "BTC", "Bitcoin", "₿"),
+                        "XETHZUSD": ("ethereum", "ETH", "Ethereum", "Ξ"),
+                        "SOLUSD": ("solana", "SOL", "Solana", "◎"),
+                        "XXRPZUSD": ("ripple", "XRP", "XRP", "✕"),
+                        "ADAUSD": ("cardano", "ADA", "Cardano", "₳"),
+                        "XDGUSD": ("dogecoin", "DOGE", "Dogecoin", "Ð"),
+                        "AVAXUSD": ("avalanche-2", "AVAX", "Avalanche", "🔺"),
+                        "DOTUSD": ("polkadot", "DOT", "Polkadot", "●"),
+                        "LINKUSD": ("chainlink", "LINK", "Chainlink", "⬡"),
+                        "XLTCZUSD": ("litecoin", "LTC", "Litecoin", "Ł"),
+                    }
+                    
+                    for kraken_key, (coin_id, symbol, name, icon) in crypto_mapping.items():
+                        if kraken_key in result:
+                            ticker = result[kraken_key]
+                            price = float(ticker["c"][0])
+                            open_price = float(ticker["o"])
+                            high = float(ticker["h"][1])
+                            low = float(ticker["l"][1])
+                            change_pct = ((price - open_price) / open_price * 100) if open_price > 0 else 0
+                            
+                            # Simple scoring based on price action
+                            score = 0
+                            signals = []
+                            
+                            # Price near low = potential buy
+                            price_position = (price - low) / (high - low) if high != low else 0.5
+                            if price_position < 0.2:
+                                score += 3
+                                signals.append("Prix proche du bas 24h")
+                            elif price_position < 0.4:
+                                score += 1
+                                signals.append("Prix en zone basse")
+                            elif price_position > 0.8:
+                                score -= 2
+                                signals.append("Prix proche du haut 24h")
+                            
+                            # Change analysis
+                            if change_pct < -5:
+                                score += 2
+                                signals.append(f"Forte baisse ({change_pct:.1f}%) - Rebond possible")
+                            elif change_pct > 5:
+                                score -= 1
+                                signals.append(f"Forte hausse ({change_pct:.1f}%)")
+                            
+                            action = "BUY" if score >= 2 else ("SELL" if score <= -2 else "WATCH")
+                            
+                            all_opportunities.append({
+                                "id": coin_id,
+                                "symbol": symbol,
+                                "name": name,
+                                "icon": icon,
+                                "type": "crypto",
+                                "price": price,
+                                "change_24h": round(change_pct, 2),
+                                "high_24h": high,
+                                "low_24h": low,
+                                "score": score,
+                                "action": action,
+                                "signals": signals,
+                                "source": "Kraken"
+                            })
+                            
+            except Exception as e:
+                errors.append(f"Crypto scan error: {e}")
+                logger.warning(f"Crypto scan error: {e}")
+        
+        # ============== 2. SCAN STOCKS via Alpha Vantage ==============
+        if request.include_stocks and ALPHA_VANTAGE_API_KEY:
+            for symbol in SCAN_STOCKS[:5]:  # Limit to avoid rate limits
+                try:
+                    response = await client.get(
+                        "https://www.alphavantage.co/query",
+                        params={
+                            "function": "GLOBAL_QUOTE",
+                            "symbol": symbol,
+                            "apikey": ALPHA_VANTAGE_API_KEY
+                        },
+                        timeout=10.0
+                    )
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        quote = data.get("Global Quote", {})
+                        
+                        if quote:
+                            price = float(quote.get("05. price", 0))
+                            change = float(quote.get("09. change", 0))
+                            change_pct = float(quote.get("10. change percent", "0").replace("%", ""))
+                            high = float(quote.get("03. high", price))
+                            low = float(quote.get("04. low", price))
+                            
+                            # Scoring
+                            score = 0
+                            signals = []
+                            
+                            if change_pct < -3:
+                                score += 2
+                                signals.append(f"Baisse significative ({change_pct:.1f}%)")
+                            elif change_pct > 3:
+                                score -= 1
+                                signals.append(f"Hausse significative ({change_pct:.1f}%)")
+                            
+                            price_position = (price - low) / (high - low) if high != low else 0.5
+                            if price_position < 0.3:
+                                score += 2
+                                signals.append("Prix en zone basse")
+                            elif price_position > 0.8:
+                                score -= 1
+                                signals.append("Prix en zone haute")
+                            
+                            action = "BUY" if score >= 2 else ("SELL" if score <= -2 else "WATCH")
+                            
+                            stock_names = {
+                                "AAPL": "Apple", "MSFT": "Microsoft", "NVDA": "NVIDIA",
+                                "GOOGL": "Google", "AMZN": "Amazon", "META": "Meta",
+                                "TSLA": "Tesla", "AMD": "AMD", "COIN": "Coinbase", "MSTR": "MicroStrategy"
+                            }
+                            
+                            all_opportunities.append({
+                                "id": symbol,
+                                "symbol": symbol,
+                                "name": stock_names.get(symbol, symbol),
+                                "icon": "📈",
+                                "type": "stock",
+                                "price": price,
+                                "change_24h": round(change_pct, 2),
+                                "high_24h": high,
+                                "low_24h": low,
+                                "score": score,
+                                "action": action,
+                                "signals": signals,
+                                "source": "Alpha Vantage"
+                            })
+                    
+                    await asyncio.sleep(0.3)  # Rate limit
+                    
+                except Exception as e:
+                    logger.warning(f"Stock {symbol} scan error: {e}")
+        
+        # ============== 3. SCAN INDICES via Alpha Vantage ==============
+        if request.include_indices and ALPHA_VANTAGE_API_KEY:
+            for symbol in SCAN_INDICES:
+                try:
+                    response = await client.get(
+                        "https://www.alphavantage.co/query",
+                        params={
+                            "function": "GLOBAL_QUOTE",
+                            "symbol": symbol,
+                            "apikey": ALPHA_VANTAGE_API_KEY
+                        },
+                        timeout=10.0
+                    )
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        quote = data.get("Global Quote", {})
+                        
+                        if quote:
+                            price = float(quote.get("05. price", 0))
+                            change_pct = float(quote.get("10. change percent", "0").replace("%", ""))
+                            high = float(quote.get("03. high", price))
+                            low = float(quote.get("04. low", price))
+                            
+                            score = 0
+                            signals = []
+                            
+                            if change_pct < -2:
+                                score += 2
+                                signals.append(f"Indice en baisse ({change_pct:.1f}%)")
+                            elif change_pct > 2:
+                                signals.append(f"Indice en hausse ({change_pct:.1f}%)")
+                            
+                            action = "BUY" if score >= 2 else ("SELL" if score <= -2 else "WATCH")
+                            
+                            index_names = {
+                                "QQQ": "NASDAQ 100", "SPY": "S&P 500",
+                                "DIA": "Dow Jones", "IWM": "Russell 2000"
+                            }
+                            
+                            all_opportunities.append({
+                                "id": symbol,
+                                "symbol": symbol,
+                                "name": index_names.get(symbol, symbol),
+                                "icon": "📊",
+                                "type": "index",
+                                "price": price,
+                                "change_24h": round(change_pct, 2),
+                                "high_24h": high,
+                                "low_24h": low,
+                                "score": score,
+                                "action": action,
+                                "signals": signals,
+                                "source": "Alpha Vantage"
+                            })
+                    
+                    await asyncio.sleep(0.3)
+                    
+                except Exception as e:
+                    logger.warning(f"Index {symbol} scan error: {e}")
+    
+    # Sort by score (best opportunities first)
+    all_opportunities.sort(key=lambda x: x["score"], reverse=True)
+    
+    # Get top opportunities
+    top_opportunities = all_opportunities[:request.max_results]
+    
+    # ============== 4. AI ANALYSIS ==============
+    ai_recommendation = None
+    if top_opportunities and EMERGENT_LLM_KEY:
+        try:
+            # Prepare data for AI
+            opp_summary = "\n".join([
+                f"- {o['name']} ({o['type'].upper()}): ${o['price']:,.2f}, {o['change_24h']:+.1f}%, Score: {o['score']}, Signaux: {', '.join(o['signals'])}"
+                for o in top_opportunities[:5]
+            ])
+            
+            chat = LlmChat(api_key=EMERGENT_LLM_KEY, model="gpt-4o")
+            ai_response = await asyncio.to_thread(
+                chat.generate_response,
+                f"""Tu es un expert trader. Analyse ces opportunités de trading du jour et donne ta recommandation:
+
+{opp_summary}
+
+Réponds en français avec:
+1. 🏆 MEILLEURE OPPORTUNITÉ: Quel actif acheter maintenant et pourquoi (2 lignes max)
+2. ⚠️ ACTIF À ÉVITER: Quel actif ne pas toucher et pourquoi (1 ligne)
+3. 💡 CONSEIL DU JOUR: Un conseil pratique de trading (1 ligne)
+
+Sois direct et concis."""
+            )
+            ai_recommendation = ai_response
+        except Exception as e:
+            logger.warning(f"AI analysis error: {e}")
+    
+    # Count by type
+    crypto_count = len([o for o in all_opportunities if o["type"] == "crypto"])
+    stock_count = len([o for o in all_opportunities if o["type"] == "stock"])
+    index_count = len([o for o in all_opportunities if o["type"] == "index"])
+    buy_count = len([o for o in all_opportunities if o["action"] == "BUY"])
+    
+    return {
+        "opportunities": top_opportunities,
+        "ai_recommendation": ai_recommendation,
+        "summary": {
+            "total_scanned": len(all_opportunities),
+            "crypto_count": crypto_count,
+            "stock_count": stock_count,
+            "index_count": index_count,
+            "buy_signals": buy_count,
+            "best_opportunity": top_opportunities[0] if top_opportunities else None
+        },
+        "scan_time": datetime.now(timezone.utc).isoformat(),
+        "errors": errors if errors else None
+    }
+
+@api_router.get("/scanner/best-opportunity")
+async def get_best_opportunity(current_user: dict = Depends(get_current_user)):
+    """
+    🎯 Obtenir la MEILLEURE opportunité de trading du moment
+    Scan rapide de tous les marchés et retourne l'actif avec le meilleur potentiel.
+    """
+    request = UnifiedScanRequest(include_crypto=True, include_stocks=True, include_indices=True, max_results=1)
+    result = await unified_opportunity_scanner(request, current_user)
+    
+    best = result.get("summary", {}).get("best_opportunity")
+    
+    if best:
+        return {
+            "found": True,
+            "opportunity": best,
+            "ai_recommendation": result.get("ai_recommendation"),
+            "message": f"🎯 Meilleure opportunité: {best['name']} ({best['type'].upper()}) - {best['action']}"
+        }
+    
+    return {
+        "found": False,
+        "message": "Aucune opportunité forte détectée pour le moment. Patience!"
+    }
+
+
+
 @api_router.get("/")
 async def root():
     return {"message": "BULL SAGE API is running", "version": "1.0.0"}
