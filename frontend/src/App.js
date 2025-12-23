@@ -206,6 +206,7 @@ function App() {
               <Route path="chart" element={<ChartPage />} />
               <Route path="admin/newsletter" element={<NewsletterAdminPage />} />
               <Route path="market-news" element={<MarketNewsPage />} />
+              <Route path="opportunity-scanner" element={<OpportunityScannerPage />} />
             </Route>
           </Routes>
         </BrowserRouter>
