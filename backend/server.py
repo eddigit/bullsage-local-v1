@@ -6465,12 +6465,12 @@ async def get_chart_klines(
 
 @api_router.get("/chart/ticker/{symbol}")
 async def get_chart_ticker(symbol: str):
-    """Get current ticker data from CryptoCompare"""
+    """Get current ticker data with fallback to Kraken"""
     base_asset = symbol.upper().replace("USDT", "").replace("USD", "")
     
+    # Try CryptoCompare first
     try:
         async with httpx.AsyncClient() as client:
-            # Get current price and 24h data
             response = await client.get(
                 f"{CRYPTOCOMPARE_API_URL}/pricemultifull",
                 params={
@@ -6496,7 +6496,59 @@ async def get_chart_ticker(symbol: str):
                         "quoteVolume": float(raw.get("VOLUME24HOURTO", 0))
                     }
     except Exception as e:
-        logger.error(f"Chart ticker error: {e}")
+        logger.warning(f"CryptoCompare ticker error: {e}")
+    
+    # Fallback to Kraken
+    try:
+        # Map symbol to Kraken pair
+        kraken_pairs = {
+            "BTC": "XBTUSD", "ETH": "ETHUSD", "SOL": "SOLUSD",
+            "XRP": "XRPUSD", "ADA": "ADAUSD", "DOGE": "DOGEUSD",
+            "DOT": "DOTUSD", "LINK": "LINKUSD", "LTC": "LTCUSD",
+            "ATOM": "ATOMUSD", "UNI": "UNIUSD", "XLM": "XLMUSD",
+            "AVAX": "AVAXUSD", "MATIC": "MATICUSD", "FIL": "FILUSD"
+        }
+        
+        kraken_pair = kraken_pairs.get(base_asset)
+        if kraken_pair:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    "https://api.kraken.com/0/public/Ticker",
+                    params={"pair": kraken_pair},
+                    timeout=10.0
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if not data.get("error") or len(data["error"]) == 0:
+                        result = data.get("result", {})
+                        # Kraken returns different keys, find the right one
+                        ticker = None
+                        for key in result:
+                            ticker = result[key]
+                            break
+                        
+                        if ticker:
+                            price = float(ticker["c"][0])
+                            open_price = float(ticker["o"])
+                            high = float(ticker["h"][1])
+                            low = float(ticker["l"][1])
+                            volume = float(ticker["v"][1])
+                            change = price - open_price
+                            change_pct = (change / open_price * 100) if open_price > 0 else 0
+                            
+                            return {
+                                "symbol": symbol,
+                                "price": price,
+                                "priceChange": change,
+                                "priceChangePercent": change_pct,
+                                "high": high,
+                                "low": low,
+                                "volume": volume,
+                                "quoteVolume": volume * price
+                            }
+    except Exception as e:
+        logger.warning(f"Kraken ticker error: {e}")
     
     raise HTTPException(status_code=503, detail="Erreur de récupération du ticker")
 
