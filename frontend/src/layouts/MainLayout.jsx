@@ -307,6 +307,31 @@ export default function MainLayout() {
 
           {/* Smart Invest & Auto Trading CTAs */}
           <div className="p-4 border-t border-white/5 space-y-2">
+            {/* Scanner IA Unifié - New Primary CTA */}
+            <NavLink
+              to="/opportunity-scanner"
+              className={`
+                relative overflow-hidden flex items-center gap-3 px-4 py-3 rounded-xl 
+                bg-gradient-to-r from-amber-500 via-orange-500 to-red-500
+                hover:from-amber-400 hover:via-orange-400 hover:to-red-400
+                transition-all duration-300 group animate-pulse-slow
+                ${location.pathname === '/opportunity-scanner' ? 'ring-2 ring-white/30' : ''}
+              `}
+              data-testid="scanner-ia-cta"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-amber-400/20 to-red-400/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative flex items-center gap-3 w-full">
+                <div className="p-2 bg-white/20 rounded-lg">
+                  <Search className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-bold text-white text-sm">🔍 Scanner IA</p>
+                  <p className="text-xs text-white/70">Crypto + Actions + Indices</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-white/50 group-hover:text-white group-hover:translate-x-1 transition-all" />
+              </div>
+            </NavLink>
+            
             <NavLink
               to="/smart-invest"
               className={`
