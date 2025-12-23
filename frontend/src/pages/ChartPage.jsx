@@ -213,13 +213,11 @@ export default function ChartPage() {
   useEffect(() => {
     const timeframe = TIMEFRAMES.find(t => t.value === selectedTimeframe);
     
+    // Removed auto-refresh to save API calls
+    // Users can manually refresh by changing timeframe or clicking refresh
     if (refreshIntervalRef.current) {
       clearInterval(refreshIntervalRef.current);
     }
-
-    refreshIntervalRef.current = setInterval(() => {
-      loadChartData(false);
-    }, timeframe.refreshMs);
 
     return () => {
       if (refreshIntervalRef.current) {
