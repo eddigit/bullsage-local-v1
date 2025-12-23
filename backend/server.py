@@ -6685,6 +6685,16 @@ async def get_chart_klines(
     # Extract base asset (remove USDT suffix)
     base_asset = symbol.upper().replace("USDT", "").replace("USD", "")
     
+    # Check cache first
+    cache_key = f"{base_asset}_{interval}_{limit}"
+    now = datetime.now(timezone.utc)
+    if cache_key in _chart_cache:
+        cached = _chart_cache[cache_key]
+        age = (now - cached["timestamp"]).total_seconds()
+        if age < CHART_CACHE_TTL:
+            logger.info(f"📦 Returning cached chart data for {cache_key}")
+            return cached["data"]
+    
     # Map interval to CryptoCompare format
     interval_map = {
         "1s": ("histominute", 1),
