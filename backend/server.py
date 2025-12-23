@@ -464,6 +464,10 @@ _crypto_cache = {
     "source": None
 }
 
+# Cache for chart data (klines) to reduce API calls
+_chart_cache = {}
+CHART_CACHE_TTL = 120  # 2 minutes cache for charts
+
 # Mapping between CoinGecko IDs and Binance symbols
 CRYPTO_MAPPING = {
     "bitcoin": {"symbol": "BTCUSDT", "name": "Bitcoin", "binance_symbol": "BTC", "rank": 1, "image": "https://coin-images.coingecko.com/coins/images/1/large/bitcoin.png"},
