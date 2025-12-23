@@ -143,8 +143,7 @@ export default function PaperTradingPage() {
   useEffect(() => {
     fetchData();
     fetchStats();
-    const interval = setInterval(fetchData, 60000);
-    return () => clearInterval(interval);
+    // Removed auto-refresh - users use the refresh button
   }, []);
 
   const handleRefresh = () => {
