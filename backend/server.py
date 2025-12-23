@@ -669,6 +669,88 @@ async def fetch_crypto_from_cryptocompare():
         logger.error(f"CryptoCompare API error: {e}")
         return None
 
+async def fetch_crypto_from_kraken():
+    """
+    Fetch real-time crypto data from Kraken API (EMERGENCY FALLBACK)
+    Free, no API key required, no rate limits for public endpoints
+    """
+    try:
+        # Kraken pairs mapping
+        kraken_pairs = {
+            "XXBTZUSD": ("bitcoin", "BTC", "Bitcoin"),
+            "XETHZUSD": ("ethereum", "ETH", "Ethereum"),
+            "SOLUSD": ("solana", "SOL", "Solana"),
+            "XXRPZUSD": ("ripple", "XRP", "XRP"),
+            "ADAUSD": ("cardano", "ADA", "Cardano"),
+            "DOGEUSD": ("dogecoin", "DOGE", "Dogecoin"),
+            "AVAXUSD": ("avalanche-2", "AVAX", "Avalanche"),
+            "DOTUSD": ("polkadot", "DOT", "Polkadot"),
+            "LINKUSD": ("chainlink", "LINK", "Chainlink"),
+            "MATICUSD": ("polygon", "MATIC", "Polygon"),
+            "XLTCZUSD": ("litecoin", "LTC", "Litecoin"),
+            "UNIUSD": ("uniswap", "UNI", "Uniswap"),
+            "ATOMUSD": ("cosmos", "ATOM", "Cosmos"),
+            "XXLMZUSD": ("stellar", "XLM", "Stellar"),
+            "FILUSD": ("filecoin", "FIL", "Filecoin"),
+        }
+        
+        pairs_str = ",".join(kraken_pairs.keys())
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://api.kraken.com/0/public/Ticker",
+                params={"pair": pairs_str},
+                timeout=15.0
+            )
+            
+            if response.status_code != 200:
+                logger.warning(f"Kraken returned {response.status_code}")
+                return None
+            
+            data = response.json()
+            
+            if data.get("error") and len(data["error"]) > 0:
+                logger.warning(f"Kraken error: {data['error']}")
+                return None
+            
+            result = data.get("result", {})
+            crypto_list = []
+            rank = 1
+            
+            for kraken_pair, (coin_id, symbol, name) in kraken_pairs.items():
+                if kraken_pair in result:
+                    ticker = result[kraken_pair]
+                    price = float(ticker["c"][0])  # Last trade price
+                    open_price = float(ticker["o"])  # Opening price
+                    change_pct = ((price - open_price) / open_price * 100) if open_price > 0 else 0
+                    
+                    # Get image from CRYPTO_MAPPING
+                    image = CRYPTO_MAPPING.get(coin_id, {}).get("image", "")
+                    
+                    crypto_list.append({
+                        "id": coin_id,
+                        "symbol": symbol.lower(),
+                        "name": name,
+                        "image": image,
+                        "current_price": price,
+                        "market_cap": 0,  # Kraken doesn't provide market cap
+                        "market_cap_rank": rank,
+                        "price_change_percentage_24h": change_pct,
+                        "high_24h": float(ticker["h"][1]),  # 24h high
+                        "low_24h": float(ticker["l"][1]),   # 24h low
+                        "total_volume": float(ticker["v"][1]),  # 24h volume
+                        "sparkline_in_7d": {"price": []},
+                        "source": "kraken"
+                    })
+                    rank += 1
+            
+            logger.info(f"✅ Fetched {len(crypto_list)} cryptos from Kraken")
+            return crypto_list
+            
+    except Exception as e:
+        logger.error(f"Kraken API error: {e}")
+        return None
+
 @api_router.get("/market/crypto")
 async def get_crypto_markets(current_user: dict = Depends(get_current_user)):
     """
