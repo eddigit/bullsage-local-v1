@@ -78,11 +78,11 @@ export default function AutoTradingPage() {
     await saveConfig(newConfig);
     
     if (newEnabled) {
-      // Start auto-scan every 5 minutes
+      // Start auto-scan every 15 minutes (reduced to save API calls)
       const interval = setInterval(() => {
         runScan();
         checkExits();
-      }, 5 * 60 * 1000);
+      }, 15 * 60 * 1000);
       setAutoScanInterval(interval);
       
       // Run initial scan
