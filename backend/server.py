@@ -6351,7 +6351,7 @@ async def get_chart_klines(
     interval: str = "1m",
     limit: int = 500
 ):
-    """Get candlestick/kline data from CryptoCompare"""
+    """Get candlestick/kline data from multiple sources with fallback"""
     # Extract base asset (remove USDT suffix)
     base_asset = symbol.upper().replace("USDT", "").replace("USD", "")
     
@@ -6368,6 +6368,7 @@ async def get_chart_klines(
     
     endpoint, aggregate = interval_map.get(interval, ("histominute", 1))
     
+    # Try CryptoCompare first
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(
@@ -6384,7 +6385,6 @@ async def get_chart_klines(
             if response.status_code == 200:
                 data = response.json()
                 if data.get("Response") == "Success":
-                    # Data can be a list or dict with "Data" key
                     raw_data = data.get("Data", [])
                     if isinstance(raw_data, dict):
                         raw_data = raw_data.get("Data", [])
@@ -6401,11 +6401,62 @@ async def get_chart_klines(
                         for d in raw_data
                         if d.get("open", 0) > 0
                     ]
-                    return {"candles": candles, "symbol": symbol}
+                    if candles:
+                        logger.info(f"✅ Got {len(candles)} candles from CryptoCompare for {symbol}")
+                        return {"candles": candles, "symbol": symbol}
                 else:
-                    logger.error(f"CryptoCompare error: {data.get('Message')}")
+                    logger.warning(f"CryptoCompare error: {data.get('Message')}")
     except Exception as e:
-        logger.error(f"Chart klines error: {e}")
+        logger.warning(f"CryptoCompare klines error: {e}")
+    
+    # Fallback to Kraken OHLC
+    try:
+        # Map symbol to Kraken pair
+        kraken_pairs = {
+            "BTC": "XXBTZUSD", "ETH": "XETHZUSD", "SOL": "SOLUSD",
+            "XRP": "XXRPZUSD", "ADA": "ADAUSD", "DOGE": "DOGEUSD",
+            "DOT": "DOTUSD", "LINK": "LINKUSD", "LTC": "XLTCZUSD",
+            "ATOM": "ATOMUSD", "UNI": "UNIUSD", "XLM": "XXLMZUSD",
+            "AVAX": "AVAXUSD", "MATIC": "MATICUSD", "FIL": "FILUSD"
+        }
+        
+        kraken_pair = kraken_pairs.get(base_asset)
+        if kraken_pair:
+            # Map interval to Kraken format (minutes)
+            kraken_interval_map = {
+                "1m": 1, "5m": 5, "15m": 15, "1h": 60, "4h": 240, "1d": 1440
+            }
+            kraken_interval = kraken_interval_map.get(interval, 60)
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    "https://api.kraken.com/0/public/OHLC",
+                    params={"pair": kraken_pair, "interval": kraken_interval},
+                    timeout=15.0
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if not data.get("error") or len(data["error"]) == 0:
+                        result = data.get("result", {})
+                        ohlc_data = result.get(kraken_pair, [])
+                        
+                        candles = [
+                            {
+                                "time": int(d[0]),
+                                "open": float(d[1]),
+                                "high": float(d[2]),
+                                "low": float(d[3]),
+                                "close": float(d[4]),
+                                "volume": float(d[6])
+                            }
+                            for d in ohlc_data[-limit:]
+                        ]
+                        if candles:
+                            logger.info(f"✅ Got {len(candles)} candles from Kraken for {symbol}")
+                            return {"candles": candles, "symbol": symbol}
+    except Exception as e:
+        logger.warning(f"Kraken OHLC error: {e}")
     
     raise HTTPException(status_code=503, detail="Erreur de récupération des données")
 
