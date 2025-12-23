@@ -80,8 +80,8 @@ export default function MarketsPage() {
 
   useEffect(() => {
     fetchMarkets();
-    const interval = setInterval(fetchMarkets, 60000);
-    return () => clearInterval(interval);
+    // Removed auto-refresh to avoid API rate limits
+    // Users can manually refresh with the button
   }, []);
 
   useEffect(() => {
