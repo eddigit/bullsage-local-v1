@@ -6815,7 +6815,10 @@ async def get_chart_klines(
                         ]
                         if candles:
                             logger.info(f"✅ Got {len(candles)} candles from Kraken for {symbol}")
-                            return {"candles": candles, "symbol": symbol}
+                            result = {"candles": candles, "symbol": symbol}
+                            # Cache the result
+                            _chart_cache[cache_key] = {"data": result, "timestamp": now}
+                            return result
     except Exception as e:
         logger.warning(f"Kraken OHLC error: {e}")
     
