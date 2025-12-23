@@ -161,7 +161,7 @@ export default function PaperTradingPage() {
 
     const coin = markets.find(c => c.id === selectedCoin);
     if (!coin) {
-      toast.error("Crypto non trouvée");
+      toast.error("Actif non trouvé");
       return;
     }
 
@@ -174,7 +174,8 @@ export default function PaperTradingPage() {
         price: coin.current_price
       });
 
-      toast.success(`${tradeType === "buy" ? "Achat" : "Vente"} exécuté avec succès!`);
+      const assetLabel = coin.type === "stock" ? "action" : coin.type === "index" ? "ETF" : "crypto";
+      toast.success(`${tradeType === "buy" ? "Achat" : "Vente"} de ${assetLabel} exécuté!`);
       setTradeDialogOpen(false);
       setSelectedCoin("");
       setTradeAmount("");
