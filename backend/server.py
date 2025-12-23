@@ -768,54 +768,31 @@ async def get_crypto_markets(current_user: dict = Depends(get_current_user)):
     
     now = datetime.now(timezone.utc)
     
-    # Check cache first (5 minutes TTL)
+    # Check cache first (10 minutes TTL)
     if _crypto_cache["data"] and _crypto_cache["timestamp"]:
         age = (now - _crypto_cache["timestamp"]).total_seconds()
         if age < _crypto_cache["ttl"]:
-            logger.info(f"Returning cached crypto data (source: {_crypto_cache.get('source', 'unknown')})")
+            logger.info(f"📦 Returning cached crypto data (source: {_crypto_cache.get('source', 'unknown')}, age: {int(age)}s)")
             return _crypto_cache["data"]
     
-    # Strategy 1: Try Kraken first (most reliable, no rate limits, no geo-blocking)
+    # ONLY use Kraken (free, unlimited, reliable)
     kraken_data = await fetch_crypto_from_kraken()
     if kraken_data and len(kraken_data) > 0:
         _crypto_cache["data"] = kraken_data
         _crypto_cache["timestamp"] = now
         _crypto_cache["source"] = "kraken"
+        logger.info(f"✅ Fresh data from Kraken: {len(kraken_data)} cryptos")
         return kraken_data
     
-    # Strategy 2: Try CryptoCompare
-    cryptocompare_data = await fetch_crypto_from_cryptocompare()
-    if cryptocompare_data and len(cryptocompare_data) > 0:
-        _crypto_cache["data"] = cryptocompare_data
-        _crypto_cache["timestamp"] = now
-        _crypto_cache["source"] = "cryptocompare"
-        return cryptocompare_data
-    
-    # Strategy 3: Try CoinGecko as fallback
-    coingecko_data = await fetch_crypto_from_coingecko()
-    if coingecko_data and len(coingecko_data) > 0:
-        _crypto_cache["data"] = coingecko_data
-        _crypto_cache["timestamp"] = now
-        _crypto_cache["source"] = "coingecko"
-        return coingecko_data
-    
-    # Strategy 4: Try Binance (may be geo-blocked)
-    binance_data = await fetch_crypto_from_binance()
-    if binance_data and len(binance_data) > 0:
-        _crypto_cache["data"] = binance_data
-        _crypto_cache["timestamp"] = now
-        _crypto_cache["source"] = "binance"
-        return binance_data
-    
-    # Strategy 5: Return stale cache if available (real data, just old)
+    # If Kraken fails, return stale cache (better than nothing)
     if _crypto_cache["data"]:
-        logger.warning("Returning stale cached data - all APIs unavailable")
+        logger.warning("⚠️ Kraken unavailable, returning stale cached data")
         return _crypto_cache["data"]
     
-    # No data available at all
+    # Last resort - no data at all
     raise HTTPException(
         status_code=503,
-        detail="Les APIs de données crypto sont temporairement indisponibles. Veuillez réessayer dans quelques minutes."
+        detail="Les données crypto sont temporairement indisponibles. Veuillez réessayer."
     )
 
 @api_router.get("/market/crypto/{coin_id}")
