@@ -6737,17 +6737,28 @@ async def get_chart_klines(
     
     # Fallback to Kraken OHLC
     try:
-        # Map symbol to Kraken pair
+        # Map symbol to Kraken pair (request format -> response format)
         kraken_pairs = {
-            "BTC": "XXBTZUSD", "ETH": "XETHZUSD", "SOL": "SOLUSD",
-            "XRP": "XXRPZUSD", "ADA": "ADAUSD", "DOGE": "DOGEUSD",
-            "DOT": "DOTUSD", "LINK": "LINKUSD", "LTC": "XLTCZUSD",
-            "ATOM": "ATOMUSD", "UNI": "UNIUSD", "XLM": "XXLMZUSD",
-            "AVAX": "AVAXUSD", "MATIC": "MATICUSD", "FIL": "FILUSD"
+            "BTC": ("XBTUSD", "XXBTZUSD"),
+            "ETH": ("ETHUSD", "XETHZUSD"),
+            "SOL": ("SOLUSD", "SOLUSD"),
+            "XRP": ("XRPUSD", "XXRPZUSD"),
+            "ADA": ("ADAUSD", "ADAUSD"),
+            "DOGE": ("DOGEUSD", "XDGUSD"),
+            "DOT": ("DOTUSD", "DOTUSD"),
+            "LINK": ("LINKUSD", "LINKUSD"),
+            "LTC": ("LTCUSD", "XLTCZUSD"),
+            "ATOM": ("ATOMUSD", "ATOMUSD"),
+            "UNI": ("UNIUSD", "UNIUSD"),
+            "XLM": ("XLMUSD", "XXLMZUSD"),
+            "AVAX": ("AVAXUSD", "AVAXUSD"),
+            "MATIC": ("MATICUSD", "MATICUSD"),
+            "FIL": ("FILUSD", "FILUSD")
         }
         
-        kraken_pair = kraken_pairs.get(base_asset)
-        if kraken_pair:
+        pair_info = kraken_pairs.get(base_asset)
+        if pair_info:
+            request_pair, response_pair = pair_info
             # Map interval to Kraken format (minutes)
             kraken_interval_map = {
                 "1m": 1, "5m": 5, "15m": 15, "1h": 60, "4h": 240, "1d": 1440
@@ -6757,7 +6768,7 @@ async def get_chart_klines(
             async with httpx.AsyncClient() as client:
                 response = await client.get(
                     "https://api.kraken.com/0/public/OHLC",
-                    params={"pair": kraken_pair, "interval": kraken_interval},
+                    params={"pair": request_pair, "interval": kraken_interval},
                     timeout=15.0
                 )
                 
@@ -6765,7 +6776,14 @@ async def get_chart_klines(
                     data = response.json()
                     if not data.get("error") or len(data["error"]) == 0:
                         result = data.get("result", {})
-                        ohlc_data = result.get(kraken_pair, [])
+                        # Try both request and response pair names
+                        ohlc_data = result.get(response_pair, result.get(request_pair, []))
+                        # If still not found, get first key that's not 'last'
+                        if not ohlc_data:
+                            for key in result:
+                                if key != 'last':
+                                    ohlc_data = result[key]
+                                    break
                         
                         candles = [
                             {
