@@ -460,7 +460,7 @@ async def get_me(current_user: dict = Depends(get_current_user)):
 _crypto_cache = {
     "data": None,
     "timestamp": None,
-    "ttl": 300,  # Cache for 5 minutes (300 seconds)
+    "ttl": 600,  # Cache for 10 minutes (600 seconds) to avoid rate limits
     "source": None
 }
 
