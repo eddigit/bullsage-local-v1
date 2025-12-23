@@ -30,6 +30,7 @@ import DeFiScannerPage from "./pages/DeFiScannerPage";
 import ChartPage from "./pages/ChartPage";
 import NewsletterAdminPage from "./pages/NewsletterAdminPage";
 import MarketNewsPage from "./pages/MarketNewsPage";
+import OpportunityScannerPage from "./pages/OpportunityScannerPage";
 
 // Layout
 import MainLayout from "./layouts/MainLayout";
