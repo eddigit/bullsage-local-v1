@@ -69,6 +69,9 @@ const defiNavigation = [
   { name: "Scanner DeFi", href: "/defi-scanner", icon: Search, highlight: true },
 ];
 
+// Scanner IA Unifié - New top feature
+const opportunityScannerItem = { name: "🔍 Scanner IA", href: "/opportunity-scanner", icon: Search, highlight: true, special: true };
+
 // Smart Invest CTA - Special item
 const smartInvestItem = { name: "Smart Invest", href: "/smart-invest", icon: Zap, highlight: true, special: true };
 
