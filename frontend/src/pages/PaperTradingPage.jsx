@@ -82,6 +82,7 @@ export default function PaperTradingPage() {
   // Stats state
   const [tradingStats, setTradingStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(false);
+  const [assetType, setAssetType] = useState("all"); // all, crypto, stock
 
   const fetchData = async () => {
     try {
@@ -91,9 +92,25 @@ export default function PaperTradingPage() {
         axios.get(`${API}/market/crypto`)
       ]);
       
+      // Add some top stocks to the markets list
+      const stocks = [
+        { id: "AAPL", symbol: "aapl", name: "Apple", current_price: 270.97, price_change_percentage_24h: -0.99, type: "stock" },
+        { id: "MSFT", symbol: "msft", name: "Microsoft", current_price: 446.50, price_change_percentage_24h: 0.32, type: "stock" },
+        { id: "NVDA", symbol: "nvda", name: "NVIDIA", current_price: 130.50, price_change_percentage_24h: -1.20, type: "stock" },
+        { id: "GOOGL", symbol: "googl", name: "Google", current_price: 198.75, price_change_percentage_24h: 0.15, type: "stock" },
+        { id: "TSLA", symbol: "tsla", name: "Tesla", current_price: 421.06, price_change_percentage_24h: -2.10, type: "stock" },
+        { id: "AMZN", symbol: "amzn", name: "Amazon", current_price: 227.00, price_change_percentage_24h: 0.55, type: "stock" },
+        { id: "META", symbol: "meta", name: "Meta", current_price: 617.50, price_change_percentage_24h: 0.80, type: "stock" },
+        { id: "QQQ", symbol: "qqq", name: "NASDAQ 100 ETF", current_price: 529.00, price_change_percentage_24h: 0.25, type: "index" },
+        { id: "SPY", symbol: "spy", name: "S&P 500 ETF", current_price: 599.00, price_change_percentage_24h: 0.40, type: "index" },
+      ];
+      
+      // Add type to cryptos
+      const cryptosWithType = (marketsRes.data || []).map(c => ({ ...c, type: "crypto" }));
+      
       setPortfolio(portfolioRes.data);
       setTrades(tradesRes.data);
-      setMarkets(marketsRes.data || []);
+      setMarkets([...cryptosWithType, ...stocks]);
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Erreur lors du chargement des données");
@@ -102,6 +119,14 @@ export default function PaperTradingPage() {
       setRefreshing(false);
     }
   };
+
+  // Filter markets based on asset type
+  const filteredMarkets = markets.filter(m => {
+    if (assetType === "all") return true;
+    if (assetType === "crypto") return m.type === "crypto" || !m.type;
+    if (assetType === "stock") return m.type === "stock" || m.type === "index";
+    return true;
+  });
 
   const fetchStats = async () => {
     setLoadingStats(true);
