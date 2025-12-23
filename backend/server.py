@@ -6672,7 +6672,72 @@ async def get_chart_klines(
             logger.info(f"📦 Returning cached chart data for {cache_key}")
             return cached["data"]
     
-    # Map interval to CryptoCompare format
+    # Use Kraken FIRST (free, unlimited, reliable)
+    kraken_pairs = {
+        "BTC": ("XBTUSD", "XXBTZUSD"),
+        "ETH": ("ETHUSD", "XETHZUSD"),
+        "SOL": ("SOLUSD", "SOLUSD"),
+        "XRP": ("XRPUSD", "XXRPZUSD"),
+        "ADA": ("ADAUSD", "ADAUSD"),
+        "DOGE": ("DOGEUSD", "XDGUSD"),
+        "DOT": ("DOTUSD", "DOTUSD"),
+        "LINK": ("LINKUSD", "LINKUSD"),
+        "LTC": ("LTCUSD", "XLTCZUSD"),
+        "ATOM": ("ATOMUSD", "ATOMUSD"),
+        "UNI": ("UNIUSD", "UNIUSD"),
+        "XLM": ("XLMUSD", "XXLMZUSD"),
+        "AVAX": ("AVAXUSD", "AVAXUSD"),
+        "MATIC": ("MATICUSD", "MATICUSD"),
+        "FIL": ("FILUSD", "FILUSD")
+    }
+    
+    pair_info = kraken_pairs.get(base_asset)
+    if pair_info:
+        try:
+            request_pair, response_pair = pair_info
+            kraken_interval_map = {
+                "1m": 1, "5m": 5, "15m": 15, "1h": 60, "4h": 240, "1d": 1440
+            }
+            kraken_interval = kraken_interval_map.get(interval, 60)
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    "https://api.kraken.com/0/public/OHLC",
+                    params={"pair": request_pair, "interval": kraken_interval},
+                    timeout=15.0
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if not data.get("error") or len(data["error"]) == 0:
+                        result_data = data.get("result", {})
+                        ohlc_data = result_data.get(response_pair, result_data.get(request_pair, []))
+                        if not ohlc_data:
+                            for key in result_data:
+                                if key != 'last':
+                                    ohlc_data = result_data[key]
+                                    break
+                        
+                        candles = [
+                            {
+                                "time": int(d[0]),
+                                "open": float(d[1]),
+                                "high": float(d[2]),
+                                "low": float(d[3]),
+                                "close": float(d[4]),
+                                "volume": float(d[6])
+                            }
+                            for d in ohlc_data[-limit:]
+                        ]
+                        if candles:
+                            logger.info(f"✅ Got {len(candles)} candles from Kraken for {symbol}")
+                            result = {"candles": candles, "symbol": symbol}
+                            _chart_cache[cache_key] = {"data": result, "timestamp": now}
+                            return result
+        except Exception as e:
+            logger.warning(f"Kraken OHLC error: {e}")
+    
+    # Fallback to CryptoCompare only if Kraken doesn't have the pair
     interval_map = {
         "1s": ("histominute", 1),
         "1m": ("histominute", 1),
@@ -6685,7 +6750,6 @@ async def get_chart_klines(
     
     endpoint, aggregate = interval_map.get(interval, ("histominute", 1))
     
-    # Try CryptoCompare first
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(
