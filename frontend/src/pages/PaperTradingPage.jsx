@@ -296,18 +296,41 @@ export default function PaperTradingPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Cryptomonnaie</Label>
+                  <Label>Type d'actif</Label>
+                  <Select value={assetType} onValueChange={setAssetType}>
+                    <SelectTrigger className="bg-black/20 border-white/10">
+                      <SelectValue placeholder="Type d'actif" />
+                    </SelectTrigger>
+                    <SelectContent className="glass border-white/10">
+                      <SelectItem value="all">🌐 Tous les actifs</SelectItem>
+                      <SelectItem value="crypto">₿ Cryptomonnaies</SelectItem>
+                      <SelectItem value="stock">📈 Actions & Indices</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Actif à trader</Label>
                   <Select value={selectedCoin} onValueChange={setSelectedCoin}>
                     <SelectTrigger className="bg-black/20 border-white/10" data-testid="coin-select">
-                      <SelectValue placeholder="Sélectionner une crypto" />
+                      <SelectValue placeholder="Sélectionner un actif" />
                     </SelectTrigger>
                     <SelectContent className="glass border-white/10 max-h-64">
-                      {markets.slice(0, 30).map(coin => (
+                      {filteredMarkets.slice(0, 30).map(coin => (
                         <SelectItem key={coin.id} value={coin.id}>
                           <div className="flex items-center gap-2">
-                            <img src={coin.image} alt={coin.name} className="w-5 h-5 rounded-full" />
+                            {coin.image ? (
+                              <img src={coin.image} alt={coin.name} className="w-5 h-5 rounded-full" />
+                            ) : (
+                              <span className="w-5 h-5 flex items-center justify-center text-sm">
+                                {coin.type === "stock" ? "📈" : coin.type === "index" ? "📊" : "₿"}
+                              </span>
+                            )}
                             <span>{coin.name}</span>
-                            <span className="text-muted-foreground">({coin.symbol.toUpperCase()})</span>
+                            <span className="text-muted-foreground">({coin.symbol?.toUpperCase()})</span>
+                            {coin.type && coin.type !== "crypto" && (
+                              <span className="text-xs text-amber-400">[{coin.type === "stock" ? "Action" : "ETF"}]</span>
+                            )}
                           </div>
                         </SelectItem>
                       ))}
