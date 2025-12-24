@@ -69,6 +69,9 @@ const defiNavigation = [
   { name: "Scanner DeFi", href: "/defi-scanner", icon: Search, highlight: true },
 ];
 
+// Pro Trader AI - Best feature
+const proTraderItem = { name: "🤖 Pro Trader AI", href: "/pro-trader", icon: Brain, highlight: true, special: true };
+
 // Scanner IA Unifié - New top feature
 const opportunityScannerItem = { name: "🔍 Scanner IA", href: "/opportunity-scanner", icon: Search, highlight: true, special: true };
 
@@ -235,12 +238,14 @@ export default function MainLayout() {
               Installer
             </Button>
           )}
-          <Avatar className="w-8 h-8">
-            <AvatarImage src={getAvatarUrl()} alt={user?.name} />
-            <AvatarFallback className="bg-secondary text-sm">
-              {getInitials(user?.name)}
-            </AvatarFallback>
-          </Avatar>
+          <NavLink to="/settings">
+            <Avatar className="w-8 h-8 ring-2 ring-transparent hover:ring-primary/30 transition-all">
+              <AvatarImage src={getAvatarUrl()} alt={user?.name} />
+              <AvatarFallback className="bg-secondary text-sm">
+                {getInitials(user?.name)}
+              </AvatarFallback>
+            </Avatar>
+          </NavLink>
         </div>
       </header>
 
@@ -307,7 +312,31 @@ export default function MainLayout() {
 
           {/* Smart Invest & Auto Trading CTAs */}
           <div className="p-4 border-t border-white/5 space-y-2">
-            {/* Scanner IA Unifié - New Primary CTA */}
+                        {/* Pro Trader AI - THE BEST CTA */}
+            <NavLink
+              to="/pro-trader"
+              className={`
+                relative overflow-hidden flex items-center gap-3 px-4 py-3 rounded-xl
+                bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600
+                hover:from-blue-500 hover:via-indigo-500 hover:to-violet-500
+                transition-all duration-300 group animate-pulse-slow
+                ${location.pathname === '/pro-trader' ? 'ring-2 ring-white/30' : ''}
+              `}
+              data-testid="pro-trader-cta"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 to-violet-400/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative flex items-center gap-3 w-full">
+                <div className="p-2 bg-white/20 rounded-lg">
+                  <Brain className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-bold text-white text-sm">🤖 Pro Trader AI</p>
+                  <p className="text-xs text-white/70">Trading Intelligent</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-white/50 group-hover:text-white group-hover:translate-x-1 transition-all" />
+              </div>
+            </NavLink>
+{/* Scanner IA Unifié - New Primary CTA */}
             <NavLink
               to="/opportunity-scanner"
               className={`
@@ -383,8 +412,11 @@ export default function MainLayout() {
 
           {/* User Section */}
           <div className="p-4 border-t border-white/5">
-            <div className="flex items-center gap-3 mb-4">
-              <Avatar className="w-10 h-10">
+            <NavLink 
+              to="/settings"
+              className="flex items-center gap-3 mb-4 p-2 -mx-2 rounded-xl hover:bg-white/5 transition-colors cursor-pointer group"
+            >
+              <Avatar className="w-10 h-10 ring-2 ring-transparent group-hover:ring-primary/30 transition-all">
                 <AvatarImage src={getAvatarUrl()} alt={user?.name} />
                 <AvatarFallback className="bg-secondary">
                   {getInitials(user?.name)}
@@ -392,9 +424,15 @@ export default function MainLayout() {
               </Avatar>
               <div className="flex-1 min-w-0">
                 <p className="font-medium truncate">{user?.name}</p>
-                <p className="text-xs text-muted-foreground capitalize">{user?.trading_level}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-muted-foreground capitalize">{user?.trading_level}</p>
+                  {user?.points > 0 && (
+                    <span className="text-xs text-amber-400">⭐ {user.points} pts</span>
+                  )}
+                </div>
               </div>
-            </div>
+              <Settings className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+            </NavLink>
             <Button
               variant="ghost"
               className="w-full justify-start text-muted-foreground hover:text-destructive min-h-[44px]"

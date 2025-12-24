@@ -31,6 +31,7 @@ import ChartPage from "./pages/ChartPage";
 import NewsletterAdminPage from "./pages/NewsletterAdminPage";
 import MarketNewsPage from "./pages/MarketNewsPage";
 import OpportunityScannerPage from "./pages/OpportunityScannerPage";
+import ProTraderPage from "./pages/ProTraderPage";
 
 // Layout
 import MainLayout from "./layouts/MainLayout";
@@ -207,6 +208,7 @@ function App() {
               <Route path="admin/newsletter" element={<NewsletterAdminPage />} />
               <Route path="market-news" element={<MarketNewsPage />} />
               <Route path="opportunity-scanner" element={<OpportunityScannerPage />} />
+              <Route path="pro-trader" element={<ProTraderPage />} />
             </Route>
           </Routes>
         </BrowserRouter>

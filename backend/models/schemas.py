@@ -24,6 +24,9 @@ class UserResponse(BaseModel):
     is_admin: bool = False
     onboarding_completed: bool = False
     preferences: Optional[Dict[str, Any]] = None
+    avatar: Optional[str] = None
+    points: int = 0
+    portfolio: Optional[Dict[str, Any]] = None
 
 class TokenResponse(BaseModel):
     access_token: str

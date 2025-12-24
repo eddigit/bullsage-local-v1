@@ -19,23 +19,7 @@ import httpx
 import numpy as np
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from services.llm_service import LlmChat, UserMessage, translate_to_french
-
-# Import des routes avancées (avec gestion d'erreur)
-try:
-    from services.advanced_routes import advanced_router
-    ADVANCED_ROUTES_AVAILABLE = True
-except ImportError as e:
-    print(f"⚠️ Routes avancées non disponibles: {e}")
-    ADVANCED_ROUTES_AVAILABLE = False
-
-# Import du Pro Trader AI
-try:
-    from services.pro_trader_routes import pro_trader_router
-    PRO_TRADER_AVAILABLE = True
-except ImportError as e:
-    print(f"⚠️ Pro Trader AI non disponible: {e}")
-    PRO_TRADER_AVAILABLE = False
+from services.llm_service import LlmChat, UserMessage
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -3220,18 +3204,17 @@ async def execute_paper_trade(trade: PaperTradeCreate, current_user: dict = Depe
         portfolio[trade.symbol] = {"amount": total_amount, "avg_price": new_avg_price}
         
     elif trade.type == "sell":
-        current_holding = portfolio.get(trade.symbol, {"amount": 0, "avg_price": 0})
+        current_holding = portfolio.get(trade.symbol, {"amount": 0})
+        if current_holding["amount"] < trade.amount:
+            raise HTTPException(status_code=400, detail="Insufficient holdings")
         
-        # Support SHORT selling - allow negative positions
         new_balance = balance + total_cost
-        new_amount = current_holding["amount"] - trade.amount
+        remaining = current_holding["amount"] - trade.amount
         
-        # Store position (can be negative for shorts)
-        portfolio[trade.symbol] = {
-            "amount": new_amount,
-            "avg_price": trade.price if new_amount < 0 else current_holding.get("avg_price", trade.price),
-            "is_short": new_amount < 0
-        }
+        if remaining > 0:
+            portfolio[trade.symbol] = {"amount": remaining, "avg_price": current_holding.get("avg_price", trade.price)}
+        else:
+            portfolio.pop(trade.symbol, None)
     else:
         raise HTTPException(status_code=400, detail="Invalid trade type")
     
@@ -6977,14 +6960,6 @@ async def get_market_news(
     except Exception as e:
         logger.error(f"News fetch error: {e}")
     
-    # Traduire les news en français
-    if news:
-        try:
-            news = await translate_to_french(news[:limit], fields=["title", "summary"])
-            logger.info(f"News traduites en français")
-        except Exception as e:
-            logger.warning(f"Translation error (using original): {e}")
-    
     return {"news": news[:limit], "count": len(news)}
 
 @api_router.get("/market/indices")
@@ -7374,16 +7349,6 @@ AVATARS_DIR.mkdir(exist_ok=True)
 # Include the router in the main app
 app.include_router(api_router)
 
-# Inclure les routes avancées si disponibles
-if ADVANCED_ROUTES_AVAILABLE:
-    app.include_router(advanced_router)
-    logger.info("✅ Routes avancées chargées")
-
-# Inclure Pro Trader AI si disponible
-if PRO_TRADER_AVAILABLE:
-    app.include_router(pro_trader_router)
-    logger.info("🧠 Pro Trader AI chargé")
-
 # Mount static files for uploads
 app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
@@ -7398,9 +7363,4 @@ app.add_middleware(
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
-
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
 

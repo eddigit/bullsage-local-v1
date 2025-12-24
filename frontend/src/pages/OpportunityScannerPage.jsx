@@ -19,14 +19,26 @@ import {
   Brain,
   Sparkles,
   Filter,
-  CheckCircle
+  CheckCircle,
+  Rocket,
+  HelpCircle,
+  Info,
+  Clock,
+  ShieldAlert,
+  TrendingUp as TrendUp
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Switch } from "../components/ui/switch";
 import { Label } from "../components/ui/label";
-import { API } from "../App";
+import { API, useAuth } from "../App";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../components/ui/tooltip";
 
 const TYPE_ICONS = {
   crypto: Bitcoin,
@@ -46,12 +58,42 @@ const ACTION_STYLES = {
   WATCH: { bg: "bg-yellow-500/20", text: "text-yellow-400", border: "border-yellow-500/30" }
 };
 
+// Descriptions des actions pour les tooltips
+const ACTION_DESCRIPTIONS = {
+  BUY: {
+    title: "🟢 Signal d'ACHAT",
+    description: "Les indicateurs suggèrent une opportunité d'achat. Le prix pourrait monter.",
+    advice: "Envisagez d'ouvrir une position LONG (achat)"
+  },
+  SELL: {
+    title: "🔴 Signal de VENTE",
+    description: "Les indicateurs suggèrent une opportunité de vente. Le prix pourrait baisser.",
+    advice: "Envisagez d'ouvrir une position SHORT (vente) ou de prendre vos profits"
+  },
+  WATCH: {
+    title: "🟡 À SURVEILLER",
+    description: "Pas de signal clair pour le moment. L'actif montre des signes intéressants.",
+    advice: "Patientez et surveillez l'évolution avant de prendre position"
+  }
+};
+
+// Descriptions des scores
+const getScoreDescription = (score) => {
+  if (score >= 4) return { level: "Excellent", color: "text-emerald-400", desc: "Signal très fort avec plusieurs confirmations" };
+  if (score >= 2) return { level: "Bon", color: "text-green-400", desc: "Signal correct avec quelques confirmations" };
+  if (score >= 0) return { level: "Neutre", color: "text-yellow-400", desc: "Signaux mitigés, prudence recommandée" };
+  if (score >= -2) return { level: "Faible", color: "text-orange-400", desc: "Signaux négatifs, éviter ou attendre" };
+  return { level: "Négatif", color: "text-red-400", desc: "Signaux fortement baissiers" };
+};
+
 export default function OpportunityScannerPage() {
+  const { user } = useAuth();
   const [opportunities, setOpportunities] = useState([]);
   const [aiRecommendation, setAiRecommendation] = useState(null);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(false);
   const [lastScan, setLastScan] = useState(null);
+  const [applyingTrade, setApplyingTrade] = useState(null);
   
   // Filters
   const [includeCrypto, setIncludeCrypto] = useState(true);
@@ -62,6 +104,41 @@ export default function OpportunityScannerPage() {
     // Auto-scan on page load
     runScan();
   }, []);
+
+  // Fonction pour appliquer un trade en Paper Trading
+  const applyTrade = async (opp) => {
+    const token = localStorage.getItem("token");
+    if (!user || !token) {
+      toast.error("Connectez-vous pour utiliser le Paper Trading");
+      return;
+    }
+    
+    setApplyingTrade(opp.symbol);
+    try {
+      const tradeType = opp.action === "BUY" ? "buy" : "sell";
+      const amount = 100 / opp.price; // ~100$ de trade
+      
+      await axios.post(`${API}/paper-trading/trade`, {
+        symbol: opp.symbol,
+        type: tradeType,
+        amount: amount,
+        price: opp.price
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      toast.success(
+        `🚀 Trade ${tradeType.toUpperCase()} ouvert sur ${opp.symbol}!\n` +
+        `Prix: ${formatPrice(opp.price, opp.type)}`,
+        { duration: 5000 }
+      );
+    } catch (error) {
+      console.error("Trade error:", error);
+      toast.error("Erreur lors de l'ouverture du trade");
+    } finally {
+      setApplyingTrade(null);
+    }
+  };
 
   const runScan = async () => {
     setLoading(true);
@@ -95,6 +172,7 @@ export default function OpportunityScannerPage() {
   };
 
   return (
+    <TooltipProvider delayDuration={200}>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -104,6 +182,21 @@ export default function OpportunityScannerPage() {
               <Search className="w-6 h-6 text-white" />
             </div>
             Scanner IA Unifié
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <HelpCircle className="w-5 h-5 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent side="right" className="max-w-sm bg-slate-900 text-white p-3">
+                <p className="font-bold mb-2">💡 Comment utiliser le Scanner</p>
+                <ul className="text-sm space-y-1">
+                  <li>• <span className="text-emerald-400">BUY</span> = Signal d'achat détecté</li>
+                  <li>• <span className="text-red-400">SELL</span> = Signal de vente détecté</li>
+                  <li>• <span className="text-yellow-400">WATCH</span> = À surveiller</li>
+                  <li>• <span className="text-blue-400">Score</span> = Force du signal (-5 à +5)</li>
+                </ul>
+                <p className="text-xs text-muted-foreground mt-2">Survolez les éléments pour plus de détails</p>
+              </TooltipContent>
+            </Tooltip>
           </h1>
           <p className="text-muted-foreground mt-1">
             Analyse en temps réel des cryptos, actions et indices pour trouver les meilleures opportunités
@@ -256,12 +349,51 @@ export default function OpportunityScannerPage() {
             
             <div className="flex flex-wrap gap-2 mt-4">
               {summary.best_opportunity.signals?.map((signal, idx) => (
-                <Badge key={idx} variant="outline" className="text-emerald-400 border-emerald-500/30">
-                  <CheckCircle className="w-3 h-3 mr-1" />
-                  {signal}
-                </Badge>
+                <Tooltip key={idx}>
+                  <TooltipTrigger asChild>
+                    <Badge variant="outline" className="text-emerald-400 border-emerald-500/30 cursor-help">
+                      <CheckCircle className="w-3 h-3 mr-1" />
+                      {signal}
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="bg-slate-900 text-white p-2">
+                    <p className="text-sm">Signal technique confirmé</p>
+                  </TooltipContent>
+                </Tooltip>
               ))}
             </div>
+            
+            {/* CTA pour la meilleure opportunité */}
+            {summary.best_opportunity.type === "crypto" && (
+              <div className="mt-4 pt-4 border-t border-emerald-500/20">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      className="w-full gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500"
+                      onClick={() => applyTrade(summary.best_opportunity)}
+                      disabled={applyingTrade === summary.best_opportunity.symbol}
+                    >
+                      {applyingTrade === summary.best_opportunity.symbol ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Ouverture en cours...
+                        </>
+                      ) : (
+                        <>
+                          <Rocket className="w-4 h-4" />
+                          🏆 Trader cette opportunité en Paper Trading
+                        </>
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-sm bg-slate-900 text-white p-3">
+                    <p className="font-bold mb-1">🏆 Meilleure opportunité du scan</p>
+                    <p className="text-sm">Ouvrir une position d'achat sur {summary.best_opportunity.symbol}</p>
+                    <p className="text-xs text-blue-400 mt-2">💡 Le Paper Trading utilise de l'argent virtuel - Aucun risque réel !</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -288,60 +420,164 @@ export default function OpportunityScannerPage() {
           {opportunities.map((opp, index) => {
             const TypeIcon = TYPE_ICONS[opp.type] || BarChart3;
             const actionStyle = ACTION_STYLES[opp.action] || ACTION_STYLES.WATCH;
+            const actionDesc = ACTION_DESCRIPTIONS[opp.action] || ACTION_DESCRIPTIONS.WATCH;
+            const scoreDesc = getScoreDescription(opp.score);
+            const canTrade = opp.action === "BUY" || opp.action === "SELL";
             
             return (
               <Card 
                 key={`${opp.symbol}-${index}`}
-                className={`glass border bg-gradient-to-br ${TYPE_COLORS[opp.type]} hover:scale-[1.02] transition-transform cursor-pointer`}
+                className={`glass border bg-gradient-to-br ${TYPE_COLORS[opp.type]} hover:scale-[1.02] transition-transform`}
               >
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-                        {opp.icon ? (
-                          <span className="text-lg">{opp.icon}</span>
-                        ) : (
-                          <TypeIcon className="w-5 h-5" />
-                        )}
-                      </div>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center cursor-help">
+                            {opp.icon ? (
+                              <span className="text-lg">{opp.icon}</span>
+                            ) : (
+                              <TypeIcon className="w-5 h-5" />
+                            )}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="bg-slate-900 text-white p-2">
+                          <p className="font-bold">{opp.type === "crypto" ? "🪙 Cryptomonnaie" : opp.type === "stock" ? "🏢 Action" : "📊 Indice"}</p>
+                        </TooltipContent>
+                      </Tooltip>
                       <div>
                         <h3 className="font-semibold">{opp.name}</h3>
                         <p className="text-xs text-muted-foreground">{opp.symbol} • {opp.type}</p>
                       </div>
                     </div>
                     
-                    <Badge className={`${actionStyle.bg} ${actionStyle.text} ${actionStyle.border}`}>
-                      {opp.action}
-                    </Badge>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge className={`${actionStyle.bg} ${actionStyle.text} ${actionStyle.border} cursor-help`}>
+                          {opp.action}
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs bg-slate-900 text-white p-3">
+                        <p className="font-bold mb-1">{actionDesc.title}</p>
+                        <p className="text-sm">{actionDesc.description}</p>
+                        <p className="text-sm text-blue-400 mt-2">💡 {actionDesc.advice}</p>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                   
                   <div className="flex items-end justify-between mb-3">
-                    <div>
-                      <p className="text-xl font-bold font-mono">
-                        {formatPrice(opp.price, opp.type)}
-                      </p>
-                      <p className={`text-sm flex items-center gap-1 ${opp.change_24h >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                        {opp.change_24h >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                        {opp.change_24h >= 0 ? "+" : ""}{opp.change_24h}%
-                      </p>
-                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="cursor-help">
+                          <p className="text-xl font-bold font-mono">
+                            {formatPrice(opp.price, opp.type)}
+                          </p>
+                          <p className={`text-sm flex items-center gap-1 ${opp.change_24h >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                            {opp.change_24h >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                            {opp.change_24h >= 0 ? "+" : ""}{opp.change_24h}%
+                          </p>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="bg-slate-900 text-white p-3">
+                        <p className="font-bold mb-1">📈 Variation 24h</p>
+                        <p className="text-sm">
+                          {opp.change_24h >= 0 
+                            ? `L'actif a gagné ${opp.change_24h}% sur les dernières 24h` 
+                            : `L'actif a perdu ${Math.abs(opp.change_24h)}% sur les dernières 24h`}
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
                     
-                    <div className="text-right">
-                      <p className="text-xs text-muted-foreground">Score</p>
-                      <p className={`text-lg font-bold ${opp.score > 0 ? "text-emerald-400" : opp.score < 0 ? "text-red-400" : "text-yellow-400"}`}>
-                        {opp.score > 0 ? "+" : ""}{opp.score}
-                      </p>
-                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="text-right cursor-help">
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">Score <Info className="w-3 h-3" /></p>
+                          <p className={`text-lg font-bold ${scoreDesc.color}`}>
+                            {opp.score > 0 ? "+" : ""}{opp.score}
+                          </p>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs bg-slate-900 text-white p-3">
+                        <p className="font-bold mb-1">📊 Score de Signal : {scoreDesc.level}</p>
+                        <p className="text-sm">{scoreDesc.desc}</p>
+                        <div className="mt-2 text-xs">
+                          <p>• +4 à +5 : Signal très fort</p>
+                          <p>• +2 à +3 : Bon signal</p>
+                          <p>• -1 à +1 : Neutre</p>
+                          <p>• -2 à -5 : Signal négatif</p>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                   
-                  {/* Signals */}
-                  <div className="flex flex-wrap gap-1">
+                  {/* Signals avec tooltip */}
+                  <div className="flex flex-wrap gap-1 mb-3">
                     {opp.signals?.slice(0, 2).map((signal, idx) => (
-                      <span key={idx} className="text-xs bg-white/5 px-2 py-0.5 rounded">
-                        {signal}
-                      </span>
+                      <Tooltip key={idx}>
+                        <TooltipTrigger asChild>
+                          <span className="text-xs bg-white/5 px-2 py-0.5 rounded cursor-help">
+                            {signal}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="bg-slate-900 text-white p-2">
+                          <p className="text-sm">Signal technique détecté par l'analyse</p>
+                        </TooltipContent>
+                      </Tooltip>
                     ))}
                   </div>
+                  
+                  {/* CTA Button pour Paper Trading */}
+                  {canTrade && opp.type === "crypto" && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          className={`w-full gap-2 ${
+                            opp.action === "BUY"
+                              ? "bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500"
+                              : "bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500"
+                          }`}
+                          onClick={() => applyTrade(opp)}
+                          disabled={applyingTrade === opp.symbol}
+                        >
+                          {applyingTrade === opp.symbol ? (
+                            <>
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                              En cours...
+                            </>
+                          ) : (
+                            <>
+                              <Rocket className="w-3 h-3" />
+                              {opp.action === "BUY" ? "🟢 ACHETER" : "🔴 VENDRE"} en Paper
+                            </>
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-sm bg-slate-900 text-white p-3">
+                        <p className="font-bold mb-1">
+                          {opp.action === "BUY" ? "🟢 Ouvrir un ACHAT" : "🔴 Ouvrir une VENTE"}
+                        </p>
+                        <p className="text-sm">
+                          {opp.action === "BUY" 
+                            ? "Vous achetez cet actif. Profit si le prix monte."
+                            : "Vous vendez cet actif. Profit si le prix baisse."}
+                        </p>
+                        <p className="text-xs text-blue-400 mt-2">💡 Paper Trading = argent virtuel, sans risque réel</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                  
+                  {/* Message si pas tradable */}
+                  {(!canTrade || opp.type !== "crypto") && (
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground">
+                        {opp.type !== "crypto" 
+                          ? "Paper Trading disponible uniquement pour les cryptos"
+                          : "Aucune action recommandée pour le moment"}
+                      </p>
+                    </div>
+                  )}
                   
                   <div className="mt-2 pt-2 border-t border-white/5">
                     <p className="text-xs text-muted-foreground">
@@ -355,5 +591,6 @@ export default function OpportunityScannerPage() {
         </div>
       )}
     </div>
+    </TooltipProvider>
   );
 }

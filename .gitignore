@@ -30,7 +30,16 @@ next-env.d.ts
 dist/
 dist
 
-# Environment files (comprehensive coverage)
+# Environment files - GARDER pour déploiement facile
+# Les .env sont commités pour ce projet privé
+# .env
+# .env.local
+# .env.*.local
+# backend/.env
+# frontend/.env
+!.env.example
+!backend/.env.example
+!frontend/.env.example
 
 *token.json*
 *credentials.json*
