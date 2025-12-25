@@ -5005,6 +5005,73 @@ async def get_api_keys(admin: dict = Depends(get_admin_user)):
         "emergent_llm": {**mask_key(EMERGENT_LLM_KEY), "name": "Emergent LLM", "usage": "IA GPT-5.1"}
     }
 
+# ============== ADMIN API HEALTH & LOGS ==============
+
+@api_router.get("/admin/api-health")
+async def get_api_health(admin: dict = Depends(get_admin_user)):
+    """Check health of all external APIs"""
+    results = {}
+    
+    async def check_api(name: str, url: str, headers: dict = None):
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url, headers=headers, timeout=10.0)
+                return {
+                    "status": "ok" if response.status_code == 200 else "error",
+                    "code": response.status_code,
+                    "latency_ms": int(response.elapsed.total_seconds() * 1000)
+                }
+        except Exception as e:
+            return {"status": "error", "code": 0, "error": str(e)[:50]}
+    
+    # Test APIs in parallel
+    import asyncio
+    checks = await asyncio.gather(
+        check_api("coingecko", "https://api.coingecko.com/api/v3/ping"),
+        check_api("binance", "https://api.binance.com/api/v3/ping"),
+        check_api("fear_greed", "https://api.alternative.me/fng/?limit=1"),
+        check_api("finnhub", f"https://finnhub.io/api/v1/quote?symbol=AAPL&token={FINNHUB_API_KEY}") if FINNHUB_API_KEY else asyncio.coroutine(lambda: {"status": "not_configured"})(),
+        check_api("alpha_vantage", f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=IBM&apikey={ALPHA_VANTAGE_API_KEY}") if ALPHA_VANTAGE_API_KEY else asyncio.coroutine(lambda: {"status": "not_configured"})(),
+    )
+    
+    results = {
+        "coingecko": checks[0],
+        "binance": checks[1],
+        "fear_greed": checks[2],
+        "finnhub": checks[3] if FINNHUB_API_KEY else {"status": "not_configured"},
+        "alpha_vantage": checks[4] if ALPHA_VANTAGE_API_KEY else {"status": "not_configured"},
+        "mongodb": {"status": "ok"} if db else {"status": "error"},
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+    
+    return results
+
+@api_router.get("/admin/logs")
+async def get_admin_logs(admin: dict = Depends(get_admin_user), limit: int = 100):
+    """Get error logs"""
+    logs = await db.error_logs.find({}).sort("timestamp", -1).limit(limit).to_list(limit)
+    for log in logs:
+        log["_id"] = str(log["_id"])
+    return logs
+
+@api_router.post("/admin/logs")
+async def create_log(level: str, message: str, source: str = "frontend", admin: dict = Depends(get_admin_user)):
+    """Create a log entry"""
+    log = {
+        "level": level,
+        "message": message,
+        "source": source,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+    await db.error_logs.insert_one(log)
+    return {"message": "Log created"}
+
+@api_router.delete("/admin/logs")
+async def clear_logs(admin: dict = Depends(get_admin_user)):
+    """Clear all logs"""
+    await db.error_logs.delete_many({})
+    return {"message": "Logs cleared"}
+
 # ============== PROFILE & AVATAR UPLOAD ==============
 
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
