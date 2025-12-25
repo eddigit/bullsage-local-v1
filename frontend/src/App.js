@@ -54,6 +54,9 @@ export const useAuth = () => {
   return context;
 };
 
+// DEV MODE - Désactiver la redirection sur 401
+const DEV_MODE = true;
+
 // Axios interceptor for auth
 axios.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
@@ -66,7 +69,8 @@ axios.interceptors.request.use((config) => {
 axios.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    // DEV MODE: Ne pas rediriger sur 401
+    if (!DEV_MODE && error.response?.status === 401) {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       window.location.href = "/login";

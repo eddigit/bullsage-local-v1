@@ -384,7 +384,27 @@ def create_token(user_id: str, email: str) -> str:
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
+# DEV MODE: Désactiver l'authentification pour le développement
+DEV_MODE = os.environ.get('DEV_MODE', 'true').lower() == 'true'
+
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    # DEV MODE: Retourner un utilisateur par défaut sans vérification
+    if DEV_MODE:
+        # Chercher le premier admin ou créer un user fictif
+        admin = await db.users.find_one({"is_admin": True}, {"_id": 0, "password": 0})
+        if admin:
+            return admin
+        return {
+            "id": "dev-user",
+            "email": "dev@bullsage.com",
+            "name": "Dev User",
+            "is_admin": True,
+            "trading_level": "advanced",
+            "watchlist": ["bitcoin", "ethereum", "solana"],
+            "paper_balance": 10000.0
+        }
+    
+    # PRODUCTION: Vérification normale du token
     try:
         payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         user_id = payload.get("user_id")
@@ -7413,9 +7433,10 @@ app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=["*"],  # DEV MODE: Tout autoriser
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 @app.on_event("shutdown")
