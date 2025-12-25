@@ -24,7 +24,11 @@ import { Separator } from "../components/ui/separator";
 import { Avatar, AvatarImage, AvatarFallback } from "../components/ui/avatar";
 import { Switch } from "../components/ui/switch";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+// Detect environment - use Render backend URL in production
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 
+  (window.location.hostname === 'localhost' 
+    ? 'http://localhost:8000' 
+    : 'https://bullsage-api.onrender.com');
 
 const TRADING_LEVELS = [
   { 

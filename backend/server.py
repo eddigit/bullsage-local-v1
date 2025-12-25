@@ -98,6 +98,7 @@ class UserResponse(BaseModel):
     is_admin: bool = False
     onboarding_completed: bool = False
     preferences: Optional[Dict[str, Any]] = None
+    avatar: Optional[str] = None
 
 class UserPreferences(BaseModel):
     experience_level: str  # beginner, intermediate, confirmed, expert
@@ -452,7 +453,8 @@ async def login(credentials: UserLogin):
         created_at=user["created_at"],
         paper_balance=user.get("paper_balance", 10000.0),
         watchlist=user.get("watchlist", []),
-        is_admin=user.get("is_admin", False)
+        is_admin=user.get("is_admin", False),
+        avatar=user.get("avatar")
     )
     
     return TokenResponse(access_token=token, user=user_response)
@@ -467,7 +469,8 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         created_at=current_user["created_at"],
         paper_balance=current_user.get("paper_balance", 10000.0),
         watchlist=current_user.get("watchlist", []),
-        is_admin=current_user.get("is_admin", False)
+        is_admin=current_user.get("is_admin", False),
+        avatar=current_user.get("avatar")
     )
 
 # ============== MARKET DATA ROUTES ==============
