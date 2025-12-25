@@ -268,25 +268,25 @@ export default function OpportunityScannerPage() {
               <p className="text-xs text-muted-foreground">Actifs scannés</p>
             </CardContent>
           </Card>
-          <Card className="glass border-white/10 border-amber-500/30">
+          <Card className="glass border-amber-500/30">
             <CardContent className="p-4 text-center">
               <p className="text-2xl font-bold text-amber-400">{summary.crypto_count}</p>
               <p className="text-xs text-muted-foreground">Cryptos</p>
             </CardContent>
           </Card>
-          <Card className="glass border-white/10 border-blue-500/30">
+          <Card className="glass border-blue-500/30">
             <CardContent className="p-4 text-center">
               <p className="text-2xl font-bold text-blue-400">{summary.stock_count}</p>
               <p className="text-xs text-muted-foreground">Actions</p>
             </CardContent>
           </Card>
-          <Card className="glass border-white/10 border-purple-500/30">
+          <Card className="glass border-purple-500/30">
             <CardContent className="p-4 text-center">
               <p className="text-2xl font-bold text-purple-400">{summary.index_count}</p>
               <p className="text-xs text-muted-foreground">Indices</p>
             </CardContent>
           </Card>
-          <Card className="glass border-white/10 border-emerald-500/30">
+          <Card className="glass border-emerald-500/30">
             <CardContent className="p-4 text-center">
               <p className="text-2xl font-bold text-emerald-400">{summary.buy_signals}</p>
               <p className="text-xs text-muted-foreground">Signaux BUY</p>
