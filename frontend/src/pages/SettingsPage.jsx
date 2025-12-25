@@ -13,8 +13,11 @@ import {
   TrendingUp,
   Zap,
   AlertTriangle,
-  Loader2
+  Loader2,
+  Settings2,
+  ExternalLink
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -364,6 +367,31 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Admin Section - Only visible for admins */}
+      {user?.is_admin && (
+        <Card className="glass border-amber-500/30 bg-amber-500/5">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Settings2 className="w-5 h-5 text-amber-500" />
+              Administration
+            </CardTitle>
+            <CardDescription>Accès réservé aux administrateurs</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link to="/admin">
+              <Button className="w-full bg-amber-600 hover:bg-amber-700 text-white">
+                <Shield className="w-4 h-4 mr-2" />
+                Accéder au tableau de bord admin
+                <ExternalLink className="w-4 h-4 ml-2" />
+              </Button>
+            </Link>
+            <p className="text-xs text-muted-foreground mt-3">
+              Gérez les utilisateurs, surveillez les APIs et consultez les logs d'erreurs.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* About */}
       <Card className="glass border-white/5">

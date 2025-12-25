@@ -1,5 +1,5 @@
 // BULL SAGE Service Worker
-const CACHE_NAME = 'bullsage-v3';
+const CACHE_NAME = 'bullsage-v4';
 const OFFLINE_URL = '/offline.html';
 
 // Assets to cache
