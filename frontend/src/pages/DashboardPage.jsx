@@ -145,18 +145,43 @@ export default function DashboardPage() {
 
   const fetchData = async () => {
     try {
-      const [marketsRes, fgRes, portfolioRes] = await Promise.all([
-        axios.get(`${API}/market/crypto`),
-        axios.get(`${API}/market/fear-greed`),
-        axios.get(`${API}/paper-trading/portfolio`)
-      ]);
-      // Ensure markets is always an array
-      const marketsData = Array.isArray(marketsRes.data) ? marketsRes.data : [];
-      setMarkets(marketsData);
-      if (fgRes.data?.data?.[0]) {
-        setFearGreed(fgRes.data.data[0]);
+      // Fetch each API separately to handle individual errors
+      let marketsData = [];
+      let fearGreedData = null;
+      let portfolioData = null;
+
+      // Fetch markets
+      try {
+        const marketsRes = await axios.get(`${API}/market/crypto`);
+        marketsData = Array.isArray(marketsRes.data) ? marketsRes.data : [];
+        console.log("Markets loaded:", marketsData.length, "coins");
+      } catch (e) {
+        console.error("Error fetching markets:", e.message);
       }
-      setPortfolio(portfolioRes.data);
+
+      // Fetch fear & greed
+      try {
+        const fgRes = await axios.get(`${API}/market/fear-greed`);
+        if (fgRes.data?.data?.[0]) {
+          fearGreedData = fgRes.data.data[0];
+          console.log("Fear & Greed loaded:", fearGreedData.value);
+        }
+      } catch (e) {
+        console.error("Error fetching fear-greed:", e.message);
+      }
+
+      // Fetch portfolio
+      try {
+        const portfolioRes = await axios.get(`${API}/paper-trading/portfolio`);
+        portfolioData = portfolioRes.data;
+        console.log("Portfolio loaded:", portfolioData);
+      } catch (e) {
+        console.error("Error fetching portfolio:", e.message);
+      }
+
+      setMarkets(marketsData);
+      setFearGreed(fearGreedData);
+      setPortfolio(portfolioData);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
