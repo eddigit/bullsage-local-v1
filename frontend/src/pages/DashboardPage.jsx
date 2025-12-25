@@ -150,7 +150,9 @@ export default function DashboardPage() {
         axios.get(`${API}/market/fear-greed`),
         axios.get(`${API}/paper-trading/portfolio`)
       ]);
-      setMarkets(marketsRes.data || []);
+      // Ensure markets is always an array
+      const marketsData = Array.isArray(marketsRes.data) ? marketsRes.data : [];
+      setMarkets(marketsData);
       if (fgRes.data?.data?.[0]) {
         setFearGreed(fgRes.data.data[0]);
       }
