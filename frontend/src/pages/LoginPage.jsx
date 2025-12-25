@@ -24,12 +24,14 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      await login(email, password);
+      const user = await login(email, password);
       toast.success("Connexion réussie !");
-      navigate("/");
+      // Attendre un tick pour que le state React soit propagé
+      setTimeout(() => {
+        window.location.href = "/";
+      }, 100);
     } catch (error) {
       toast.error(error.response?.data?.detail || "Erreur de connexion");
-    } finally {
       setLoading(false);
     }
   };
