@@ -235,7 +235,50 @@ export default function AdminPage() {
     setLoadingHealth(true);
     try {
       const response = await axios.get(`${API}/admin/api-health`);
-      setApiHealth(response.data);
+      const data = response.data;
+      
+      // Transform API response to expected format
+      const apiNames = {
+        coingecko: { name: 'CoinGecko', description: 'Données crypto temps réel' },
+        binance: { name: 'Binance', description: 'Prix et volumes' },
+        fear_greed: { name: 'Fear & Greed', description: 'Indice de sentiment' },
+        finnhub: { name: 'Finnhub', description: 'News et sentiment' },
+        alpha_vantage: { name: 'Alpha Vantage', description: 'Forex et actions' },
+        mongodb: { name: 'MongoDB', description: 'Base de données' }
+      };
+      
+      const apis = [];
+      let online = 0;
+      let total = 0;
+      
+      Object.keys(apiNames).forEach(key => {
+        if (data[key]) {
+          total++;
+          const status = data[key].status === 'ok' ? 'online' : 
+                        data[key].status === 'not_configured' ? 'not_configured' : 'offline';
+          if (status === 'online') online++;
+          
+          apis.push({
+            name: apiNames[key].name,
+            description: apiNames[key].description,
+            status: status,
+            latency: data[key].latency_ms || 0,
+            code: data[key].code || 0
+          });
+        }
+      });
+      
+      const healthPercentage = total > 0 ? Math.round((online / total) * 100) : 0;
+      
+      setApiHealth({
+        apis,
+        summary: {
+          online,
+          total,
+          health_percentage: healthPercentage
+        },
+        timestamp: data.timestamp
+      });
     } catch (error) {
       console.error("Error fetching API health:", error);
       toast.error("Erreur lors du test des API");
