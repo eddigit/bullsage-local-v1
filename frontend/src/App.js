@@ -36,7 +36,11 @@ import ProTraderPage from "./pages/ProTraderPage";
 // Layout
 import MainLayout from "./layouts/MainLayout";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+// Detect environment - use Render backend URL in production
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 
+  (window.location.hostname === 'localhost' 
+    ? 'http://localhost:8000' 
+    : 'https://bullsage-api.onrender.com');
 export const API = `${BACKEND_URL}/api`;
 
 // Auth Context
