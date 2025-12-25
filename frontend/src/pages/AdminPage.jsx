@@ -52,8 +52,8 @@ export default function AdminPage() {
         axios.get(`${API}/admin/stats`),
         axios.get(`${API}/admin/users`)
       ]);
-      setStats(statsRes.data);
-      setUsers(usersRes.data);
+      setStats(statsRes.data || {});
+      setUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
     } catch (error) {
       console.error("Error fetching admin data:", error);
       toast.error("Erreur lors du chargement des données admin");

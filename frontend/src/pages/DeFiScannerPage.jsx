@@ -83,10 +83,11 @@ export default function DeFiScannerPage() {
       });
       
       const response = await axios.get(`${API}/defi-scanner/scan?${params}`);
-      setTokens(response.data.tokens || []);
-      setScanTime(response.data.scan_time);
-      setTotalFound(response.data.total_found || 0);
-      toast.success(`${response.data.total_found} tokens trouvés!`);
+      const data = response.data || {};
+      setTokens(Array.isArray(data.tokens) ? data.tokens : []);
+      setScanTime(data.scan_time || null);
+      setTotalFound(data.total_found || 0);
+      toast.success(`${data.total_found || 0} tokens trouvés!`);
     } catch (error) {
       console.error("Scan error:", error);
       toast.error("Erreur lors du scan");

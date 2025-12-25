@@ -55,8 +55,8 @@ export default function AlertsPage() {
         axios.get(`${API}/alerts`),
         axios.get(`${API}/market/crypto`)
       ]);
-      setAlerts(alertsRes.data);
-      setMarkets(marketsRes.data || []);
+      setAlerts(Array.isArray(alertsRes.data) ? alertsRes.data : []);
+      setMarkets(Array.isArray(marketsRes.data) ? marketsRes.data : []);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {

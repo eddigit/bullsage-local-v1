@@ -68,7 +68,7 @@ export default function MarketIntelligencePage() {
   const fetchData = async () => {
     try {
       const response = await axios.get(`${API}/market/intelligence`);
-      setData(response.data);
+      setData(response.data || {});
     } catch (error) {
       console.error("Error fetching market intelligence:", error);
       toast.error("Erreur lors du chargement des données");

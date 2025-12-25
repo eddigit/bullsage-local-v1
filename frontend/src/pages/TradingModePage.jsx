@@ -271,10 +271,11 @@ export default function TradingModePage() {
         axios.get(`${API}/market/forex/EUR/USD`).catch(() => ({ data: null }))
       ]);
       
+      const newsData = Array.isArray(newsRes.data) ? newsRes.data : [];
       setMarketContext({
         fearGreed: fearGreedRes.data?.data?.[0] || null,
         macro: macroRes.data || null,
-        news: newsRes.data?.slice(0, 5) || [],
+        news: newsData.slice(0, 5),
         eurusd: forexRes.data?.["Realtime Currency Exchange Rate"] || null
       });
     } catch (error) {
@@ -305,11 +306,12 @@ export default function TradingModePage() {
     const fetchMarkets = async () => {
       try {
         const response = await axios.get(`${API}/market/crypto`);
-        setMarkets(response.data || []);
+        const marketsData = Array.isArray(response.data) ? response.data : [];
+        setMarkets(marketsData);
         
         // Auto-select first watchlist coin
-        if (user?.watchlist?.length > 0 && response.data) {
-          const firstWatchlistCoin = response.data.find(c => c.id === user.watchlist[0]);
+        if (user?.watchlist?.length > 0 && marketsData.length > 0) {
+          const firstWatchlistCoin = marketsData.find(c => c.id === user.watchlist[0]);
           if (firstWatchlistCoin) {
             setSelectedCoin(firstWatchlistCoin);
           }
@@ -372,11 +374,13 @@ export default function TradingModePage() {
     
     try {
       const response = await axios.get(`${API}/trading/scan-opportunities`);
-      setAlerts(response.data.alerts || []);
+      const data = response.data || {};
+      const alertsData = Array.isArray(data.alerts) ? data.alerts : [];
+      setAlerts(alertsData);
       
-      if (response.data.alerts?.length > 0 && soundEnabled) {
+      if (alertsData.length > 0 && soundEnabled) {
         playAlertSound();
-        toast.success(`${response.data.alerts.length} opportunité(s) détectée(s) !`);
+        toast.success(`${alertsData.length} opportunité(s) détectée(s) !`);
       } else {
         toast.info("Aucune opportunité forte détectée");
       }

@@ -545,8 +545,9 @@ export default function ProTraderPage() {
     try {
       // Charger le dashboard
       const dashRes = await axios.get(`${API}/pro/dashboard`);
-      setOpportunities(dashRes.data.best_opportunities || []);
-      setMarketOverview(dashRes.data.market_overview || []);
+      const dashData = dashRes.data || {};
+      setOpportunities(Array.isArray(dashData.best_opportunities) ? dashData.best_opportunities : []);
+      setMarketOverview(Array.isArray(dashData.market_overview) ? dashData.market_overview : []);
       setScanMessage(dashRes.data.summary || "");
       
       // Charger les règles
@@ -574,9 +575,10 @@ export default function ProTraderPage() {
     try {
       const symbols = "BTC,ETH,SOL,XRP,ADA,AVAX,DOT,LINK";
       const res = await axios.get(`${API}/pro/scan?symbols=${symbols}`);
-      setOpportunities(res.data.best_setups || []);
-      setScanMessage(res.data.message || "");
-      toast.success(`${res.data.opportunities_found} opportunités trouvées!`);
+      const scanData = res.data || {};
+      setOpportunities(Array.isArray(scanData.best_setups) ? scanData.best_setups : []);
+      setScanMessage(scanData.message || "");
+      toast.success(`${scanData.opportunities_found || 0} opportunités trouvées!`);
     } catch (error) {
       toast.error("Erreur lors du scan");
     } finally {

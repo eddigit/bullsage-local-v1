@@ -68,7 +68,7 @@ export default function MarketsPage() {
   const fetchMarkets = async () => {
     try {
       const response = await axios.get(`${API}/market/crypto`);
-      setMarkets(response.data || []);
+      setMarkets(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error("Error fetching markets:", error);
       toast.error("Erreur lors du chargement des marchés");

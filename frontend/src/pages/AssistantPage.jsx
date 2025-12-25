@@ -43,7 +43,8 @@ export default function AssistantPage() {
     const fetchHistory = async () => {
       try {
         const response = await axios.get(`${API}/assistant/history?limit=20`);
-        const formattedMessages = response.data.flatMap(item => [
+        const historyData = Array.isArray(response.data) ? response.data : [];
+        const formattedMessages = historyData.flatMap(item => [
           { role: "user", content: item.message, timestamp: item.timestamp },
           { role: "assistant", content: item.response, timestamp: item.timestamp }
         ]);
@@ -63,7 +64,8 @@ export default function AssistantPage() {
     const fetchMarketContext = async () => {
       try {
         const response = await axios.get(`${API}/market/crypto`);
-        setMarketContext(response.data?.slice(0, 10) || []);
+        const marketData = Array.isArray(response.data) ? response.data : [];
+        setMarketContext(marketData.slice(0, 10));
       } catch (error) {
         console.error("Error fetching market context:", error);
       }

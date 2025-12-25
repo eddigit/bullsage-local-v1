@@ -135,7 +135,7 @@ export default function CockpitPage() {
   const fetchAlerts = async () => {
     try {
       const response = await axios.get(`${API}/alerts/smart`);
-      setAlerts(response.data || []);
+      setAlerts(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error("Error fetching alerts:", error);
     }
@@ -144,7 +144,7 @@ export default function CockpitPage() {
   const fetchMarkets = async () => {
     try {
       const response = await axios.get(`${API}/market/crypto`);
-      setMarkets(response.data || []);
+      setMarkets(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error("Error fetching markets:", error);
     }

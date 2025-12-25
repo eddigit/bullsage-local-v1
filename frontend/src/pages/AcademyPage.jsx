@@ -203,9 +203,9 @@ export default function AcademyPage() {
         })
       ]);
       
-      setAcademyData(modulesRes.data);
-      setBadges(badgesRes.data);
-      setLeaderboard(leaderboardRes.data);
+      setAcademyData(modulesRes.data || { modules: [], progress: {} });
+      setBadges(Array.isArray(badgesRes.data) ? badgesRes.data : []);
+      setLeaderboard(Array.isArray(leaderboardRes.data) ? leaderboardRes.data : []);
     } catch (error) {
       console.error("Error fetching academy data:", error);
     } finally {

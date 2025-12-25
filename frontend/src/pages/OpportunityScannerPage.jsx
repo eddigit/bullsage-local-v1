@@ -150,12 +150,14 @@ export default function OpportunityScannerPage() {
         max_results: 15
       });
       
-      setOpportunities(response.data.opportunities || []);
-      setAiRecommendation(response.data.ai_recommendation);
-      setSummary(response.data.summary);
+      const data = response.data || {};
+      setOpportunities(Array.isArray(data.opportunities) ? data.opportunities : []);
+      setAiRecommendation(data.ai_recommendation || null);
+      setSummary(data.summary || null);
       setLastScan(new Date());
       
-      toast.success(`🔍 Scan terminé - ${response.data.opportunities?.length || 0} opportunités trouvées`);
+      const oppCount = Array.isArray(data.opportunities) ? data.opportunities.length : 0;
+      toast.success(`🔍 Scan terminé - ${oppCount} opportunités trouvées`);
     } catch (error) {
       console.error("Scan error:", error);
       toast.error("Erreur lors du scan");

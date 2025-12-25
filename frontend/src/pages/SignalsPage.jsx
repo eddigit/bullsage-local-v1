@@ -126,8 +126,8 @@ export default function SignalsPage() {
         axios.get(`${API}/signals`),
         axios.get(`${API}/signals/stats`)
       ]);
-      setSignals(signalsRes.data);
-      setStats(statsRes.data);
+      setSignals(Array.isArray(signalsRes.data) ? signalsRes.data : []);
+      setStats(statsRes.data || null);
     } catch (error) {
       console.error("Error fetching signals:", error);
       toast.error("Erreur lors du chargement des signaux");

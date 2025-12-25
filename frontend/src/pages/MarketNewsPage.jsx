@@ -67,7 +67,8 @@ export default function MarketNewsPage() {
     setNewsLoading(true);
     try {
       const response = await axios.get(`${API}/market/news?category=${cat}&limit=20`);
-      setNews(response.data.news || []);
+      const data = response.data || {};
+      setNews(Array.isArray(data.news) ? data.news : []);
     } catch (error) {
       console.error("News error:", error);
     } finally {
@@ -78,7 +79,8 @@ export default function MarketNewsPage() {
   const loadIndices = async () => {
     try {
       const response = await axios.get(`${API}/market/indices`);
-      setIndices(response.data.indices || []);
+      const data = response.data || {};
+      setIndices(Array.isArray(data.indices) ? data.indices : []);
     } catch (error) {
       console.error("Indices error:", error);
     }
@@ -87,7 +89,8 @@ export default function MarketNewsPage() {
   const loadEconomicCalendar = async () => {
     try {
       const response = await axios.get(`${API}/market/economic-calendar`);
-      setEconomicEvents(response.data.events || []);
+      const data = response.data || {};
+      setEconomicEvents(Array.isArray(data.events) ? data.events : []);
     } catch (error) {
       console.error("Calendar error:", error);
     }

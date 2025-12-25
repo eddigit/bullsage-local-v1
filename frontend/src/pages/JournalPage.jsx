@@ -112,9 +112,9 @@ export default function JournalPage() {
         axios.get(`${API}/journal/stats`),
         axios.get(`${API}/market/crypto`)
       ]);
-      setTrades(tradesRes.data || []);
-      setStats(statsRes.data);
-      setMarkets(marketsRes.data || []);
+      setTrades(Array.isArray(tradesRes.data) ? tradesRes.data : []);
+      setStats(statsRes.data || {});
+      setMarkets(Array.isArray(marketsRes.data) ? marketsRes.data : []);
     } catch (error) {
       console.error("Error fetching journal data:", error);
     } finally {

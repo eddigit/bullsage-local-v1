@@ -73,8 +73,8 @@ export default function WalletPage() {
         axios.get(`${API}/wallet/list`),
         axios.get(`${API}/wallet/supported-chains`)
       ]);
-      setWallets(walletsRes.data);
-      setChains(chainsRes.data);
+      setWallets(Array.isArray(walletsRes.data) ? walletsRes.data : []);
+      setChains(Array.isArray(chainsRes.data) ? chainsRes.data : []);
     } catch (error) {
       console.error("Load error:", error);
     } finally {

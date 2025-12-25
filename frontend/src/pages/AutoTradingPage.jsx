@@ -34,8 +34,8 @@ export default function AutoTradingPage() {
       const response = await axios.get(`${API}/auto-trading/config`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setConfig(response.data.config);
-      setStats(response.data.stats);
+      setConfig(response.data?.config || { enabled: false, assets_to_trade: [], max_position_size: 100, risk_per_trade: 2 });
+      setStats(response.data?.stats || { total_trades: 0, win_rate: 0, total_pnl: 0 });
     } catch (error) {
       console.error('Error fetching config:', error);
     } finally {
@@ -49,7 +49,7 @@ export default function AutoTradingPage() {
       const response = await axios.get(`${API}/auto-trading/history?limit=50`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setHistory(response.data);
+      setHistory(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Error fetching history:', error);
     }

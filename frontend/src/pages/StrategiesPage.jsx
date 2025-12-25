@@ -97,7 +97,7 @@ export default function StrategiesPage() {
   const fetchStrategies = async () => {
     try {
       const response = await axios.get(`${API}/strategies`);
-      setStrategies(response.data);
+      setStrategies(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error("Error fetching strategies:", error);
     } finally {
