@@ -1,11 +1,13 @@
 from fastapi import APIRouter, HTTPException, Depends
 from datetime import datetime, timezone
 import uuid
+import logging
 
 from ..core.config import db
 from ..core.auth import get_current_user
 from ..models.schemas import PaperTrade, PaperTradeCreate
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/paper-trading", tags=["Paper Trading"])
 
 @router.post("/trade", response_model=PaperTrade)
@@ -72,21 +74,51 @@ async def execute_paper_trade(trade: PaperTradeCreate, current_user: dict = Depe
 @router.get("/trades")
 async def get_paper_trades(limit: int = 50, current_user: dict = Depends(get_current_user)):
     """Get paper trading history"""
-    trades = await db.paper_trades.find(
-        {"user_id": current_user["id"]},
-        {"_id": 0}
-    ).sort("timestamp", -1).limit(limit).to_list(limit)
-    return trades
+    try:
+        user_id = current_user["id"]
+        logger.info(f"Fetching trades for user: {user_id}")
+        
+        trades = await db.paper_trades.find(
+            {"user_id": user_id},
+            {"_id": 0}
+        ).sort("timestamp", -1).limit(limit).to_list(limit)
+        
+        logger.info(f"Found {len(trades)} trades for user: {user_id}")
+        
+        # Always return a list
+        return trades if trades else []
+    except Exception as e:
+        logger.error(f"Error fetching trades: {e}")
+        return []
 
 @router.get("/portfolio")
 async def get_paper_portfolio(current_user: dict = Depends(get_current_user)):
     """Get paper trading portfolio"""
-    user = await db.users.find_one({"id": current_user["id"]})
-    return {
-        "balance": user.get("paper_balance", 10000.0),
-        "portfolio": user.get("portfolio", {}),
-        "initial_balance": 10000.0
-    }
+    try:
+        user = await db.users.find_one({"id": current_user["id"]})
+        if not user:
+            logger.warning(f"User not found for portfolio: {current_user['id']}")
+            return {
+                "balance": 10000.0,
+                "portfolio": {},
+                "initial_balance": 10000.0
+            }
+        
+        portfolio = user.get("portfolio", {})
+        logger.info(f"Portfolio for user {current_user['id']}: {len(portfolio)} positions")
+        
+        return {
+            "balance": user.get("paper_balance", 10000.0),
+            "portfolio": portfolio,
+            "initial_balance": 10000.0
+        }
+    except Exception as e:
+        logger.error(f"Error fetching portfolio: {e}")
+        return {
+            "balance": 10000.0,
+            "portfolio": {},
+            "initial_balance": 10000.0
+        }
 
 @router.post("/reset")
 async def reset_paper_portfolio(current_user: dict = Depends(get_current_user)):

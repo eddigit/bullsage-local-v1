@@ -105,11 +105,18 @@ export default function PaperTradingPage() {
         { id: "SPY", symbol: "spy", name: "S&P 500 ETF", current_price: 599.00, price_change_percentage_24h: 0.40, type: "index" },
       ];
       
-      // Add type to cryptos
-      const cryptosWithType = (marketsRes.data || []).map(c => ({ ...c, type: "crypto" }));
+      // Safely extract data - handle various response formats
+      const marketsData = Array.isArray(marketsRes.data) ? marketsRes.data : 
+                          (marketsRes.data?.data && Array.isArray(marketsRes.data.data)) ? marketsRes.data.data : [];
+      const tradesData = Array.isArray(tradesRes.data) ? tradesRes.data : 
+                         (tradesRes.data?.data && Array.isArray(tradesRes.data.data)) ? tradesRes.data.data : [];
+      const portfolioData = portfolioRes.data || { balance: 10000, portfolio: {} };
       
-      setPortfolio(portfolioRes.data);
-      setTrades(tradesRes.data);
+      // Add type to cryptos
+      const cryptosWithType = marketsData.map(c => ({ ...c, type: "crypto" }));
+      
+      setPortfolio(portfolioData);
+      setTrades(tradesData);
       setMarkets([...cryptosWithType, ...stocks]);
     } catch (error) {
       console.error("Error fetching data:", error);

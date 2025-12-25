@@ -22,13 +22,13 @@ async def get_crypto_markets(current_user: dict = Depends(get_current_user)):
     """Get top cryptocurrencies with current prices"""
     data = await market_data_service.get_crypto_list()
     
-    if data:
+    # Always return a list, never None
+    if data and isinstance(data, list):
         return data
     
-    raise HTTPException(
-        status_code=503,
-        detail="Les APIs de données crypto sont temporairement indisponibles. Veuillez réessayer dans quelques minutes."
-    )
+    # Return empty list instead of raising an error
+    logger.warning("Crypto data unavailable, returning empty list")
+    return []
 
 
 @router.get("/crypto/{coin_id}")

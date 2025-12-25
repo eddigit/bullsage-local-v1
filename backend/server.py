@@ -805,11 +805,9 @@ async def get_crypto_markets(current_user: dict = Depends(get_current_user)):
         logger.warning("⚠️ Kraken unavailable, returning stale cached data")
         return _crypto_cache["data"]
     
-    # Last resort - no data at all
-    raise HTTPException(
-        status_code=503,
-        detail="Les données crypto sont temporairement indisponibles. Veuillez réessayer."
-    )
+    # Last resort - return empty list instead of error to prevent frontend crash
+    logger.warning("⚠️ No crypto data available, returning empty list")
+    return []
 
 @api_router.get("/market/crypto/{coin_id}")
 async def get_crypto_detail(coin_id: str, current_user: dict = Depends(get_current_user)):
@@ -3260,55 +3258,77 @@ async def execute_paper_trade(trade: PaperTradeCreate, current_user: dict = Depe
 @api_router.get("/paper-trading/trades")
 async def get_paper_trades(limit: int = 50, current_user: dict = Depends(get_current_user)):
     """Get paper trading history"""
-    trades = await db.paper_trades.find(
-        {"user_id": current_user["id"]},
-        {"_id": 0}
-    ).sort("timestamp", -1).limit(limit).to_list(limit)
-    
-    # Normalize field names for frontend compatibility
-    for trade in trades:
-        if "quantity" in trade and "amount" not in trade:
-            trade["amount"] = trade["quantity"]
-        if "entry_price" in trade and "price" not in trade:
-            trade["price"] = trade["entry_price"]
-        if "created_at" in trade and "timestamp" not in trade:
-            trade["timestamp"] = trade["created_at"]
-    
-    return trades
+    try:
+        trades = await db.paper_trades.find(
+            {"user_id": current_user["id"]},
+            {"_id": 0}
+        ).sort("timestamp", -1).limit(limit).to_list(limit)
+        
+        if not trades:
+            return []
+        
+        # Normalize field names for frontend compatibility
+        for trade in trades:
+            if "quantity" in trade and "amount" not in trade:
+                trade["amount"] = trade["quantity"]
+            if "entry_price" in trade and "price" not in trade:
+                trade["price"] = trade["entry_price"]
+            if "created_at" in trade and "timestamp" not in trade:
+                trade["timestamp"] = trade["created_at"]
+        
+        return trades
+    except Exception as e:
+        logger.error(f"Error fetching paper trades: {e}")
+        return []
 
 @api_router.get("/paper-trading/portfolio")
 async def get_paper_portfolio(current_user: dict = Depends(get_current_user)):
     """Get paper trading portfolio"""
-    user = await db.users.find_one({"id": current_user["id"]})
-    
-    portfolio = user.get("portfolio", {})
-    
-    # Normalize portfolio structure - convert list to dict if needed
-    if isinstance(portfolio, list):
-        normalized = {}
-        for item in portfolio:
-            coin_id = item.get("coin_id", item.get("symbol", "unknown"))
-            normalized[coin_id] = {
-                "amount": item.get("quantity", item.get("amount", 0)),
-                "quantity": item.get("quantity", item.get("amount", 0)),
-                "avg_price": item.get("avg_price", 0),
-                "symbol": item.get("symbol", coin_id.upper()[:4])
+    try:
+        user = await db.users.find_one({"id": current_user["id"]})
+        
+        if not user:
+            return {
+                "balance": 10000.0,
+                "portfolio": {},
+                "initial_balance": 10000.0
             }
-        portfolio = normalized
-    else:
-        # Ensure each holding has both amount and quantity
-        for symbol, holding in portfolio.items():
-            if isinstance(holding, dict):
-                if "quantity" in holding and "amount" not in holding:
-                    holding["amount"] = holding["quantity"]
-                if "amount" in holding and "quantity" not in holding:
-                    holding["quantity"] = holding["amount"]
-    
-    return {
-        "balance": user.get("paper_balance", 10000.0),
-        "portfolio": portfolio,
-        "initial_balance": 10000.0
-    }
+        
+        portfolio = user.get("portfolio", {})
+        
+        # Normalize portfolio structure - convert list to dict if needed
+        if isinstance(portfolio, list):
+            normalized = {}
+            for item in portfolio:
+                coin_id = item.get("coin_id", item.get("symbol", "unknown"))
+                normalized[coin_id] = {
+                    "amount": item.get("quantity", item.get("amount", 0)),
+                    "quantity": item.get("quantity", item.get("amount", 0)),
+                    "avg_price": item.get("avg_price", 0),
+                    "symbol": item.get("symbol", coin_id.upper()[:4])
+                }
+            portfolio = normalized
+        else:
+            # Ensure each holding has both amount and quantity
+            for symbol, holding in portfolio.items():
+                if isinstance(holding, dict):
+                    if "quantity" in holding and "amount" not in holding:
+                        holding["amount"] = holding["quantity"]
+                    if "amount" in holding and "quantity" not in holding:
+                        holding["quantity"] = holding["amount"]
+        
+        return {
+            "balance": user.get("paper_balance", 10000.0),
+            "portfolio": portfolio,
+            "initial_balance": 10000.0
+        }
+    except Exception as e:
+        logger.error(f"Error fetching paper portfolio: {e}")
+        return {
+            "balance": 10000.0,
+            "portfolio": {},
+            "initial_balance": 10000.0
+        }
 
 @api_router.post("/paper-trading/reset")
 async def reset_paper_portfolio(current_user: dict = Depends(get_current_user)):
