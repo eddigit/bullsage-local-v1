@@ -5010,12 +5010,11 @@ async def get_api_keys(admin: dict = Depends(get_admin_user)):
 @api_router.get("/admin/api-health")
 async def get_api_health(admin: dict = Depends(get_admin_user)):
     """Check health of all external APIs"""
-    results = {}
     
-    async def check_api(name: str, url: str, headers: dict = None):
+    async def check_api(name: str, url: str):
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.get(url, headers=headers, timeout=10.0)
+                response = await client.get(url, timeout=10.0)
                 return {
                     "status": "ok" if response.status_code == 200 else "error",
                     "code": response.status_code,
@@ -5024,23 +5023,14 @@ async def get_api_health(admin: dict = Depends(get_admin_user)):
         except Exception as e:
             return {"status": "error", "code": 0, "error": str(e)[:50]}
     
-    # Test APIs in parallel
-    import asyncio
-    checks = await asyncio.gather(
-        check_api("coingecko", "https://api.coingecko.com/api/v3/ping"),
-        check_api("binance", "https://api.binance.com/api/v3/ping"),
-        check_api("fear_greed", "https://api.alternative.me/fng/?limit=1"),
-        check_api("finnhub", f"https://finnhub.io/api/v1/quote?symbol=AAPL&token={FINNHUB_API_KEY}") if FINNHUB_API_KEY else asyncio.coroutine(lambda: {"status": "not_configured"})(),
-        check_api("alpha_vantage", f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=IBM&apikey={ALPHA_VANTAGE_API_KEY}") if ALPHA_VANTAGE_API_KEY else asyncio.coroutine(lambda: {"status": "not_configured"})(),
-    )
-    
+    # Test APIs sequentially to avoid issues
     results = {
-        "coingecko": checks[0],
-        "binance": checks[1],
-        "fear_greed": checks[2],
-        "finnhub": checks[3] if FINNHUB_API_KEY else {"status": "not_configured"},
-        "alpha_vantage": checks[4] if ALPHA_VANTAGE_API_KEY else {"status": "not_configured"},
-        "mongodb": {"status": "ok"} if db else {"status": "error"},
+        "coingecko": await check_api("coingecko", "https://api.coingecko.com/api/v3/ping"),
+        "binance": await check_api("binance", "https://api.binance.com/api/v3/ping"),
+        "fear_greed": await check_api("fear_greed", "https://api.alternative.me/fng/?limit=1"),
+        "finnhub": await check_api("finnhub", f"https://finnhub.io/api/v1/quote?symbol=AAPL&token={FINNHUB_API_KEY}") if FINNHUB_API_KEY else {"status": "not_configured"},
+        "alpha_vantage": await check_api("alpha_vantage", f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=IBM&apikey={ALPHA_VANTAGE_API_KEY}") if ALPHA_VANTAGE_API_KEY else {"status": "not_configured"},
+        "mongodb": {"status": "ok"},
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
     
