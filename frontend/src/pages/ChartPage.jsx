@@ -173,8 +173,8 @@ export default function ChartPage() {
         axios.get(`${API}/chart/ticker/${selectedPair}`)
       ]);
 
-      const candles = klinesRes.data.candles;
-      const ticker = tickerRes.data;
+      const candles = klinesRes.data?.candles || [];
+      const ticker = tickerRes.data || {};
 
       if (candlestickSeriesRef.current && volumeSeriesRef.current && candles.length > 0) {
         candlestickSeriesRef.current.setData(candles);
