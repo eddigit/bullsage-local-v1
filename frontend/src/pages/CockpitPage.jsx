@@ -1,207 +1,138 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useAuth, API } from "../App";
 import axios from "axios";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 import {
   Sun,
-  Bell,
-  BellRing,
   TrendingUp,
   TrendingDown,
   AlertTriangle,
-  CheckCircle,
   Zap,
-  Target,
-  Shield,
   Brain,
   RefreshCw,
   Loader2,
-  Plus,
-  Trash2,
-  Volume2,
-  VolumeX,
-  Clock,
   ArrowUpRight,
   ArrowDownRight,
-  Coffee
+  Target,
+  DollarSign,
+  BarChart3,
+  Coins,
+  LineChart,
+  Building2,
+  CheckCircle,
+  XCircle,
+  History
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
-import { Input } from "../components/ui/input";
-import { Label } from "../components/ui/label";
-import { Switch } from "../components/ui/switch";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "../components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { ScrollArea } from "../components/ui/scroll-area";
 
-// Alert sound
-const playAlertSound = () => {
-  try {
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    oscillator.frequency.value = 800;
-    oscillator.type = "sine";
-    gainNode.gain.value = 0.3;
-    oscillator.start();
-    setTimeout(() => { oscillator.frequency.value = 1000; }, 100);
-    setTimeout(() => { oscillator.frequency.value = 1200; }, 200);
-    setTimeout(() => { 
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-      setTimeout(() => oscillator.stop(), 300);
-    }, 300);
-  } catch (e) {
-    console.log("Audio not supported");
+const formatPrice = (price, decimals = 2) => {
+  if (!price && price !== 0) return "$0.00";
+  if (price >= 1000) return `$${price.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+  if (price >= 1) return `$${price.toFixed(decimals)}`;
+  return `$${price.toFixed(6)}`;
+};
+
+const getMarketIcon = (type) => {
+  switch (type) {
+    case "crypto": return <Coins className="w-4 h-4" />;
+    case "forex": return <DollarSign className="w-4 h-4" />;
+    case "indices": return <BarChart3 className="w-4 h-4" />;
+    case "stocks": return <Building2 className="w-4 h-4" />;
+    default: return <LineChart className="w-4 h-4" />;
   }
 };
 
-const formatPrice = (price) => {
-  if (!price) return "$0.00";
-  if (price >= 1000) return `$${price.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
-  if (price >= 1) return `$${price.toFixed(2)}`;
-  return `$${price.toFixed(6)}`;
+const getMarketLabel = (type) => {
+  switch (type) {
+    case "crypto": return "Crypto";
+    case "forex": return "Forex";
+    case "indices": return "Indice";
+    case "stocks": return "Action";
+    default: return type;
+  }
 };
 
 export default function CockpitPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [briefing, setBriefing] = useState(null);
-  const [alerts, setAlerts] = useState([]);
-  const [markets, setMarkets] = useState([]);
+  const [signals, setSignals] = useState(null);
+  const [signalsHistory, setSignalsHistory] = useState([]);
+  const [signalsStats, setSignalsStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [loadingBriefing, setLoadingBriefing] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  
-  // New alert dialog
-  const [newAlertOpen, setNewAlertOpen] = useState(false);
-  const [newAlert, setNewAlert] = useState({
-    symbol: "",
-    symbol_name: "",
-    alert_type: "price",
-    condition: "below",
-    value: "",
-    sound_enabled: true,
-    repeat: false
-  });
-  const [submitting, setSubmitting] = useState(false);
-
-  // Auto-check alerts
-  const checkAlerts = useCallback(async () => {
-    try {
-      const response = await axios.get(`${API}/alerts/check`);
-      if (response.data.triggered?.length > 0) {
-        response.data.triggered.forEach(alert => {
-          if (soundEnabled && alert.sound_enabled) {
-            playAlertSound();
-          }
-          toast.warning(
-            `🔔 ${alert.symbol_name}: ${alert.condition === "above" ? "↑" : "↓"} ${formatPrice(alert.value)}`,
-            { duration: 10000 }
-          );
-        });
-        // Refresh alerts list
-        fetchAlerts();
-      }
-    } catch (error) {
-      console.error("Error checking alerts:", error);
-    }
-  }, [soundEnabled]);
+  const [loadingSignals, setLoadingSignals] = useState(false);
+  const [activeTab, setActiveTab] = useState("signals");
 
   const fetchBriefing = async () => {
-    setLoadingBriefing(true);
     try {
       const response = await axios.get(`${API}/briefing/daily`);
       setBriefing(response.data);
     } catch (error) {
       console.error("Error fetching briefing:", error);
+    }
+  };
+
+  const fetchSignals = async () => {
+    setLoadingSignals(true);
+    try {
+      const response = await axios.get(`${API}/signals/ai-trading`);
+      setSignals(response.data);
+    } catch (error) {
+      console.error("Error fetching signals:", error);
+      toast.error("Erreur lors de la génération des signaux");
     } finally {
-      setLoadingBriefing(false);
+      setLoadingSignals(false);
     }
   };
 
-  const fetchAlerts = async () => {
+  const fetchHistory = async () => {
     try {
-      const response = await axios.get(`${API}/alerts/smart`);
-      setAlerts(Array.isArray(response.data) ? response.data : []);
+      const response = await axios.get(`${API}/signals/history?limit=20`);
+      setSignalsHistory(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
-      console.error("Error fetching alerts:", error);
+      console.error("Error fetching history:", error);
     }
   };
 
-  const fetchMarkets = async () => {
+  const fetchStats = async () => {
     try {
-      const response = await axios.get(`${API}/market/crypto`);
-      setMarkets(Array.isArray(response.data) ? response.data : []);
+      const response = await axios.get(`${API}/signals/stats`);
+      setSignalsStats(response.data);
     } catch (error) {
-      console.error("Error fetching markets:", error);
+      console.error("Error fetching stats:", error);
+    }
+  };
+
+  const updateSignalResult = async (signalId, result, pnl) => {
+    try {
+      await axios.post(`${API}/signals/${signalId}/result?result=${result}&pnl_percent=${pnl}`);
+      toast.success("Résultat enregistré");
+      fetchHistory();
+      fetchStats();
+    } catch (error) {
+      toast.error("Erreur lors de la mise à jour");
     }
   };
 
   useEffect(() => {
     const init = async () => {
-      await Promise.all([fetchBriefing(), fetchAlerts(), fetchMarkets()]);
+      await Promise.all([fetchBriefing(), fetchSignals(), fetchHistory(), fetchStats()]);
       setLoading(false);
     };
     init();
-    // Note: Auto-check disabled to prevent API rate limiting
-    // User can manually check alerts with the "Vérifier" button
   }, []);
-
-  const handleCreateAlert = async () => {
-    if (!newAlert.symbol || !newAlert.value) {
-      toast.error("Remplissez tous les champs");
-      return;
-    }
-    
-    setSubmitting(true);
-    try {
-      await axios.post(`${API}/alerts/smart`, {
-        ...newAlert,
-        value: parseFloat(newAlert.value)
-      });
-      toast.success("Alerte créée");
-      setNewAlertOpen(false);
-      setNewAlert({
-        symbol: "", symbol_name: "", alert_type: "price",
-        condition: "below", value: "", sound_enabled: true, repeat: false
-      });
-      fetchAlerts();
-    } catch (error) {
-      toast.error("Erreur lors de la création");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDeleteAlert = async (alertId) => {
-    try {
-      await axios.delete(`${API}/alerts/smart/${alertId}`);
-      toast.success("Alerte supprimée");
-      fetchAlerts();
-    } catch (error) {
-      toast.error("Erreur lors de la suppression");
-    }
-  };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-12 h-12 animate-spin text-primary" />
-          <p className="text-muted-foreground">Préparation du cockpit...</p>
+          <p className="text-muted-foreground">Bull Sage analyse les marchés...</p>
         </div>
       </div>
     );
@@ -213,10 +144,10 @@ export default function CockpitPage() {
     return "text-yellow-500";
   };
 
-  const getSentimentIcon = (sentiment) => {
-    if (sentiment === "bullish") return <TrendingUp className="w-5 h-5" />;
-    if (sentiment === "bearish") return <TrendingDown className="w-5 h-5" />;
-    return <Target className="w-5 h-5" />;
+  const getSentimentBg = (sentiment) => {
+    if (sentiment === "bullish") return "bg-emerald-500/10 border-emerald-500/20";
+    if (sentiment === "bearish") return "bg-rose-500/10 border-rose-500/20";
+    return "bg-yellow-500/10 border-yellow-500/20";
   };
 
   return (
@@ -224,340 +155,401 @@ export default function CockpitPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-yellow-500 flex items-center justify-center">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
             <Sun className="w-6 h-6 text-white" />
           </div>
           <div>
             <h1 className="text-2xl md:text-3xl font-bold font-manrope">Cockpit Trading</h1>
-            <p className="text-sm text-muted-foreground">Briefing matinal & Alertes</p>
+            <p className="text-sm text-muted-foreground">
+              Signaux IA Multi-Marchés • Crypto, Forex, Indices, Actions
+            </p>
           </div>
         </div>
         
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            className="border-white/10"
-          >
-            {soundEnabled ? (
-              <Volume2 className="w-4 h-4 text-primary" />
-            ) : (
-              <VolumeX className="w-4 h-4 text-muted-foreground" />
-            )}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={fetchBriefing}
-            disabled={loadingBriefing}
-            className="border-white/10"
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${loadingBriefing ? "animate-spin" : ""}`} />
-            Actualiser
-          </Button>
-        </div>
+        <Button
+          onClick={fetchSignals}
+          disabled={loadingSignals}
+          className="bg-primary hover:bg-primary/90 text-black font-bold"
+        >
+          <RefreshCw className={`w-4 h-4 mr-2 ${loadingSignals ? "animate-spin" : ""}`} />
+          {loadingSignals ? "Analyse en cours..." : "Analyser les Marchés"}
+        </Button>
       </div>
 
-      {/* Daily Briefing */}
-      <Card className="glass border-amber-500/20 bg-gradient-to-br from-amber-500/5 to-orange-500/5">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Coffee className="w-5 h-5 text-amber-500" />
-              Briefing du {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
-            </CardTitle>
-            {briefing && (
-              <Badge className={`${getSentimentColor(briefing.sentiment)} bg-transparent border`}>
-                {getSentimentIcon(briefing.sentiment)}
-                <span className="ml-1 capitalize">{briefing.sentiment}</span>
-              </Badge>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {loadingBriefing && !briefing ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-amber-500" />
-            </div>
-          ) : briefing ? (
-            <div className="space-y-4">
-              {/* Market Overview */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="p-3 rounded-lg bg-white/5 text-center">
-                  <p className="text-xs text-muted-foreground">Fear & Greed</p>
-                  <p className={`text-xl font-bold ${
-                    briefing.fear_greed < 30 ? "text-rose-500" :
-                    briefing.fear_greed > 70 ? "text-emerald-500" : "text-yellow-500"
-                  }`}>
-                    {briefing.fear_greed}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{briefing.fear_greed_label}</p>
-                </div>
-                <div className="p-3 rounded-lg bg-white/5 text-center">
-                  <p className="text-xs text-muted-foreground">Bitcoin</p>
-                  <p className="text-xl font-bold">{formatPrice(briefing.btc_price)}</p>
-                  <p className={`text-xs ${briefing.btc_change_24h >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
-                    {briefing.btc_change_24h >= 0 ? "+" : ""}{briefing.btc_change_24h}%
-                  </p>
-                </div>
-                <div className="p-3 rounded-lg bg-white/5 text-center">
-                  <p className="text-xs text-muted-foreground">Trades Ouverts</p>
-                  <p className="text-xl font-bold text-blue-500">{briefing.open_trades}</p>
-                </div>
-                <div className="p-3 rounded-lg bg-white/5 text-center">
-                  <p className="text-xs text-muted-foreground">Focus</p>
-                  <p className="text-xl font-bold text-violet-500 capitalize">{briefing.watchlist_focus}</p>
-                </div>
-              </div>
-              
-              {/* AI Summary */}
-              <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                <p className="text-sm">{briefing.summary}</p>
-              </div>
-              
-              {/* Opportunities & Risks */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Opportunities */}
-                <div className="p-4 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
-                  <h3 className="font-medium text-emerald-500 flex items-center gap-2 mb-2">
-                    <Zap className="w-4 h-4" /> Opportunités
-                  </h3>
-                  {briefing.opportunities?.length > 0 ? (
-                    <ul className="space-y-1">
-                      {briefing.opportunities.map((opp, idx) => (
-                        <li key={idx} className="text-sm flex items-start gap-2">
-                          <ArrowUpRight className="w-3 h-3 text-emerald-500 mt-1 flex-shrink-0" />
-                          {opp}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">Aucune opportunité majeure identifiée</p>
-                  )}
-                </div>
-                
-                {/* Risks */}
-                <div className="p-4 rounded-lg bg-rose-500/5 border border-rose-500/20">
-                  <h3 className="font-medium text-rose-500 flex items-center gap-2 mb-2">
-                    <Shield className="w-4 h-4" /> Risques
-                  </h3>
-                  {briefing.risks?.length > 0 ? (
-                    <ul className="space-y-1">
-                      {briefing.risks.map((risk, idx) => (
-                        <li key={idx} className="text-sm flex items-start gap-2">
-                          <AlertTriangle className="w-3 h-3 text-rose-500 mt-1 flex-shrink-0" />
-                          {risk}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">Aucun risque majeur identifié</p>
-                  )}
-                </div>
-              </div>
-              
-              {/* Main Action */}
-              <div className="p-4 rounded-lg bg-violet-500/10 border border-violet-500/20">
-                <h3 className="font-medium text-violet-500 flex items-center gap-2 mb-1">
-                  <Brain className="w-4 h-4" /> Action Recommandée
-                </h3>
-                <p className="text-sm">{briefing.main_action}</p>
-              </div>
-            </div>
-          ) : (
-            <p className="text-center text-muted-foreground py-8">
-              Impossible de charger le briefing
+      {/* Market Overview */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card className="glass border-white/5">
+          <CardContent className="pt-4 pb-4 text-center">
+            <p className="text-xs text-muted-foreground">Fear & Greed</p>
+            <p className={`text-2xl font-bold ${
+              (signals?.fear_greed?.value || briefing?.fear_greed) < 30 ? "text-rose-500" :
+              (signals?.fear_greed?.value || briefing?.fear_greed) > 70 ? "text-emerald-500" : "text-yellow-500"
+            }`}>
+              {signals?.fear_greed?.value || briefing?.fear_greed || "—"}
             </p>
-          )}
-        </CardContent>
-      </Card>
+            <p className="text-xs text-muted-foreground">
+              {signals?.fear_greed?.label || briefing?.fear_greed_label || "—"}
+            </p>
+          </CardContent>
+        </Card>
 
-      {/* Smart Alerts */}
-      <Card className="glass border-white/5">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Bell className="w-5 h-5 text-primary" />
-              Mes Alertes
-            </CardTitle>
-            <div className="flex items-center gap-2">
-              <Button 
-                onClick={checkAlerts} 
-                variant="outline" 
-                size="sm" 
-                className="border-white/10"
-              >
-                <RefreshCw className="w-4 h-4 mr-1" /> Vérifier
-              </Button>
-              <Button onClick={() => setNewAlertOpen(true)} size="sm" className="bg-primary text-black">
-                <Plus className="w-4 h-4 mr-1" /> Nouvelle Alerte
-              </Button>
+        <Card className={`glass border ${getSentimentBg(signals?.market_sentiment || briefing?.sentiment)}`}>
+          <CardContent className="pt-4 pb-4 text-center">
+            <p className="text-xs text-muted-foreground">Sentiment</p>
+            <p className={`text-2xl font-bold capitalize ${getSentimentColor(signals?.market_sentiment || briefing?.sentiment)}`}>
+              {signals?.market_sentiment || briefing?.sentiment || "Neutral"}
+            </p>
+            <p className="text-xs text-muted-foreground">Marché global</p>
+          </CardContent>
+        </Card>
+
+        <Card className="glass border-white/5">
+          <CardContent className="pt-4 pb-4 text-center">
+            <p className="text-xs text-muted-foreground">Signaux Actifs</p>
+            <p className="text-2xl font-bold text-primary">
+              {signals?.signals?.length || 0}
+            </p>
+            <p className="text-xs text-muted-foreground">Opportunités</p>
+          </CardContent>
+        </Card>
+
+        <Card className="glass border-white/5">
+          <CardContent className="pt-4 pb-4 text-center">
+            <p className="text-xs text-muted-foreground">Win Rate</p>
+            <p className={`text-2xl font-bold ${(signalsStats?.win_rate || 0) >= 50 ? "text-emerald-500" : "text-rose-500"}`}>
+              {signalsStats?.win_rate || 0}%
+            </p>
+            <p className="text-xs text-muted-foreground">{signalsStats?.total_signals || 0} trades</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList className="bg-black/20 border border-white/10">
+          <TabsTrigger value="signals" className="data-[state=active]:bg-primary data-[state=active]:text-black">
+            <Zap className="w-4 h-4 mr-2" />
+            Signaux du Jour
+          </TabsTrigger>
+          <TabsTrigger value="history" className="data-[state=active]:bg-primary data-[state=active]:text-black">
+            <History className="w-4 h-4 mr-2" />
+            Historique
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Signaux du jour */}
+        <TabsContent value="signals" className="space-y-4">
+          {/* Warning */}
+          {signals?.warning && (
+            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-amber-200">{signals.warning}</p>
             </div>
-          </div>
-          <CardDescription>
-            Cliquez sur &quot;Vérifier&quot; pour contrôler si vos alertes ont été déclenchées
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {alerts.length === 0 ? (
-            <div className="text-center py-8">
-              <Bell className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-              <p className="text-muted-foreground">Aucune alerte configurée</p>
-              <p className="text-sm text-muted-foreground/70">Créez des alertes pour ne jamais manquer une opportunité</p>
+          )}
+
+          {/* Signaux */}
+          {loadingSignals ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="flex flex-col items-center gap-4">
+                <Loader2 className="w-12 h-12 animate-spin text-primary" />
+                <p className="text-muted-foreground">Grok analyse les marchés...</p>
+                <p className="text-xs text-muted-foreground">Crypto • Forex • Indices • Actions</p>
+              </div>
             </div>
-          ) : (
-            <div className="space-y-2">
-              {alerts.map((alert) => (
-                <div
-                  key={alert.id}
-                  className={`p-3 rounded-lg flex items-center justify-between ${
-                    alert.triggered ? "bg-amber-500/10 border border-amber-500/20" : "bg-white/5 border border-white/5"
+          ) : signals?.signals?.length > 0 ? (
+            <div className="space-y-4">
+              {signals.signals.map((signal, idx) => (
+                <Card 
+                  key={idx} 
+                  className={`glass border-2 ${
+                    signal.direction === "ACHAT" 
+                      ? "border-emerald-500/30 bg-gradient-to-r from-emerald-500/5 to-transparent" 
+                      : "border-rose-500/30 bg-gradient-to-r from-rose-500/5 to-transparent"
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                      alert.condition === "above" ? "bg-emerald-500/20" : "bg-rose-500/20"
-                    }`}>
-                      {alert.condition === "above" ? (
-                        <ArrowUpRight className="w-4 h-4 text-emerald-500" />
-                      ) : (
-                        <ArrowDownRight className="w-4 h-4 text-rose-500" />
-                      )}
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      {/* Left: Asset info */}
+                      <div className="flex items-center gap-4">
+                        <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${
+                          signal.direction === "ACHAT" ? "bg-emerald-500/20" : "bg-rose-500/20"
+                        }`}>
+                          {signal.direction === "ACHAT" ? (
+                            <ArrowUpRight className="w-8 h-8 text-emerald-500" />
+                          ) : (
+                            <ArrowDownRight className="w-8 h-8 text-rose-500" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-xl font-bold">{signal.asset}</h3>
+                            <Badge variant="outline" className="border-white/20">
+                              {getMarketIcon(signal.market_type)}
+                              <span className="ml-1">{getMarketLabel(signal.market_type)}</span>
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{signal.asset_name}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge className={`${
+                              signal.direction === "ACHAT" 
+                                ? "bg-emerald-500 text-white" 
+                                : "bg-rose-500 text-white"
+                            }`}>
+                              {signal.direction}
+                            </Badge>
+                            <span className="text-sm font-mono">
+                              @ {signal.entry_price ? formatPrice(signal.entry_price) : "Market"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Center: Metrics */}
+                      <div className="grid grid-cols-4 gap-4 flex-1 max-w-xl">
+                        <div className="text-center p-2 rounded-lg bg-white/5">
+                          <p className="text-xs text-muted-foreground">Confiance</p>
+                          <p className={`text-lg font-bold ${
+                            signal.confidence >= 80 ? "text-emerald-500" :
+                            signal.confidence >= 60 ? "text-yellow-500" : "text-rose-500"
+                          }`}>
+                            {signal.confidence}%
+                          </p>
+                        </div>
+                        <div className="text-center p-2 rounded-lg bg-white/5">
+                          <p className="text-xs text-muted-foreground">Durée</p>
+                          <p className="text-lg font-bold text-blue-400">
+                            {signal.duration}
+                          </p>
+                        </div>
+                        <div className="text-center p-2 rounded-lg bg-emerald-500/10">
+                          <p className="text-xs text-muted-foreground">Take Profit</p>
+                          <p className="text-lg font-bold text-emerald-500">
+                            +{signal.take_profit}%
+                          </p>
+                        </div>
+                        <div className="text-center p-2 rounded-lg bg-rose-500/10">
+                          <p className="text-xs text-muted-foreground">Stop Loss</p>
+                          <p className="text-lg font-bold text-rose-500">
+                            -{signal.stop_loss}%
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Right: Actions */}
+                      <div className="flex flex-col gap-2">
+                        <Button 
+                          size="sm"
+                          onClick={() => navigate(`/chart?symbol=${signal.asset}`)}
+                          className="bg-white/10 hover:bg-white/20"
+                        >
+                          <LineChart className="w-4 h-4 mr-1" />
+                          Graphique
+                        </Button>
+                        <Button 
+                          size="sm"
+                          onClick={() => navigate(`/paper-trading`)}
+                          className={signal.direction === "ACHAT" ? "bg-emerald-500 hover:bg-emerald-600" : "bg-rose-500 hover:bg-rose-600"}
+                        >
+                          <Target className="w-4 h-4 mr-1" />
+                          Simuler
+                        </Button>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">{alert.symbol_name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {alert.condition === "above" ? "Au-dessus de" : "En-dessous de"} {formatPrice(alert.value)}
-                      </p>
+
+                    {/* Reason */}
+                    <div className="mt-4 p-3 rounded-lg bg-white/5 border border-white/10">
+                      <div className="flex items-start gap-2">
+                        <Brain className="w-4 h-4 text-violet-400 mt-0.5 flex-shrink-0" />
+                        <p className="text-sm">{signal.reason}</p>
+                      </div>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    {alert.triggered && (
-                      <Badge className="bg-amber-500/20 text-amber-500">
-                        <BellRing className="w-3 h-3 mr-1" /> Déclenchée
-                      </Badge>
-                    )}
-                    {alert.sound_enabled && !alert.triggered && (
-                      <Volume2 className="w-4 h-4 text-muted-foreground" />
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDeleteAlert(alert.id)}
-                      className="text-muted-foreground hover:text-rose-500"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
+                  </CardContent>
+                </Card>
               ))}
+
+              {/* Markets analyzed */}
+              {signals.markets_analyzed && (
+                <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground pt-4">
+                  <span>📊 Marchés analysés:</span>
+                  <span>{signals.markets_analyzed.crypto} cryptos</span>
+                  <span>•</span>
+                  <span>{signals.markets_analyzed.forex} forex</span>
+                  <span>•</span>
+                  <span>{signals.markets_analyzed.indices} indices</span>
+                  <span>•</span>
+                  <span>{signals.markets_analyzed.stocks} actions</span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <Card className="glass border-white/5">
+              <CardContent className="py-16 text-center">
+                <Brain className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+                <p className="text-muted-foreground">Aucun signal disponible</p>
+                <p className="text-sm text-muted-foreground/70 mt-1">
+                  Cliquez sur &quot;Analyser les Marchés&quot; pour générer des signaux
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Briefing Summary */}
+          {briefing && (
+            <Card className="glass border-amber-500/20 bg-gradient-to-r from-amber-500/5 to-transparent">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Sun className="w-4 h-4 text-amber-500" />
+                  Briefing du {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm">{briefing.summary}</p>
+                {briefing.main_action && (
+                  <div className="mt-3 p-2 rounded bg-violet-500/10 border border-violet-500/20">
+                    <p className="text-xs text-violet-400 font-medium">
+                      💡 {briefing.main_action}
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Historique */}
+        <TabsContent value="history">
+          <Card className="glass border-white/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <History className="w-5 h-5" />
+                Historique des Signaux
+              </CardTitle>
+              <CardDescription>
+                Marquez vos trades comme gagnants ou perdants pour suivre votre track record
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[400px]">
+                {signalsHistory.length > 0 ? (
+                  <div className="space-y-2">
+                    {signalsHistory.map((signal) => (
+                      <div
+                        key={signal.id}
+                        className={`p-3 rounded-lg border flex items-center justify-between ${
+                          signal.status === "closed" 
+                            ? signal.result === "win" 
+                              ? "bg-emerald-500/10 border-emerald-500/20"
+                              : signal.result === "loss"
+                                ? "bg-rose-500/10 border-rose-500/20"
+                                : "bg-white/5 border-white/10"
+                            : "bg-white/5 border-white/10"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded flex items-center justify-center ${
+                            signal.direction === "ACHAT" ? "bg-emerald-500/20" : "bg-rose-500/20"
+                          }`}>
+                            {signal.direction === "ACHAT" ? (
+                              <ArrowUpRight className="w-4 h-4 text-emerald-500" />
+                            ) : (
+                              <ArrowDownRight className="w-4 h-4 text-rose-500" />
+                            )}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{signal.asset}</span>
+                              <Badge variant="outline" className="text-xs">
+                                {getMarketLabel(signal.market_type)}
+                              </Badge>
+                              <Badge className={signal.direction === "ACHAT" ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"}>
+                                {signal.direction}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(signal.created_at).toLocaleString("fr-FR")} • {signal.duration}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {signal.status === "closed" ? (
+                            <Badge className={
+                              signal.result === "win" 
+                                ? "bg-emerald-500 text-white"
+                                : signal.result === "loss"
+                                  ? "bg-rose-500 text-white"
+                                  : "bg-gray-500 text-white"
+                            }>
+                              {signal.result === "win" ? "✓ Gagné" : signal.result === "loss" ? "✗ Perdu" : "= Breakeven"}
+                              {signal.pnl_percent ? ` (${signal.pnl_percent > 0 ? "+" : ""}${signal.pnl_percent}%)` : ""}
+                            </Badge>
+                          ) : (
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 text-emerald-500 hover:bg-emerald-500/20"
+                                onClick={() => updateSignalResult(signal.id, "win", signal.take_profit || 2)}
+                              >
+                                <CheckCircle className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 text-rose-500 hover:bg-rose-500/20"
+                                onClick={() => updateSignalResult(signal.id, "loss", -(signal.stop_loss || 1))}
+                              >
+                                <XCircle className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <History className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+                    <p className="text-muted-foreground">Aucun signal dans l&apos;historique</p>
+                  </div>
+                )}
+              </ScrollArea>
+            </CardContent>
+          </Card>
+
+          {/* Stats */}
+          {signalsStats && signalsStats.total_signals > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+              <Card className="glass border-white/5">
+                <CardContent className="pt-4 pb-4 text-center">
+                  <p className="text-xs text-muted-foreground">Total Signaux</p>
+                  <p className="text-2xl font-bold">{signalsStats.total_signals}</p>
+                </CardContent>
+              </Card>
+              <Card className="glass border-emerald-500/20">
+                <CardContent className="pt-4 pb-4 text-center">
+                  <p className="text-xs text-muted-foreground">Gagnants</p>
+                  <p className="text-2xl font-bold text-emerald-500">{signalsStats.wins}</p>
+                </CardContent>
+              </Card>
+              <Card className="glass border-rose-500/20">
+                <CardContent className="pt-4 pb-4 text-center">
+                  <p className="text-xs text-muted-foreground">Perdants</p>
+                  <p className="text-2xl font-bold text-rose-500">{signalsStats.losses}</p>
+                </CardContent>
+              </Card>
+              <Card className={`glass border-2 ${signalsStats.total_pnl >= 0 ? "border-emerald-500/30" : "border-rose-500/30"}`}>
+                <CardContent className="pt-4 pb-4 text-center">
+                  <p className="text-xs text-muted-foreground">P&L Total</p>
+                  <p className={`text-2xl font-bold ${signalsStats.total_pnl >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                    {signalsStats.total_pnl >= 0 ? "+" : ""}{signalsStats.total_pnl}%
+                  </p>
+                </CardContent>
+              </Card>
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* New Alert Dialog */}
-      <Dialog open={newAlertOpen} onOpenChange={setNewAlertOpen}>
-        <DialogContent className="glass border-white/10 max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Bell className="w-5 h-5 text-primary" />
-              Nouvelle Alerte
-            </DialogTitle>
-            <DialogDescription>
-              Soyez notifié quand le prix atteint votre cible
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Crypto</Label>
-              <Select
-                value={newAlert.symbol}
-                onValueChange={(value) => {
-                  const coin = markets.find(m => m.id === value);
-                  setNewAlert({
-                    ...newAlert,
-                    symbol: value,
-                    symbol_name: coin?.name || value
-                  });
-                }}
-              >
-                <SelectTrigger className="bg-black/20 border-white/10">
-                  <SelectValue placeholder="Sélectionner..." />
-                </SelectTrigger>
-                <SelectContent className="glass border-white/10 max-h-60">
-                  {markets.slice(0, 30).map(coin => (
-                    <SelectItem key={coin.id} value={coin.id}>
-                      <div className="flex items-center gap-2">
-                        <img src={coin.image} alt={coin.name} className="w-4 h-4 rounded-full" />
-                        {coin.name} - {formatPrice(coin.current_price)}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Condition</Label>
-                <Select value={newAlert.condition} onValueChange={(v) => setNewAlert({...newAlert, condition: v})}>
-                  <SelectTrigger className="bg-black/20 border-white/10">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="glass border-white/10">
-                    <SelectItem value="above">↑ Au-dessus de</SelectItem>
-                    <SelectItem value="below">↓ En-dessous de</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <Label>Prix cible ($)</Label>
-                <Input
-                  type="number"
-                  step="any"
-                  placeholder="0.00"
-                  value={newAlert.value}
-                  onChange={(e) => setNewAlert({...newAlert, value: e.target.value})}
-                  className="bg-black/20 border-white/10"
-                />
-              </div>
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <Label className="flex items-center gap-2">
-                <Volume2 className="w-4 h-4" /> Son activé
-              </Label>
-              <Switch
-                checked={newAlert.sound_enabled}
-                onCheckedChange={(v) => setNewAlert({...newAlert, sound_enabled: v})}
-              />
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <Label className="flex items-center gap-2">
-                <RefreshCw className="w-4 h-4" /> Répéter l&apos;alerte
-              </Label>
-              <Switch
-                checked={newAlert.repeat}
-                onCheckedChange={(v) => setNewAlert({...newAlert, repeat: v})}
-              />
-            </div>
-            
-            <Button
-              onClick={handleCreateAlert}
-              disabled={submitting}
-              className="w-full bg-primary text-black"
-            >
-              {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Bell className="w-4 h-4 mr-2" />}
-              Créer l&apos;Alerte
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

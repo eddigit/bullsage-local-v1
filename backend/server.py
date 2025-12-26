@@ -2132,6 +2132,286 @@ Format JSON:
         "generated_at": datetime.now(timezone.utc).isoformat()
     }
 
+# ============== SIGNAUX TRADING MULTI-MARCHÉS (IA) ==============
+
+@api_router.get("/signals/ai-trading")
+async def get_ai_trading_signals(current_user: dict = Depends(get_current_user)):
+    """
+    Génère des signaux de trading IA multi-marchés.
+    Crypto, Forex, Indices, Actions - avec durée et confiance.
+    """
+    
+    # Récupérer les données de marché
+    market_data = {
+        "crypto": [],
+        "forex": [],
+        "indices": [],
+        "stocks": []
+    }
+    
+    async with httpx.AsyncClient() as client:
+        # Fear & Greed Index
+        try:
+            fg_response = await client.get("https://api.alternative.me/fng/?limit=1", timeout=10.0)
+            if fg_response.status_code == 200:
+                fg_data = fg_response.json().get("data", [{}])[0]
+                market_data["fear_greed"] = {
+                    "value": int(fg_data.get("value", 50)),
+                    "label": fg_data.get("value_classification", "Neutral")
+                }
+        except Exception:
+            market_data["fear_greed"] = {"value": 50, "label": "Neutral"}
+        
+        # Crypto - Top 10
+        try:
+            crypto_response = await client.get(
+                "https://min-api.cryptocompare.com/data/top/mktcapfull",
+                params={"limit": 10, "tsym": "USD"},
+                timeout=15.0
+            )
+            if crypto_response.status_code == 200:
+                for item in crypto_response.json().get("Data", []):
+                    coin_info = item.get("CoinInfo", {})
+                    raw = item.get("RAW", {}).get("USD", {})
+                    market_data["crypto"].append({
+                        "symbol": coin_info.get("Name", ""),
+                        "name": coin_info.get("FullName", ""),
+                        "price": raw.get("PRICE", 0),
+                        "change_24h": raw.get("CHANGEPCT24HOUR", 0),
+                        "volume": raw.get("VOLUME24HOURTO", 0),
+                        "high_24h": raw.get("HIGH24HOUR", 0),
+                        "low_24h": raw.get("LOW24HOUR", 0)
+                    })
+        except Exception as e:
+            logger.error(f"Error fetching crypto data: {e}")
+        
+        # Forex - Paires majeures (via Alpha Vantage ou données statiques)
+        forex_pairs = [
+            {"symbol": "EUR/USD", "name": "Euro/Dollar", "price": 1.0420, "change_24h": 0.15},
+            {"symbol": "GBP/USD", "name": "Livre/Dollar", "price": 1.2530, "change_24h": -0.22},
+            {"symbol": "USD/JPY", "name": "Dollar/Yen", "price": 157.25, "change_24h": 0.35},
+            {"symbol": "USD/CHF", "name": "Dollar/Franc", "price": 0.9015, "change_24h": -0.10},
+            {"symbol": "AUD/USD", "name": "Dollar Australien", "price": 0.6210, "change_24h": 0.08},
+        ]
+        
+        # Essayer Alpha Vantage pour Forex
+        if ALPHA_VANTAGE_API_KEY:
+            try:
+                fx_response = await client.get(
+                    "https://www.alphavantage.co/query",
+                    params={
+                        "function": "CURRENCY_EXCHANGE_RATE",
+                        "from_currency": "EUR",
+                        "to_currency": "USD",
+                        "apikey": ALPHA_VANTAGE_API_KEY
+                    },
+                    timeout=10.0
+                )
+                if fx_response.status_code == 200:
+                    fx_data = fx_response.json().get("Realtime Currency Exchange Rate", {})
+                    if fx_data:
+                        forex_pairs[0]["price"] = float(fx_data.get("5. Exchange Rate", 1.04))
+            except Exception:
+                pass
+        
+        market_data["forex"] = forex_pairs
+        
+        # Indices majeurs
+        market_data["indices"] = [
+            {"symbol": "SPX", "name": "S&P 500", "price": 5970, "change_24h": 0.45},
+            {"symbol": "NDX", "name": "NASDAQ 100", "price": 21450, "change_24h": 0.62},
+            {"symbol": "DJI", "name": "Dow Jones", "price": 42840, "change_24h": 0.28},
+            {"symbol": "DAX", "name": "DAX 40", "price": 19850, "change_24h": -0.15},
+            {"symbol": "CAC", "name": "CAC 40", "price": 7320, "change_24h": -0.08},
+        ]
+        
+        # Actions populaires
+        market_data["stocks"] = [
+            {"symbol": "AAPL", "name": "Apple", "price": 252.50, "change_24h": 0.85},
+            {"symbol": "MSFT", "name": "Microsoft", "price": 436.20, "change_24h": 1.20},
+            {"symbol": "NVDA", "name": "NVIDIA", "price": 134.50, "change_24h": -2.10},
+            {"symbol": "TSLA", "name": "Tesla", "price": 455.80, "change_24h": 3.50},
+            {"symbol": "AMZN", "name": "Amazon", "price": 225.30, "change_24h": 0.95},
+        ]
+    
+    # Construire le contexte pour l'IA
+    context = f"""
+ANALYSE MULTI-MARCHÉS - {datetime.now().strftime('%d/%m/%Y %H:%M')}
+
+Tu es un trader expert avec 20 ans d'expérience. Analyse ces données et donne des SIGNAUX DE TRADING PRÉCIS.
+
+DONNÉES MARCHÉ:
+- Fear & Greed Index: {market_data['fear_greed']['value']} ({market_data['fear_greed']['label']})
+
+CRYPTO (Top 5):
+{chr(10).join([f"- {c['name']} ({c['symbol']}): ${c['price']:,.2f} ({c['change_24h']:+.1f}%)" for c in market_data['crypto'][:5]])}
+
+FOREX:
+{chr(10).join([f"- {f['name']} ({f['symbol']}): {f['price']:.4f} ({f['change_24h']:+.2f}%)" for f in market_data['forex']])}
+
+INDICES:
+{chr(10).join([f"- {i['name']} ({i['symbol']}): {i['price']:,.0f} ({i['change_24h']:+.2f}%)" for i in market_data['indices']])}
+
+ACTIONS:
+{chr(10).join([f"- {s['name']} ({s['symbol']}): ${s['price']:.2f} ({s['change_24h']:+.2f}%)" for s in market_data['stocks']])}
+
+GÉNÈRE EXACTEMENT 3-5 SIGNAUX DE TRADING avec:
+1. Direction: ACHAT ou VENTE
+2. Confiance: 60-95%
+3. Durée suggérée: "1-4h", "4-12h", "1-3 jours", etc.
+4. Take Profit: % de gain attendu
+5. Stop Loss: % de perte max
+6. Raison: 1 phrase claire
+
+FORMAT JSON STRICT:
+{{
+  "market_sentiment": "bullish/bearish/neutral",
+  "signals": [
+    {{
+      "asset": "BTC",
+      "asset_name": "Bitcoin",
+      "market_type": "crypto",
+      "direction": "ACHAT",
+      "confidence": 85,
+      "duration": "4-8h",
+      "entry_price": 98500,
+      "take_profit": 3.5,
+      "stop_loss": 1.5,
+      "reason": "Support $98K testé 3 fois, rebond confirmé avec volume"
+    }}
+  ],
+  "warning": "Message de prudence si nécessaire"
+}}
+
+Sois PRÉCIS et ACTIONNABLE. Pas de blabla, que des signaux exploitables.
+"""
+
+    try:
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"signals_{current_user['id']}_{datetime.now().strftime('%Y%m%d%H')}",
+            system_message="Tu es un trader professionnel. Tu donnes des signaux de trading précis et actionnables."
+        )
+        chat.with_model("xai", "grok-3-latest")
+        
+        user_msg = UserMessage(text=context)
+        ai_response = await chat.send_message(user_msg)
+        response_text = str(ai_response) if ai_response else ""
+        
+        # Parser le JSON
+        import re
+        import json
+        json_match = re.search(r'\{[\s\S]*\}', response_text)
+        if json_match:
+            try:
+                signals_data = json.loads(json_match.group())
+            except Exception:
+                signals_data = {"market_sentiment": "neutral", "signals": [], "warning": "Erreur de parsing"}
+        else:
+            signals_data = {"market_sentiment": "neutral", "signals": [], "warning": "Aucun signal généré"}
+        
+        # Sauvegarder les signaux en base pour historique
+        for signal in signals_data.get("signals", []):
+            signal_doc = {
+                "id": str(uuid.uuid4()),
+                "user_id": current_user["id"],
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "status": "active",
+                **signal
+            }
+            await db.ai_signals.insert_one(signal_doc)
+        
+        return {
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "fear_greed": market_data["fear_greed"],
+            **signals_data,
+            "markets_analyzed": {
+                "crypto": len(market_data["crypto"]),
+                "forex": len(market_data["forex"]),
+                "indices": len(market_data["indices"]),
+                "stocks": len(market_data["stocks"])
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error generating AI signals: {e}")
+        return {
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "market_sentiment": "neutral",
+            "signals": [],
+            "warning": f"Erreur lors de la génération: {str(e)}",
+            "fear_greed": market_data.get("fear_greed", {"value": 50, "label": "Neutral"})
+        }
+
+
+@api_router.get("/signals/history")
+async def get_signals_history(limit: int = 50, current_user: dict = Depends(get_current_user)):
+    """Récupère l'historique des signaux générés pour l'utilisateur"""
+    
+    signals = await db.ai_signals.find(
+        {"user_id": current_user["id"]},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    
+    return signals
+
+
+@api_router.post("/signals/{signal_id}/result")
+async def update_signal_result(
+    signal_id: str, 
+    result: str,  # "win", "loss", "breakeven"
+    pnl_percent: float = 0,
+    current_user: dict = Depends(get_current_user)
+):
+    """Met à jour le résultat d'un signal (pour le track record)"""
+    
+    await db.ai_signals.update_one(
+        {"id": signal_id, "user_id": current_user["id"]},
+        {"$set": {
+            "status": "closed",
+            "result": result,
+            "pnl_percent": pnl_percent,
+            "closed_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    return {"message": "Signal mis à jour"}
+
+
+@api_router.get("/signals/stats")
+async def get_signals_stats(current_user: dict = Depends(get_current_user)):
+    """Statistiques du track record des signaux"""
+    
+    all_signals = await db.ai_signals.find(
+        {"user_id": current_user["id"], "status": "closed"},
+        {"_id": 0}
+    ).to_list(1000)
+    
+    if not all_signals:
+        return {
+            "total_signals": 0,
+            "wins": 0,
+            "losses": 0,
+            "win_rate": 0,
+            "avg_pnl": 0,
+            "total_pnl": 0
+        }
+    
+    wins = [s for s in all_signals if s.get("result") == "win"]
+    losses = [s for s in all_signals if s.get("result") == "loss"]
+    total_pnl = sum(s.get("pnl_percent", 0) for s in all_signals)
+    
+    return {
+        "total_signals": len(all_signals),
+        "wins": len(wins),
+        "losses": len(losses),
+        "breakeven": len(all_signals) - len(wins) - len(losses),
+        "win_rate": round(len(wins) / len(all_signals) * 100, 1) if all_signals else 0,
+        "avg_pnl": round(total_pnl / len(all_signals), 2) if all_signals else 0,
+        "total_pnl": round(total_pnl, 2)
+    }
+
+
 # ============== TRADING CHECKLIST ROUTE ==============
 
 @api_router.get("/trading/checklist")

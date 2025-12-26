@@ -48,42 +48,32 @@ import {
   SheetTrigger,
 } from "../components/ui/sheet";
 
-// Main navigation items
+// Main navigation items - SIMPLIFIÉ
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Graphique", href: "/chart", icon: CandlestickChart, highlight: true },
-  { name: "Académie", href: "/academy", icon: GraduationCap, highlight: true },
-  { name: "Cockpit", href: "/cockpit", icon: Sun },
-  { name: "Mode Trading", href: "/trading", icon: Crosshair },
-  { name: "Journal", href: "/journal", icon: BookOpen },
-  { name: "Mes Signaux", href: "/signals", icon: Signal },
-  { name: "Intelligence", href: "/intelligence", icon: Brain },
-  { name: "Marchés", href: "/markets", icon: TrendingUp },
-  { name: "Actualités", href: "/market-news", icon: Newspaper, highlight: true },
-  { name: "Assistant IA", href: "/assistant", icon: MessageCircle },
+  { name: "Cockpit Trading", href: "/cockpit", icon: Sun, highlight: true },
+  { name: "Graphique", href: "/chart", icon: CandlestickChart },
   { name: "Paper Trading", href: "/paper-trading", icon: Wallet },
-  { name: "Stratégies", href: "/strategies", icon: Target },
-  { name: "Alertes", href: "/alerts", icon: Bell },
+  { name: "Journal", href: "/journal", icon: BookOpen },
+  { name: "Assistant IA", href: "/assistant", icon: MessageCircle },
+  { name: "Académie", href: "/academy", icon: GraduationCap, highlight: true },
   { name: "Paramètres", href: "/settings", icon: Settings },
 ];
 
-// DeFi navigation items
-const defiNavigation = [
-  { name: "Wallets DeFi", href: "/wallet", icon: Wallet, highlight: true },
-  { name: "Scanner DeFi", href: "/defi-scanner", icon: Search, highlight: true },
-];
+// DeFi navigation items - SUPPRIMÉ
+const defiNavigation = [];
 
-// Pro Trader AI - Best feature
-const proTraderItem = { name: "🤖 Pro Trader AI", href: "/pro-trader", icon: Brain, highlight: true, special: true };
+// Pro Trader AI - Intégré dans Cockpit
+const proTraderItem = null;
 
-// Scanner IA Unifié - New top feature
-const opportunityScannerItem = { name: "🔍 Scanner IA", href: "/opportunity-scanner", icon: Search, highlight: true, special: true };
+// Scanner IA Unifié - Intégré dans Cockpit
+const opportunityScannerItem = null;
 
-// Smart Invest CTA - Special item
-const smartInvestItem = { name: "Smart Invest", href: "/smart-invest", icon: Zap, highlight: true, special: true };
+// Smart Invest CTA - SUPPRIMÉ
+const smartInvestItem = null;
 
-// Auto Trading CTA - Special item
-const autoTradingItem = { name: "Auto-Trading", href: "/auto-trading", icon: Bot, highlight: true, special: true };
+// Auto Trading CTA - SUPPRIMÉ
+const autoTradingItem = null;
 
 // Admin navigation
 const adminNavigation = [
@@ -92,12 +82,12 @@ const adminNavigation = [
   { name: "Clés API", href: "/admin/api-keys", icon: Key, admin: true },
 ];
 
-// Bottom bar items (mobile) - 5 main items
+// Bottom bar items (mobile) - 5 main items - SIMPLIFIÉ
 const bottomNavItems = [
   { name: "Accueil", href: "/", icon: Home },
+  { name: "Cockpit", href: "/cockpit", icon: Sun },
+  { name: "Graphique", href: "/chart", icon: CandlestickChart },
   { name: "Académie", href: "/academy", icon: GraduationCap },
-  { name: "Trading", href: "/trading", icon: Crosshair },
-  { name: "Assistant", href: "/assistant", icon: MessageCircle },
   { name: "Plus", href: null, icon: MoreHorizontal, isMore: true },
 ];
 
