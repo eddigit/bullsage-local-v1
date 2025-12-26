@@ -203,20 +203,37 @@ export default function PaperTradingPage() {
     }
   };
 
-  // Calculate portfolio value
+  // Calculate portfolio value - utiliser les données du backend si disponibles
   const calculatePortfolioValue = () => {
-    let totalValue = portfolio.balance;
-    Object.entries(portfolio.portfolio || {}).forEach(([symbol, holding]) => {
-      const coin = markets.find(c => c.id === symbol);
-      if (coin) {
-        totalValue += (holding.amount || holding.quantity || 0) * coin.current_price;
-      }
-    });
+    // Si le backend fournit la valeur totale, l'utiliser
+    if (portfolio.total_value) {
+      return portfolio.total_value;
+    }
+    
+    // Sinon, calculer manuellement
+    let totalValue = portfolio.balance || 0;
+    
+    // Utiliser positions si disponible
+    if (portfolio.positions?.length > 0) {
+      portfolio.positions.forEach(pos => {
+        totalValue += pos.current_value || 0;
+      });
+    } else {
+      // Fallback sur le portfolio classique
+      Object.entries(portfolio.portfolio || {}).forEach(([symbol, holding]) => {
+        const coin = markets.find(c => c.id === symbol || c.symbol?.toLowerCase() === symbol.toLowerCase());
+        if (coin) {
+          totalValue += (holding.amount || holding.quantity || 0) * coin.current_price;
+        }
+      });
+    }
     return totalValue;
   };
 
   const portfolioValue = calculatePortfolioValue();
-  const portfolioChange = ((portfolioValue - 10000) / 10000) * 100;
+  const portfolioChange = portfolio.total_pnl_percent !== undefined 
+    ? portfolio.total_pnl_percent 
+    : ((portfolioValue - 10000) / 10000) * 100;
 
   // Get current price for selected coin
   const selectedCoinData = markets.find(c => c.id === selectedCoin);
@@ -498,46 +515,75 @@ export default function PaperTradingPage() {
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[400px]">
-                {Object.keys(portfolio.portfolio || {}).length > 0 ? (
+                {(portfolio.positions?.length > 0 || Object.keys(portfolio.portfolio || {}).length > 0) ? (
                   <div className="space-y-3">
-                    {Object.entries(portfolio.portfolio).map(([symbol, holding]) => {
-                      const coin = markets.find(c => c.id === symbol);
-                      const qty = holding.amount || holding.quantity || 0;
-                      const currentValue = coin ? qty * coin.current_price : 0;
-                      const costBasis = qty * holding.avg_price;
-                      const pnl = currentValue - costBasis;
-                      const pnlPercent = costBasis > 0 ? (pnl / costBasis) * 100 : 0;
+                    {/* Utiliser positions si disponible (avec P&L temps réel), sinon portfolio */}
+                    {(portfolio.positions || Object.entries(portfolio.portfolio || {}).map(([symbol, h]) => ({
+                      symbol,
+                      amount: h.amount || h.quantity || 0,
+                      avg_price: h.avg_price,
+                      current_price: 0,
+                      current_value: 0,
+                      pnl: 0,
+                      pnl_percent: 0,
+                      entry_date: h.entry_date
+                    }))).filter(pos => pos.amount > 0).map((position) => {
+                      const coin = markets.find(c => c.id === position.symbol || c.symbol?.toLowerCase() === position.symbol?.toLowerCase());
+                      
+                      // Si position vient du backend avec prix temps réel
+                      const currentPrice = position.current_price || (coin ? coin.current_price : position.avg_price);
+                      const currentValue = position.current_value || (position.amount * currentPrice);
+                      const costBasis = position.cost_basis || (position.amount * position.avg_price);
+                      const pnl = position.pnl !== undefined ? position.pnl : (currentValue - costBasis);
+                      const pnlPercent = position.pnl_percent !== undefined ? position.pnl_percent : (costBasis > 0 ? (pnl / costBasis) * 100 : 0);
 
                       return (
                         <div
-                          key={symbol}
+                          key={position.symbol}
                           className="p-4 rounded-lg bg-white/5 border border-white/10"
-                          data-testid={`position-${symbol}`}
+                          data-testid={`position-${position.symbol}`}
                         >
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-3">
-                              {coin && <img src={coin.image} alt={coin.name} className="w-10 h-10 rounded-full" />}
+                              {coin?.image && <img src={coin.image} alt={coin?.name} className="w-10 h-10 rounded-full" />}
                               <div>
-                                <p className="font-medium">{coin?.name || symbol}</p>
-                                <p className="text-sm text-muted-foreground uppercase">{symbol}</p>
+                                <p className="font-medium">{coin?.name || position.symbol}</p>
+                                <p className="text-sm text-muted-foreground uppercase">{position.symbol}</p>
                               </div>
                             </div>
                             <Badge className={pnl >= 0 ? "bg-emerald-500/20 text-emerald-500" : "bg-rose-500/20 text-rose-500"}>
                               {formatPercent(pnlPercent)} P&L
                             </Badge>
                           </div>
+                          
+                          {/* Date d'entrée */}
+                          {position.entry_date && (
+                            <div className="mb-3 text-xs text-muted-foreground">
+                              📅 Ouvert le {new Date(position.entry_date).toLocaleString("fr-FR", { 
+                                day: "2-digit", 
+                                month: "short", 
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit"
+                              })}
+                            </div>
+                          )}
+                          
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                             <div>
                               <p className="text-muted-foreground">Quantité</p>
-                              <p className="font-mono font-medium">{(holding.amount || holding.quantity || 0).toFixed(6)}</p>
+                              <p className="font-mono font-medium">{position.amount.toFixed(6)}</p>
                             </div>
                             <div>
                               <p className="text-muted-foreground">Prix moyen</p>
-                              <p className="font-mono font-medium">{formatPrice(holding.avg_price)}</p>
+                              <p className="font-mono font-medium">{formatPrice(position.avg_price)}</p>
                             </div>
                             <div>
                               <p className="text-muted-foreground">Valeur actuelle</p>
                               <p className="font-mono font-medium">{formatPrice(currentValue)}</p>
+                              {currentPrice > 0 && (
+                                <p className="text-xs text-muted-foreground">@ {formatPrice(currentPrice)}</p>
+                              )}
                             </div>
                             <div>
                               <p className="text-muted-foreground">P&L</p>
