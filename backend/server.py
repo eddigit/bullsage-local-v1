@@ -54,7 +54,9 @@ JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
 
 # API Keys
-EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
+XAI_API_KEY = os.environ.get('XAI_API_KEY') or os.environ.get('OPENAI_API_KEY')
+XAI_BASE_URL = "https://api.x.ai/v1"
+EMERGENT_LLM_KEY = XAI_API_KEY  # Backward compatibility
 COINGECKO_API_URL = os.environ.get('COINGECKO_API_URL', 'https://api.coingecko.com/api/v3')
 BINANCE_API_URL = "https://api.binance.com/api/v3"
 CRYPTOCOMPARE_API_URL = "https://min-api.cryptocompare.com/data"
@@ -985,7 +987,7 @@ Format de réponse STRICT (JSON array):
 
 Maximum 4-5 news les plus importantes. Sois TRÈS concis."""
         )
-        chat.with_model("openai", "gpt-4o")
+        chat.with_model("xai", "grok-3-latest")
         
         user_msg = UserMessage(text=f"Analyse ces actualités crypto des dernières 48h et résume en français avec impact marché:\n\n{news_text}")
         ai_response = await chat.send_message(user_msg)
@@ -2076,7 +2078,7 @@ Format JSON:
             session_id=f"briefing_{current_user['id']}_{datetime.now().strftime('%Y%m%d')}",
             system_message="Tu es BULL, un trader expert qui donne des briefings matinaux concis et actionnables."
         )
-        chat.with_model("openai", "gpt-4o")
+        chat.with_model("xai", "grok-3-latest")
         
         user_msg = UserMessage(text=context)
         ai_response = await chat.send_message(user_msg)
@@ -2707,7 +2709,7 @@ Niveau du trader: {current_user.get('trading_level', 'intermediate')}
 Tu dois être DIRECT et CLAIR. Pas de blabla. Des décisions concrètes.
 Utilise les indicateurs fournis pour justifier ta recommandation."""
         )
-        chat.with_model("openai", "gpt-4o")
+        chat.with_model("xai", "grok-3-latest")
         
         user_msg = UserMessage(text=ai_context)
         ai_response = await chat.send_message(user_msg)
@@ -3174,7 +3176,7 @@ async def chat_with_bull(request: ChatRequest, current_user: dict = Depends(get_
             session_id=f"bullsage_{current_user['id']}_{datetime.now().strftime('%Y%m%d%H')}",
             system_message=system_message
         )
-        chat.with_model("openai", "gpt-5.1")
+        chat.with_model("xai", "grok-3-latest")
         
         user_message = UserMessage(text=request.message)
         response = await chat.send_message(user_message)
@@ -5002,7 +5004,7 @@ async def get_api_keys(admin: dict = Depends(get_admin_user)):
         "finnhub": {**mask_key(FINNHUB_API_KEY), "name": "Finnhub", "usage": "News, Sentiment, Calendrier éco"},
         "fred": {**mask_key(FRED_API_KEY), "name": "FRED", "usage": "Données macro (Fed, Inflation, PIB)"},
         "marketaux": {**mask_key(MARKETAUX_API_KEY), "name": "Marketaux", "usage": "News sentiment avancé"},
-        "emergent_llm": {**mask_key(EMERGENT_LLM_KEY), "name": "Emergent LLM", "usage": "IA GPT-5.1"}
+        "xai_grok": {**mask_key(XAI_API_KEY), "name": "xAI Grok", "usage": "IA Grok-3 (Analyses & Chat)"}
     }
 
 # ============== ADMIN API HEALTH & LOGS ==============

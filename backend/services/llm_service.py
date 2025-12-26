@@ -1,6 +1,6 @@
 """
-LLM Service - Compatible wrapper to replace emergentintegrations
-Uses OpenAI API directly for local deployment
+LLM Service - Compatible wrapper using Grok (xAI) API
+Uses xAI API which is OpenAI-compatible
 """
 import os
 import logging
@@ -9,8 +9,9 @@ from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
 
-# Get API key from environment
-OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY') or os.environ.get('EMERGENT_LLM_KEY')
+# Get API key from environment (Grok/xAI)
+XAI_API_KEY = os.environ.get('XAI_API_KEY') or os.environ.get('OPENAI_API_KEY')
+XAI_BASE_URL = "https://api.x.ai/v1"
 
 
 class UserMessage:
@@ -21,8 +22,8 @@ class UserMessage:
 
 class LlmChat:
     """
-    Compatible LLM Chat wrapper that uses OpenAI API directly.
-    Replaces emergentintegrations.llm.chat.LlmChat
+    Compatible LLM Chat wrapper that uses Grok (xAI) API.
+    xAI API is OpenAI-compatible.
     """
     
     def __init__(
@@ -31,15 +32,18 @@ class LlmChat:
         session_id: Optional[str] = None,
         system_message: Optional[str] = None
     ):
-        self.api_key = api_key or OPENAI_API_KEY
+        self.api_key = api_key or XAI_API_KEY
         self.session_id = session_id
         self.system_message = system_message or "Tu es un assistant IA expert en trading et marchés financiers."
-        self.model = "gpt-4o"
-        self.provider = "openai"
+        self.model = "grok-3-latest"  # Modèle Grok
+        self.provider = "xai"
         self.messages = []
         
-        # Initialize OpenAI client
-        self.client = AsyncOpenAI(api_key=self.api_key)
+        # Initialize xAI client (OpenAI-compatible)
+        self.client = AsyncOpenAI(
+            api_key=self.api_key,
+            base_url=XAI_BASE_URL
+        )
         
         # Add system message to conversation
         if self.system_message:
@@ -102,14 +106,17 @@ class LlmChat:
 async def get_ai_response(
     prompt: str,
     system_message: str = "Tu es un assistant IA expert en trading et marchés financiers.",
-    model: str = "gpt-4o",
+    model: str = "grok-3-latest",
     api_key: Optional[str] = None
 ) -> str:
     """
-    Simple one-shot AI query function
+    Simple one-shot AI query function using Grok (xAI)
     """
     try:
-        client = AsyncOpenAI(api_key=api_key or OPENAI_API_KEY)
+        client = AsyncOpenAI(
+            api_key=api_key or XAI_API_KEY,
+            base_url=XAI_BASE_URL
+        )
         
         response = await client.chat.completions.create(
             model=model,
@@ -147,7 +154,10 @@ async def translate_to_french(texts: list[dict], fields: list[str] = ["title", "
         return texts
     
     try:
-        client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+        client = AsyncOpenAI(
+            api_key=XAI_API_KEY,
+            base_url=XAI_BASE_URL
+        )
         
         # Préparer les textes à traduire (non cachés)
         texts_to_translate = []
@@ -171,7 +181,7 @@ Textes à traduire:
 {batch_text}"""
             
             response = await client.chat.completions.create(
-                model="gpt-4o-mini",  # Modèle plus rapide pour les traductions
+                model="grok-3-fast",  # Modèle Grok rapide pour les traductions
                 messages=[
                     {"role": "system", "content": "Tu es un traducteur professionnel spécialisé dans la finance et les marchés. Tu traduis de l'anglais vers le français."},
                     {"role": "user", "content": prompt}

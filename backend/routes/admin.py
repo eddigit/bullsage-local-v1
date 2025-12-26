@@ -11,6 +11,7 @@ from ..core.config import (
     FRED_API_KEY, 
     MARKETAUX_API_KEY,
     COINGECKO_API_URL,
+    XAI_API_KEY,
     EMERGENT_LLM_KEY,
     logger
 )
@@ -188,11 +189,11 @@ async def check_all_apis(current_user: dict = Depends(get_admin_user)):
     else:
         api_checks.append(("MarketAux", None))
     
-    # Check LLM
-    if EMERGENT_LLM_KEY:
-        api_checks.append(("Emergent LLM", "https://api.emergentmind.com/health"))
+    # Check LLM (xAI Grok)
+    if XAI_API_KEY:
+        api_checks.append(("xAI Grok", "https://api.x.ai/v1/models"))
     else:
-        api_checks.append(("Emergent LLM", None))
+        api_checks.append(("xAI Grok", None))
     
     results = []
     

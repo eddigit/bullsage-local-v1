@@ -1,5 +1,6 @@
 """Newsletter Service - Daily market analysis newsletter"""
 import asyncio
+import os
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 import aiosmtplib
@@ -7,13 +8,22 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import httpx
 import logging
+from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
+
+# Grok (xAI) Configuration
+XAI_API_KEY = os.environ.get('XAI_API_KEY') or os.environ.get('OPENAI_API_KEY')
+XAI_BASE_URL = "https://api.x.ai/v1"
 
 class NewsletterService:
     def __init__(self, db, llm_client=None):
         self.db = db
-        self.llm_client = llm_client
+        # Initialize xAI client for Grok
+        self.llm_client = llm_client or AsyncOpenAI(
+            api_key=XAI_API_KEY,
+            base_url=XAI_BASE_URL
+        )
         self.smtp_config = None
     
     async def load_smtp_config(self):
@@ -213,7 +223,7 @@ Génère en français:
 4. FORMAT: JSON avec les clés summary, btc_outlook, tips (array)"""
 
             response = await self.llm_client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="grok-3-fast",
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=500,
                 temperature=0.7

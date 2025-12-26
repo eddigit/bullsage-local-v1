@@ -18,7 +18,9 @@ JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
 
 # API Keys & URLs
-EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
+XAI_API_KEY = os.environ.get('XAI_API_KEY') or os.environ.get('OPENAI_API_KEY')
+XAI_BASE_URL = "https://api.x.ai/v1"
+EMERGENT_LLM_KEY = XAI_API_KEY  # Backward compatibility
 COINGECKO_API_URL = os.environ.get('COINGECKO_API_URL', 'https://api.coingecko.com/api/v3')
 CRYPTOCOMPARE_API_URL = "https://min-api.cryptocompare.com/data"
 BINANCE_API_URL = "https://api.binance.com/api/v3"
