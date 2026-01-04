@@ -22,7 +22,7 @@ export default function AutoTradingPage() {
     assets_to_trade: ['bitcoin', 'ethereum', 'solana', 'cardano', 'ripple']
   });
   const [stats, setStats] = useState({ today_trades: 0, is_active: false });
-  const [history, setHistory] = useState({ trades: [], stats: {} });
+  const [history, setHistory] = useState({ trades: [], stats: { win_rate: 0, total_profit: 0, total_trades: 0 } });
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -49,7 +49,17 @@ export default function AutoTradingPage() {
       const response = await axios.get(`${API}/auto-trading/history?limit=50`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setHistory(Array.isArray(response.data) ? response.data : []);
+      // Handle both array and object response formats
+      if (Array.isArray(response.data)) {
+        setHistory({ trades: response.data, stats: { win_rate: 0, total_profit: 0, total_trades: response.data.length } });
+      } else if (response.data?.trades) {
+        setHistory({
+          trades: response.data.trades || [],
+          stats: response.data.stats || { win_rate: 0, total_profit: 0, total_trades: 0 }
+        });
+      } else {
+        setHistory({ trades: [], stats: { win_rate: 0, total_profit: 0, total_trades: 0 } });
+      }
     } catch (error) {
       console.error('Error fetching history:', error);
     }
@@ -213,7 +223,7 @@ export default function AutoTradingPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-400">Win Rate</p>
-                <p className="text-2xl font-bold text-green-400">{history.stats.win_rate || 0}%</p>
+                <p className="text-2xl font-bold text-green-400">{history?.stats?.win_rate || 0}%</p>
               </div>
               <Target className="h-8 w-8 text-green-500" />
             </div>
@@ -225,8 +235,8 @@ export default function AutoTradingPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-400">P&L Total</p>
-                <p className={`text-2xl font-bold ${(history.stats.total_profit || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  ${(history.stats.total_profit || 0).toFixed(2)}
+                <p className={`text-2xl font-bold ${(history?.stats?.total_profit || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  ${(history?.stats?.total_profit || 0).toFixed(2)}
                 </p>
               </div>
               <DollarSign className="h-8 w-8 text-yellow-500" />
@@ -239,7 +249,7 @@ export default function AutoTradingPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-400">Total Trades</p>
-                <p className="text-2xl font-bold">{history.stats.total_trades || 0}</p>
+                <p className="text-2xl font-bold">{history?.stats?.total_trades || 0}</p>
               </div>
               <History className="h-8 w-8 text-blue-500" />
             </div>
