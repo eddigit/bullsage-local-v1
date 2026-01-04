@@ -2298,17 +2298,71 @@ Sois PRÉCIS et ACTIONNABLE. Pas de blabla, que des signaux exploitables.
         ai_response = await chat.send_message(user_msg)
         response_text = str(ai_response) if ai_response else ""
         
-        # Parser le JSON
+        # Parser le JSON - avec plusieurs tentatives de nettoyage
         import re
         import json
+        
+        signals_data = None
+        
+        # Tentative 1: Extraction directe du JSON
         json_match = re.search(r'\{[\s\S]*\}', response_text)
         if json_match:
+            json_str = json_match.group()
+            
+            # Nettoyer le JSON des caractères problématiques
+            # Remplacer les guillemets typographiques
+            json_str = json_str.replace('"', '"').replace('"', '"')
+            json_str = json_str.replace("'", "'").replace("'", "'")
+            # Supprimer les caractères de contrôle
+            json_str = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', json_str)
+            # Corriger les virgules en trop avant les accolades/crochets fermants
+            json_str = re.sub(r',\s*([}\]])', r'\1', json_str)
+            
             try:
-                signals_data = json.loads(json_match.group())
-            except Exception:
-                signals_data = {"market_sentiment": "neutral", "signals": [], "warning": "Erreur de parsing"}
-        else:
-            signals_data = {"market_sentiment": "neutral", "signals": [], "warning": "Aucun signal généré"}
+                signals_data = json.loads(json_str)
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON decode error (attempt 1): {e}")
+                logger.error(f"JSON string: {json_str[:500]}...")
+                
+                # Tentative 2: Extraction plus stricte du JSON
+                try:
+                    # Chercher un JSON valide en comptant les accolades
+                    brace_count = 0
+                    start_idx = None
+                    end_idx = None
+                    for i, char in enumerate(response_text):
+                        if char == '{':
+                            if start_idx is None:
+                                start_idx = i
+                            brace_count += 1
+                        elif char == '}':
+                            brace_count -= 1
+                            if brace_count == 0 and start_idx is not None:
+                                end_idx = i + 1
+                                break
+                    
+                    if start_idx is not None and end_idx is not None:
+                        clean_json = response_text[start_idx:end_idx]
+                        clean_json = clean_json.replace('"', '"').replace('"', '"')
+                        clean_json = re.sub(r',\s*([}\]])', r'\1', clean_json)
+                        signals_data = json.loads(clean_json)
+                except Exception as e2:
+                    logger.error(f"JSON decode error (attempt 2): {e2}")
+        
+        # Si toujours pas de données, créer une réponse par défaut
+        if signals_data is None:
+            logger.warning(f"Could not parse AI response: {response_text[:500]}")
+            signals_data = {
+                "market_sentiment": "neutral", 
+                "signals": [], 
+                "warning": "L'IA n'a pas pu générer de signaux exploitables. Réessayez dans quelques instants."
+            }
+        
+        # Valider la structure des signaux
+        if "signals" not in signals_data:
+            signals_data["signals"] = []
+        if "market_sentiment" not in signals_data:
+            signals_data["market_sentiment"] = "neutral"
         
         # Sauvegarder les signaux en base pour historique
         for signal in signals_data.get("signals", []):
