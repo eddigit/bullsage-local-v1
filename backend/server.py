@@ -3530,7 +3530,7 @@ async def get_paper_trades(limit: int = 50, current_user: dict = Depends(get_cur
 
 @api_router.get("/paper-trading/portfolio")
 async def get_paper_portfolio(current_user: dict = Depends(get_current_user)):
-    """Get paper trading portfolio"""
+    """Get paper trading portfolio with real-time prices"""
     try:
         user = await db.users.find_one({"id": current_user["id"]})
         
@@ -3538,6 +3538,7 @@ async def get_paper_portfolio(current_user: dict = Depends(get_current_user)):
             return {
                 "balance": 10000.0,
                 "portfolio": {},
+                "positions": [],
                 "initial_balance": 10000.0
             }
         
@@ -3552,7 +3553,8 @@ async def get_paper_portfolio(current_user: dict = Depends(get_current_user)):
                     "amount": item.get("quantity", item.get("amount", 0)),
                     "quantity": item.get("quantity", item.get("amount", 0)),
                     "avg_price": item.get("avg_price", 0),
-                    "symbol": item.get("symbol", coin_id.upper()[:4])
+                    "symbol": item.get("symbol", coin_id.upper()[:4]),
+                    "entry_date": item.get("entry_date")
                 }
             portfolio = normalized
         else:
@@ -3564,9 +3566,101 @@ async def get_paper_portfolio(current_user: dict = Depends(get_current_user)):
                     if "amount" in holding and "quantity" not in holding:
                         holding["quantity"] = holding["amount"]
         
+        # Récupérer les prix actuels pour calculer le P&L en temps réel
+        positions = []
+        if portfolio:
+            try:
+                # Mapping des symboles vers les IDs CoinGecko
+                symbol_to_id = {
+                    'btc': 'bitcoin', 'eth': 'ethereum', 'xrp': 'ripple',
+                    'sol': 'solana', 'ada': 'cardano', 'doge': 'dogecoin',
+                    'dot': 'polkadot', 'matic': 'matic-network', 'link': 'chainlink',
+                    'avax': 'avalanche-2', 'shib': 'shiba-inu', 'ltc': 'litecoin',
+                    'trx': 'tron', 'atom': 'cosmos', 'xlm': 'stellar',
+                    'uni': 'uniswap', 'near': 'near', 'apt': 'aptos'
+                }
+                
+                # Récupérer les prix via CryptoCompare (plus rapide)
+                symbols = [s.upper() for s in portfolio.keys()]
+                symbols_str = ",".join(symbols[:20])  # Limite à 20
+                
+                async with httpx.AsyncClient() as client:
+                    price_response = await client.get(
+                        f"https://min-api.cryptocompare.com/data/pricemultifull?fsyms={symbols_str}&tsyms=USD",
+                        timeout=10.0
+                    )
+                    
+                    prices_data = {}
+                    if price_response.status_code == 200:
+                        raw_data = price_response.json().get("RAW", {})
+                        for sym, data in raw_data.items():
+                            if "USD" in data:
+                                prices_data[sym.lower()] = {
+                                    "price": data["USD"].get("PRICE", 0),
+                                    "change_24h": data["USD"].get("CHANGEPCT24HOUR", 0),
+                                    "image": f"https://www.cryptocompare.com{data['USD'].get('IMAGEURL', '')}"
+                                }
+                
+                # Construire les positions avec P&L
+                for symbol, holding in portfolio.items():
+                    if not isinstance(holding, dict):
+                        continue
+                    
+                    amount = holding.get("amount", holding.get("quantity", 0))
+                    avg_price = holding.get("avg_price", 0)
+                    
+                    if amount <= 0:
+                        continue
+                    
+                    # Obtenir le prix actuel
+                    symbol_lower = symbol.lower()
+                    price_info = prices_data.get(symbol_lower, {})
+                    current_price = price_info.get("price", avg_price)
+                    
+                    # Calculer le P&L
+                    cost_basis = amount * avg_price
+                    current_value = amount * current_price
+                    pnl = current_value - cost_basis
+                    pnl_percent = (pnl / cost_basis * 100) if cost_basis > 0 else 0
+                    
+                    positions.append({
+                        "symbol": symbol.upper(),
+                        "amount": amount,
+                        "avg_price": avg_price,
+                        "current_price": current_price,
+                        "current_value": current_value,
+                        "cost_basis": cost_basis,
+                        "pnl": pnl,
+                        "pnl_percent": pnl_percent,
+                        "entry_date": holding.get("entry_date"),
+                        "image": price_info.get("image", ""),
+                        "change_24h": price_info.get("change_24h", 0)
+                    })
+                    
+            except Exception as price_error:
+                logger.warning(f"Could not fetch real-time prices: {price_error}")
+                # Retourner les positions sans prix temps réel
+                for symbol, holding in portfolio.items():
+                    if not isinstance(holding, dict):
+                        continue
+                    amount = holding.get("amount", holding.get("quantity", 0))
+                    if amount > 0:
+                        positions.append({
+                            "symbol": symbol.upper(),
+                            "amount": amount,
+                            "avg_price": holding.get("avg_price", 0),
+                            "current_price": holding.get("avg_price", 0),
+                            "current_value": amount * holding.get("avg_price", 0),
+                            "cost_basis": amount * holding.get("avg_price", 0),
+                            "pnl": 0,
+                            "pnl_percent": 0,
+                            "entry_date": holding.get("entry_date")
+                        })
+        
         return {
             "balance": user.get("paper_balance", 10000.0),
             "portfolio": portfolio,
+            "positions": positions,
             "initial_balance": 10000.0
         }
     except Exception as e:
@@ -3574,6 +3668,7 @@ async def get_paper_portfolio(current_user: dict = Depends(get_current_user)):
         return {
             "balance": 10000.0,
             "portfolio": {},
+            "positions": [],
             "initial_balance": 10000.0
         }
 

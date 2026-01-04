@@ -14,7 +14,9 @@ import {
   DollarSign,
   RotateCcw,
   Plus,
-  Minus
+  Minus,
+  HelpCircle,
+  Info
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -50,6 +52,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "../components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../components/ui/tooltip";
 
 const formatPrice = (price) => {
   if (!price) return "$0.00";
@@ -420,14 +428,40 @@ export default function PaperTradingPage() {
           <CardContent className="pt-6">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Valeur du Portfolio</p>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger className="text-left">
+                      <p className="text-sm text-muted-foreground flex items-center gap-1">
+                        Valeur du Portfolio <HelpCircle className="w-3 h-3" />
+                      </p>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="font-medium">Valeur Totale du Portfolio</p>
+                      <p className="text-xs text-muted-foreground">
+                        = Solde cash + Valeur de toutes vos positions crypto au prix actuel du marché
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <p className="text-2xl font-bold font-mono mt-1" data-testid="total-value">
                   {formatPrice(portfolioValue)}
                 </p>
-                <div className={`flex items-center gap-1 mt-1 ${portfolioChange >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
-                  {portfolioChange >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                  <span className="text-sm font-mono">{formatPercent(portfolioChange)}</span>
-                </div>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <div className={`flex items-center gap-1 mt-1 ${portfolioChange >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                        {portfolioChange >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                        <span className="text-sm font-mono">{formatPercent(portfolioChange)}</span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Performance depuis le début</p>
+                      <p className="text-xs text-muted-foreground">
+                        ({formatPrice(portfolioValue)} - $10,000) / $10,000 × 100
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
               <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
                 <PieChart className="w-5 h-5 text-primary" />
@@ -440,11 +474,25 @@ export default function PaperTradingPage() {
           <CardContent className="pt-6">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Solde Disponible</p>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger className="text-left">
+                      <p className="text-sm text-muted-foreground flex items-center gap-1">
+                        Solde Disponible <HelpCircle className="w-3 h-3" />
+                      </p>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="font-medium">Cash Disponible</p>
+                      <p className="text-xs text-muted-foreground">
+                        Argent non investi que vous pouvez utiliser pour acheter des actifs
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <p className="text-2xl font-bold font-mono mt-1" data-testid="available-balance">
                   {formatPrice(portfolio.balance)}
                 </p>
-                <p className="text-sm text-muted-foreground mt-1">Cash disponible</p>
+                <p className="text-sm text-muted-foreground mt-1">💵 Prêt à investir</p>
               </div>
               <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
                 <DollarSign className="w-5 h-5 text-blue-500" />
@@ -457,7 +505,21 @@ export default function PaperTradingPage() {
           <CardContent className="pt-6">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Capital Initial</p>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger className="text-left">
+                      <p className="text-sm text-muted-foreground flex items-center gap-1">
+                        Capital Initial <HelpCircle className="w-3 h-3" />
+                      </p>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="font-medium">Capital de Départ</p>
+                      <p className="text-xs text-muted-foreground">
+                        Montant fictif avec lequel vous avez commencé. Comparez-le à votre valeur actuelle pour voir votre performance !
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <p className="text-2xl font-bold font-mono mt-1">$10,000.00</p>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
@@ -510,8 +572,20 @@ export default function PaperTradingPage() {
         <TabsContent value="portfolio">
           <Card className="glass border-white/5">
             <CardHeader>
-              <CardTitle className="text-lg">Mes Positions</CardTitle>
-              <CardDescription>Vos positions actuelles en crypto</CardDescription>
+              <CardTitle className="text-lg flex items-center gap-2">
+                Mes Positions
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <HelpCircle className="w-4 h-4 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p>Vos positions représentent les actifs que vous détenez. Le P&L (Profit & Loss) montre votre gain ou perte par rapport au prix d'achat.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </CardTitle>
+              <CardDescription>Vos positions actuelles en crypto avec P&L en temps réel</CardDescription>
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[400px]">
@@ -528,19 +602,42 @@ export default function PaperTradingPage() {
                       pnl_percent: 0,
                       entry_date: h.entry_date
                     }))).filter(pos => pos.amount > 0).map((position) => {
-                      const coin = markets.find(c => c.id === position.symbol || c.symbol?.toLowerCase() === position.symbol?.toLowerCase());
+                      // Amélioration de la recherche du prix actuel
+                      const symbolLower = position.symbol?.toLowerCase();
+                      const coin = markets.find(c => 
+                        c.id?.toLowerCase() === symbolLower || 
+                        c.symbol?.toLowerCase() === symbolLower ||
+                        c.id?.toLowerCase() === position.symbol?.toLowerCase() ||
+                        // Correspondance partielle (ex: "xrp" dans "ripple")
+                        c.name?.toLowerCase().includes(symbolLower) ||
+                        // Correspondance par symbole CoinGecko
+                        (symbolLower === 'btc' && c.id === 'bitcoin') ||
+                        (symbolLower === 'eth' && c.id === 'ethereum') ||
+                        (symbolLower === 'xrp' && c.id === 'ripple') ||
+                        (symbolLower === 'sol' && c.id === 'solana') ||
+                        (symbolLower === 'ada' && c.id === 'cardano') ||
+                        (symbolLower === 'doge' && c.id === 'dogecoin') ||
+                        (symbolLower === 'dot' && c.id === 'polkadot') ||
+                        (symbolLower === 'matic' && c.id === 'matic-network') ||
+                        (symbolLower === 'link' && c.id === 'chainlink') ||
+                        (symbolLower === 'avax' && c.id === 'avalanche-2')
+                      );
                       
-                      // Si position vient du backend avec prix temps réel
-                      const currentPrice = position.current_price || (coin ? coin.current_price : position.avg_price);
-                      const currentValue = position.current_value || (position.amount * currentPrice);
-                      const costBasis = position.cost_basis || (position.amount * position.avg_price);
-                      const pnl = position.pnl !== undefined ? position.pnl : (currentValue - costBasis);
-                      const pnlPercent = position.pnl_percent !== undefined ? position.pnl_percent : (costBasis > 0 ? (pnl / costBasis) * 100 : 0);
+                      // Calculer le prix actuel et le P&L en temps réel
+                      const currentPrice = coin?.current_price || position.current_price || position.avg_price;
+                      const currentValue = position.amount * currentPrice;
+                      const costBasis = position.amount * position.avg_price;
+                      const pnl = currentValue - costBasis;
+                      const pnlPercent = costBasis > 0 ? (pnl / costBasis) * 100 : 0;
+                      
+                      // Variation depuis l'achat
+                      const priceChange = currentPrice - position.avg_price;
+                      const priceChangePercent = position.avg_price > 0 ? (priceChange / position.avg_price) * 100 : 0;
 
                       return (
                         <div
                           key={position.symbol}
-                          className="p-4 rounded-lg bg-white/5 border border-white/10"
+                          className="p-4 rounded-lg bg-white/5 border border-white/10 hover:border-white/20 transition-colors"
                           data-testid={`position-${position.symbol}`}
                         >
                           <div className="flex items-center justify-between mb-3">
@@ -551,9 +648,27 @@ export default function PaperTradingPage() {
                                 <p className="text-sm text-muted-foreground uppercase">{position.symbol}</p>
                               </div>
                             </div>
-                            <Badge className={pnl >= 0 ? "bg-emerald-500/20 text-emerald-500" : "bg-rose-500/20 text-rose-500"}>
-                              {formatPercent(pnlPercent)} P&L
-                            </Badge>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  <Badge className={pnl >= 0 ? "bg-emerald-500/20 text-emerald-500 cursor-help" : "bg-rose-500/20 text-rose-500 cursor-help"}>
+                                    {formatPercent(pnlPercent)} P&L
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="font-medium">Profit & Loss (P&L)</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {pnl >= 0 ? "Gain" : "Perte"} depuis votre achat
+                                  </p>
+                                  <p className="text-xs mt-1">
+                                    Coût d'achat: {formatPrice(costBasis)}
+                                  </p>
+                                  <p className="text-xs">
+                                    Valeur actuelle: {formatPrice(currentValue)}
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           </div>
                           
                           {/* Date d'entrée */}
@@ -570,27 +685,92 @@ export default function PaperTradingPage() {
                           )}
                           
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                            <div>
-                              <p className="text-muted-foreground">Quantité</p>
-                              <p className="font-mono font-medium">{position.amount.toFixed(6)}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Prix moyen</p>
-                              <p className="font-mono font-medium">{formatPrice(position.avg_price)}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Valeur actuelle</p>
-                              <p className="font-mono font-medium">{formatPrice(currentValue)}</p>
-                              {currentPrice > 0 && (
-                                <p className="text-xs text-muted-foreground">@ {formatPrice(currentPrice)}</p>
-                              )}
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">P&L</p>
-                              <p className={`font-mono font-medium ${pnl >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
-                                {pnl >= 0 ? "+" : ""}{formatPrice(pnl)}
-                              </p>
-                            </div>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger className="text-left">
+                                  <p className="text-muted-foreground flex items-center gap-1">
+                                    Quantité <Info className="w-3 h-3" />
+                                  </p>
+                                  <p className="font-mono font-medium">{position.amount.toFixed(6)}</p>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Nombre d'unités que vous possédez</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Plus vous avez de quantité, plus l'impact du prix est grand
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger className="text-left">
+                                  <p className="text-muted-foreground flex items-center gap-1">
+                                    Prix moyen <Info className="w-3 h-3" />
+                                  </p>
+                                  <p className="font-mono font-medium">{formatPrice(position.avg_price)}</p>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Prix moyen d'achat (PRU)</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Moyenne pondérée de tous vos achats
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger className="text-left">
+                                  <p className="text-muted-foreground flex items-center gap-1">
+                                    Valeur actuelle <Info className="w-3 h-3" />
+                                  </p>
+                                  <p className="font-mono font-medium">{formatPrice(currentValue)}</p>
+                                  <p className={`text-xs flex items-center gap-1 ${priceChangePercent >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                                    @ {formatPrice(currentPrice)}
+                                    {priceChangePercent !== 0 && (
+                                      <span>({priceChangePercent >= 0 ? "+" : ""}{priceChangePercent.toFixed(2)}%)</span>
+                                    )}
+                                  </p>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Valeur = Quantité × Prix actuel</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {position.amount.toFixed(4)} × {formatPrice(currentPrice)} = {formatPrice(currentValue)}
+                                  </p>
+                                  <p className={`text-xs mt-1 ${priceChangePercent >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                                    Le prix a {priceChangePercent >= 0 ? "augmenté" : "baissé"} de {Math.abs(priceChangePercent).toFixed(2)}% depuis votre achat
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger className="text-left">
+                                  <p className="text-muted-foreground flex items-center gap-1">
+                                    P&L <Info className="w-3 h-3" />
+                                  </p>
+                                  <p className={`font-mono font-medium ${pnl >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                                    {pnl >= 0 ? "+" : ""}{formatPrice(pnl)}
+                                  </p>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Profit & Loss (Gain/Perte)</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    P&L = Valeur actuelle - Coût d'achat
+                                  </p>
+                                  <p className="text-xs mt-1">
+                                    {formatPrice(currentValue)} - {formatPrice(costBasis)} = {formatPrice(pnl)}
+                                  </p>
+                                  {pnl !== 0 && (
+                                    <p className={`text-xs mt-1 ${pnl >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                                      {pnl >= 0 ? "🎉 Vous êtes en profit !" : "📉 Vous êtes en perte"}
+                                    </p>
+                                  )}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           </div>
                         </div>
                       );
