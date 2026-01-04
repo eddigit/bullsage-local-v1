@@ -2134,11 +2134,14 @@ Format JSON:
 
 # ============== SIGNAUX TRADING MULTI-MARCHÉS (IA) ==============
 
+# Import du système de consensus multi-IA
+from services.multi_ai_consensus import MultiAIConsensus
+
 @api_router.get("/signals/ai-trading")
 async def get_ai_trading_signals(current_user: dict = Depends(get_current_user)):
     """
-    Génère des signaux de trading IA multi-marchés.
-    Crypto, Forex, Indices, Actions - avec durée et confiance.
+    Génère des signaux de trading via CONSENSUS MULTI-IA.
+    Plusieurs modèles analysent les marchés et votent ensemble pour des signaux plus fiables.
     """
     
     # Récupérer les données de marché
@@ -2185,7 +2188,7 @@ async def get_ai_trading_signals(current_user: dict = Depends(get_current_user))
         except Exception as e:
             logger.error(f"Error fetching crypto data: {e}")
         
-        # Forex - Paires majeures (via Alpha Vantage ou données statiques)
+        # Forex - Paires majeures
         forex_pairs = [
             {"symbol": "EUR/USD", "name": "Euro/Dollar", "price": 1.0420, "change_24h": 0.15},
             {"symbol": "GBP/USD", "name": "Livre/Dollar", "price": 1.2530, "change_24h": -0.22},
@@ -2234,169 +2237,54 @@ async def get_ai_trading_signals(current_user: dict = Depends(get_current_user))
             {"symbol": "AMZN", "name": "Amazon", "price": 225.30, "change_24h": 0.95},
         ]
     
-    # Construire le contexte pour l'IA
-    context = f"""
-ANALYSE MULTI-MARCHÉS - {datetime.now().strftime('%d/%m/%Y %H:%M')}
-
-Tu es un trader expert avec 20 ans d'expérience. Analyse ces données et donne des SIGNAUX DE TRADING PRÉCIS.
-
-DONNÉES MARCHÉ:
-- Fear & Greed Index: {market_data['fear_greed']['value']} ({market_data['fear_greed']['label']})
-
-CRYPTO (Top 5):
-{chr(10).join([f"- {c['name']} ({c['symbol']}): ${c['price']:,.2f} ({c['change_24h']:+.1f}%)" for c in market_data['crypto'][:5]])}
-
-FOREX:
-{chr(10).join([f"- {f['name']} ({f['symbol']}): {f['price']:.4f} ({f['change_24h']:+.2f}%)" for f in market_data['forex']])}
-
-INDICES:
-{chr(10).join([f"- {i['name']} ({i['symbol']}): {i['price']:,.0f} ({i['change_24h']:+.2f}%)" for i in market_data['indices']])}
-
-ACTIONS:
-{chr(10).join([f"- {s['name']} ({s['symbol']}): ${s['price']:.2f} ({s['change_24h']:+.2f}%)" for s in market_data['stocks']])}
-
-GÉNÈRE EXACTEMENT 3-5 SIGNAUX DE TRADING avec:
-1. Direction: ACHAT ou VENTE
-2. Confiance: 60-95%
-3. Durée suggérée: "1-4h", "4-12h", "1-3 jours", etc.
-4. Take Profit: % de gain attendu
-5. Stop Loss: % de perte max
-6. Raison: 1 phrase claire
-
-FORMAT JSON STRICT:
-{{
-  "market_sentiment": "bullish/bearish/neutral",
-  "signals": [
-    {{
-      "asset": "BTC",
-      "asset_name": "Bitcoin",
-      "market_type": "crypto",
-      "direction": "ACHAT",
-      "confidence": 85,
-      "duration": "4-8h",
-      "entry_price": 98500,
-      "take_profit": 3.5,
-      "stop_loss": 1.5,
-      "reason": "Support $98K testé 3 fois, rebond confirmé avec volume"
-    }}
-  ],
-  "warning": "Message de prudence si nécessaire"
-}}
-
-Sois PRÉCIS et ACTIONNABLE. Pas de blabla, que des signaux exploitables.
-"""
-
+    # Ajouter les infos de marchés analysés
+    market_data["markets_analyzed"] = {
+        "crypto": len(market_data["crypto"]),
+        "forex": len(market_data["forex"]),
+        "indices": len(market_data["indices"]),
+        "stocks": len(market_data["stocks"])
+    }
+    
     try:
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"signals_{current_user['id']}_{datetime.now().strftime('%Y%m%d%H')}",
-            system_message="Tu es un trader professionnel. Tu donnes des signaux de trading précis et actionnables."
+        # Utiliser le système de consensus multi-IA
+        logger.info("🤖 Lancement de l'analyse multi-IA avec Grok, Claude, GPT-4 et Gemini...")
+        
+        consensus = MultiAIConsensus(
+            xai_api_key=XAI_API_KEY,
+            openrouter_api_key=os.environ.get('OPENROUTER_API_KEY'),
+            anthropic_api_key=os.environ.get('ANTHROPIC_API_KEY')
         )
-        chat.with_model("xai", "grok-3-latest")
         
-        user_msg = UserMessage(text=context)
-        ai_response = await chat.send_message(user_msg)
-        response_text = str(ai_response) if ai_response else ""
+        result = await consensus.get_consensus_signals(market_data, current_user["id"])
         
-        # Parser le JSON - avec plusieurs tentatives de nettoyage
-        import re
-        import json
-        
-        signals_data = None
-        
-        # Tentative 1: Extraction directe du JSON
-        json_match = re.search(r'\{[\s\S]*\}', response_text)
-        if json_match:
-            json_str = json_match.group()
-            
-            # Nettoyer le JSON des caractères problématiques
-            # Remplacer les guillemets typographiques
-            json_str = json_str.replace('"', '"').replace('"', '"')
-            json_str = json_str.replace("'", "'").replace("'", "'")
-            # Supprimer les caractères de contrôle
-            json_str = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', json_str)
-            # Corriger les virgules en trop avant les accolades/crochets fermants
-            json_str = re.sub(r',\s*([}\]])', r'\1', json_str)
-            
-            try:
-                signals_data = json.loads(json_str)
-            except json.JSONDecodeError as e:
-                logger.error(f"JSON decode error (attempt 1): {e}")
-                logger.error(f"JSON string: {json_str[:500]}...")
-                
-                # Tentative 2: Extraction plus stricte du JSON
-                try:
-                    # Chercher un JSON valide en comptant les accolades
-                    brace_count = 0
-                    start_idx = None
-                    end_idx = None
-                    for i, char in enumerate(response_text):
-                        if char == '{':
-                            if start_idx is None:
-                                start_idx = i
-                            brace_count += 1
-                        elif char == '}':
-                            brace_count -= 1
-                            if brace_count == 0 and start_idx is not None:
-                                end_idx = i + 1
-                                break
-                    
-                    if start_idx is not None and end_idx is not None:
-                        clean_json = response_text[start_idx:end_idx]
-                        clean_json = clean_json.replace('"', '"').replace('"', '"')
-                        clean_json = re.sub(r',\s*([}\]])', r'\1', clean_json)
-                        signals_data = json.loads(clean_json)
-                except Exception as e2:
-                    logger.error(f"JSON decode error (attempt 2): {e2}")
-        
-        # Si toujours pas de données, créer une réponse par défaut
-        if signals_data is None:
-            logger.warning(f"Could not parse AI response: {response_text[:500]}")
-            signals_data = {
-                "market_sentiment": "neutral", 
-                "signals": [], 
-                "warning": "L'IA n'a pas pu générer de signaux exploitables. Réessayez dans quelques instants."
-            }
-        
-        # Valider la structure des signaux
-        if "signals" not in signals_data:
-            signals_data["signals"] = []
-        if "market_sentiment" not in signals_data:
-            signals_data["market_sentiment"] = "neutral"
+        models_info = result.get("models_used", [])
+        responded = sum(1 for m in models_info if m.get("responded", False))
+        logger.info(f"✅ Consensus obtenu: {len(result.get('signals', []))} signaux, sentiment: {result.get('market_sentiment')}, modèles: {responded}/{len(models_info)}")
         
         # Sauvegarder les signaux en base pour historique
-        for signal in signals_data.get("signals", []):
+        for signal in result.get("signals", []):
             signal_doc = {
                 "id": str(uuid.uuid4()),
                 "user_id": current_user["id"],
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "status": "active",
+                "consensus_method": "multi-ai",
                 **signal
             }
             await db.ai_signals.insert_one(signal_doc)
         
-        return {
-            "generated_at": datetime.now(timezone.utc).isoformat(),
-            "fear_greed": market_data["fear_greed"],
-            **signals_data,
-            "markets_analyzed": {
-                "crypto": len(market_data["crypto"]),
-                "forex": len(market_data["forex"]),
-                "indices": len(market_data["indices"]),
-                "stocks": len(market_data["stocks"])
-            }
-        }
+        return result
         
     except Exception as e:
         logger.error(f"Error generating AI signals: {e}")
+        import traceback
+        traceback.print_exc()
         return {
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "market_sentiment": "neutral",
             "signals": [],
-            "warning": f"Erreur lors de la génération: {str(e)}",
-            "fear_greed": market_data.get("fear_greed", {"value": 50, "label": "Neutral"})
+            "warning": f"Erreur lors de la génération des signaux: {str(e)}"
         }
-
 
 @api_router.get("/signals/history")
 async def get_signals_history(limit: int = 50, current_user: dict = Depends(get_current_user)):
