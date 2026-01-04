@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from datetime import datetime, timezone
 import httpx
 import asyncio
+import os
 from typing import Optional
 
 from ..core.config import (
@@ -16,6 +17,7 @@ from ..core.config import (
     logger
 )
 from ..core.auth import get_current_user, get_admin_user
+from ..services.api_health_checker import api_health_checker
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -343,3 +345,64 @@ async def clear_error_logs(
         "deleted_count": result.deleted_count,
         "message": f"Supprimé {result.deleted_count} logs de plus de {older_than_days} jours"
     }
+
+
+# ============== SYSTEM HEALTH CHECK ==============
+
+@router.get("/system-health")
+async def get_system_health(
+    force_refresh: bool = False,
+    current_user: dict = Depends(get_admin_user)
+):
+    """
+    Vérification complète de la santé du système.
+    Teste toutes les API IA, sources de données et services.
+    """
+    try:
+        health_status = await api_health_checker.check_all(force_refresh=force_refresh)
+        return health_status
+    except Exception as e:
+        logger.error(f"Error checking system health: {e}")
+        return {
+            "error": str(e),
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+            "summary": {"overall_status": "error", "health_score": 0}
+        }
+
+
+@router.get("/system-health/public")
+async def get_public_system_health():
+    """
+    Version publique du health check (pour l'affichage dans l'UI).
+    Ne nécessite pas d'authentification admin.
+    """
+    try:
+        health_status = await api_health_checker.check_all(force_refresh=False)
+        
+        # Simplifier pour l'affichage public
+        return {
+            "summary": health_status.get("summary", {}),
+            "checked_at": health_status.get("checked_at"),
+            "ai_models": [
+                {
+                    "name": v.get("name"),
+                    "status": v.get("status"),
+                    "message": v.get("message")
+                }
+                for v in health_status.get("ai_models", {}).values()
+            ],
+            "market_data": [
+                {
+                    "name": v.get("name"),
+                    "status": v.get("status"),
+                    "message": v.get("message")
+                }
+                for v in health_status.get("market_data", {}).values()
+            ]
+        }
+    except Exception as e:
+        return {
+            "summary": {"overall_status": "error", "health_score": 0},
+            "error": str(e)
+        }
+

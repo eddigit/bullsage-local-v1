@@ -34,6 +34,7 @@ import { Badge } from "../components/ui/badge";
 import { ScrollArea } from "../components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Progress } from "../components/ui/progress";
+import SystemHealthMonitor from "../components/SystemHealthMonitor";
 import {
   Table,
   TableBody,
@@ -651,91 +652,35 @@ export default function AdminPage() {
 
         {/* APIs Tab */}
         <TabsContent value="apis" className="mt-6 space-y-6">
-          {loadingHealth ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="flex flex-col items-center gap-4">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                <p className="text-muted-foreground">Test des API en cours...</p>
+          {/* Nouveau moniteur de santé système */}
+          <SystemHealthMonitor isAdmin={true} />
+          
+          {/* API Legend */}
+          <Card className="glass border-white/5">
+            <CardHeader>
+              <CardTitle className="text-lg">Légende des statuts</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-6">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-green-500" />
+                  <span className="text-sm">Opérationnel</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                  <span className="text-sm">Dégradé</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-500" />
+                  <span className="text-sm">Hors ligne</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-gray-400" />
+                  <span className="text-sm">Standby (crédits insuffisants)</span>
+                </div>
               </div>
-            </div>
-          ) : apiHealth ? (
-            <>
-              {/* Health Summary */}
-              <Card className="glass border-white/5">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        <Wifi className="w-5 h-5 text-primary" />
-                        Santé des Services
-                      </CardTitle>
-                      <CardDescription>
-                        Dernière vérification: {new Date(apiHealth.timestamp).toLocaleString("fr-FR")}
-                      </CardDescription>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-3xl font-bold font-mono">
-                        {apiHealth.summary.health_percentage}%
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {apiHealth.summary.online}/{apiHealth.summary.total} en ligne
-                      </p>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <Progress 
-                    value={apiHealth.summary.health_percentage} 
-                    className="h-3"
-                  />
-                </CardContent>
-              </Card>
-
-              {/* API Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {apiHealth.apis.map((api) => (
-                  <ApiCard key={api.name} api={api} />
-                ))}
-              </div>
-
-              {/* API Legend */}
-              <Card className="glass border-white/5">
-                <CardContent className="pt-6">
-                  <div className="flex flex-wrap gap-4">
-                    <div className="flex items-center gap-2">
-                      <StatusIndicator status="online" />
-                      <span className="text-sm">En ligne</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <StatusIndicator status="rate_limited" />
-                      <span className="text-sm">Limite atteinte</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <StatusIndicator status="timeout" />
-                      <span className="text-sm">Timeout</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <StatusIndicator status="offline" />
-                      <span className="text-sm">Hors ligne</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <StatusIndicator status="not_configured" />
-                      <span className="text-sm">Non configuré</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </>
-          ) : (
-            <Card className="glass border-white/5">
-              <CardContent className="py-12 text-center">
-                <Server className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">
-                  Cliquez sur Actualiser pour tester les API
-                </p>
-              </CardContent>
-            </Card>
-          )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Logs Tab */}
