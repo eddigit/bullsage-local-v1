@@ -29,11 +29,20 @@ import {
   Search,
   CandlestickChart,
   Mail,
-  Newspaper
+  Newspaper,
+  ChevronDown
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { ScrollArea } from "../components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
 
 // Detect environment - use Render backend URL in production
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 
@@ -59,21 +68,6 @@ const navigation = [
   { name: "Académie", href: "/academy", icon: GraduationCap, highlight: true },
   { name: "Paramètres", href: "/settings", icon: Settings },
 ];
-
-// DeFi navigation items - SUPPRIMÉ
-const defiNavigation = [];
-
-// Pro Trader AI - Intégré dans Cockpit
-const proTraderItem = null;
-
-// Scanner IA Unifié - Intégré dans Cockpit
-const opportunityScannerItem = null;
-
-// Smart Invest CTA - SUPPRIMÉ
-const smartInvestItem = null;
-
-// Auto Trading CTA - SUPPRIMÉ
-const autoTradingItem = null;
 
 // Admin navigation
 const adminNavigation = [
@@ -277,132 +271,8 @@ export default function MainLayout() {
                   ))}
                 </>
               )}
-              
-              {/* DeFi Section */}
-              <div className="pt-4 mt-4 border-t border-white/5">
-                <p className="px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                  DeFi
-                </p>
-                {defiNavigation.map((item) => (
-                  <NavLink
-                    key={item.name}
-                    to={item.href}
-                    className={({ isActive }) => `
-                      flex items-center gap-3 px-4 py-3 rounded-xl min-h-[48px] transition-all
-                      ${isActive 
-                        ? "bg-primary/10 text-primary" 
-                        : "hover:bg-white/5 text-muted-foreground hover:text-foreground"
-                      }
-                    `}
-                    data-testid={`nav-${item.href.slice(1)}`}
-                  >
-                    <item.icon className="w-5 h-5" />
-                    <span className="font-medium">{item.name}</span>
-                  </NavLink>
-                ))}
-              </div>
             </nav>
           </ScrollArea>
-
-          {/* Smart Invest & Auto Trading CTAs */}
-          <div className="p-4 border-t border-white/5 space-y-2">
-                        {/* Pro Trader AI - THE BEST CTA */}
-            <NavLink
-              to="/pro-trader"
-              className={`
-                relative overflow-hidden flex items-center gap-3 px-4 py-3 rounded-xl
-                bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600
-                hover:from-blue-500 hover:via-indigo-500 hover:to-violet-500
-                transition-all duration-300 group animate-pulse-slow
-                ${location.pathname === '/pro-trader' ? 'ring-2 ring-white/30' : ''}
-              `}
-              data-testid="pro-trader-cta"
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 to-violet-400/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="relative flex items-center gap-3 w-full">
-                <div className="p-2 bg-white/20 rounded-lg">
-                  <Brain className="w-5 h-5 text-white" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-bold text-white text-sm">🤖 Pro Trader AI</p>
-                  <p className="text-xs text-white/70">Trading Intelligent</p>
-                </div>
-                <ChevronRight className="w-4 h-4 text-white/50 group-hover:text-white group-hover:translate-x-1 transition-all" />
-              </div>
-            </NavLink>
-{/* Scanner IA Unifié - New Primary CTA */}
-            <NavLink
-              to="/opportunity-scanner"
-              className={`
-                relative overflow-hidden flex items-center gap-3 px-4 py-3 rounded-xl 
-                bg-gradient-to-r from-amber-500 via-orange-500 to-red-500
-                hover:from-amber-400 hover:via-orange-400 hover:to-red-400
-                transition-all duration-300 group animate-pulse-slow
-                ${location.pathname === '/opportunity-scanner' ? 'ring-2 ring-white/30' : ''}
-              `}
-              data-testid="scanner-ia-cta"
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-amber-400/20 to-red-400/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="relative flex items-center gap-3 w-full">
-                <div className="p-2 bg-white/20 rounded-lg">
-                  <Search className="w-5 h-5 text-white" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-bold text-white text-sm">🔍 Scanner IA</p>
-                  <p className="text-xs text-white/70">Crypto + Actions + Indices</p>
-                </div>
-                <ChevronRight className="w-4 h-4 text-white/50 group-hover:text-white group-hover:translate-x-1 transition-all" />
-              </div>
-            </NavLink>
-            
-            <NavLink
-              to="/smart-invest"
-              className={`
-                relative overflow-hidden flex items-center gap-3 px-4 py-3 rounded-xl 
-                bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600
-                hover:from-violet-500 hover:via-purple-500 hover:to-fuchsia-500
-                transition-all duration-300 group
-                ${location.pathname === '/smart-invest' ? 'ring-2 ring-white/30' : ''}
-              `}
-              data-testid="smart-invest-cta"
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-violet-400/20 to-fuchsia-400/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="relative flex items-center gap-3 w-full">
-                <div className="p-2 bg-white/20 rounded-lg">
-                  <Zap className="w-5 h-5 text-white" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-bold text-white text-sm">Smart Invest</p>
-                  <p className="text-xs text-white/70">Investir en 1 clic</p>
-                </div>
-                <ChevronRight className="w-4 h-4 text-white/50 group-hover:text-white group-hover:translate-x-1 transition-all" />
-              </div>
-            </NavLink>
-            
-            <NavLink
-              to="/auto-trading"
-              className={`
-                relative overflow-hidden flex items-center gap-3 px-4 py-3 rounded-xl 
-                bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600
-                hover:from-emerald-500 hover:via-teal-500 hover:to-cyan-500
-                transition-all duration-300 group
-                ${location.pathname === '/auto-trading' ? 'ring-2 ring-white/30' : ''}
-              `}
-              data-testid="auto-trading-cta"
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-emerald-400/20 to-cyan-400/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="relative flex items-center gap-3 w-full">
-                <div className="p-2 bg-white/20 rounded-lg">
-                  <Bot className="w-5 h-5 text-white" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-bold text-white text-sm">Auto-Trading</p>
-                  <p className="text-xs text-white/70">L&apos;IA trade 24/7</p>
-                </div>
-                <ChevronRight className="w-4 h-4 text-white/50 group-hover:text-white group-hover:translate-x-1 transition-all" />
-              </div>
-            </NavLink>
-          </div>
 
           {/* User Section */}
           <div className="p-4 border-t border-white/5">
@@ -440,8 +310,128 @@ export default function MainLayout() {
         </div>
       </aside>
 
+      {/* ===================== DESKTOP TOP HEADER ===================== */}
+      <header className="hidden md:flex fixed top-0 left-64 right-0 h-16 glass-heavy z-40 items-center justify-between px-6 border-b border-white/5">
+        {/* Quick Action Buttons - Left side */}
+        <div className="flex items-center gap-2">
+          <NavLink
+            to="/pro-trader"
+            className={`
+              flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
+              bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500
+              text-white transition-all duration-200 shadow-lg shadow-blue-600/20
+              ${location.pathname === '/pro-trader' ? 'ring-2 ring-white/30' : ''}
+            `}
+          >
+            <Brain className="w-4 h-4" />
+            <span>Pro Trader AI</span>
+          </NavLink>
+          
+          <NavLink
+            to="/opportunity-scanner"
+            className={`
+              flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
+              bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400
+              text-white transition-all duration-200 shadow-lg shadow-amber-600/20
+              ${location.pathname === '/opportunity-scanner' ? 'ring-2 ring-white/30' : ''}
+            `}
+          >
+            <Search className="w-4 h-4" />
+            <span>Scanner IA</span>
+          </NavLink>
+          
+          <NavLink
+            to="/smart-invest"
+            className={`
+              flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
+              bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500
+              text-white transition-all duration-200 shadow-lg shadow-violet-600/20
+              ${location.pathname === '/smart-invest' ? 'ring-2 ring-white/30' : ''}
+            `}
+          >
+            <Zap className="w-4 h-4" />
+            <span>Smart Invest</span>
+          </NavLink>
+          
+          <NavLink
+            to="/auto-trading"
+            className={`
+              flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
+              bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500
+              text-white transition-all duration-200 shadow-lg shadow-emerald-600/20
+              ${location.pathname === '/auto-trading' ? 'ring-2 ring-white/30' : ''}
+            `}
+          >
+            <Bot className="w-4 h-4" />
+            <span>Auto Trading</span>
+          </NavLink>
+        </div>
+
+        {/* User Menu - Right side */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="flex items-center gap-3 px-3 py-2 h-auto hover:bg-white/5">
+              <Avatar className="w-9 h-9 ring-2 ring-transparent hover:ring-primary/30 transition-all">
+                <AvatarImage src={getAvatarUrl()} alt={user?.name} />
+                <AvatarFallback className="bg-secondary">
+                  {getInitials(user?.name)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="text-left hidden lg:block">
+                <p className="font-medium text-sm">{user?.name}</p>
+                <p className="text-xs text-muted-foreground capitalize">{user?.trading_level}</p>
+              </div>
+              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56 bg-background/95 backdrop-blur-xl border-white/10">
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex flex-col space-y-1">
+                <p className="font-medium">{user?.name}</p>
+                <p className="text-xs text-muted-foreground">{user?.email}</p>
+                {user?.points > 0 && (
+                  <p className="text-xs text-amber-400">⭐ {user.points} points</p>
+                )}
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator className="bg-white/10" />
+            <DropdownMenuItem asChild>
+              <NavLink to="/settings" className="flex items-center gap-2 cursor-pointer">
+                <User className="w-4 h-4" />
+                <span>Mon Profil</span>
+              </NavLink>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <NavLink to="/settings" className="flex items-center gap-2 cursor-pointer">
+                <Settings className="w-4 h-4" />
+                <span>Paramètres</span>
+              </NavLink>
+            </DropdownMenuItem>
+            {user?.is_admin && (
+              <>
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem asChild>
+                  <NavLink to="/admin" className="flex items-center gap-2 cursor-pointer text-violet-400">
+                    <Shield className="w-4 h-4" />
+                    <span>Administration</span>
+                  </NavLink>
+                </DropdownMenuItem>
+              </>
+            )}
+            <DropdownMenuSeparator className="bg-white/10" />
+            <DropdownMenuItem 
+              onClick={logout}
+              className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Déconnexion</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </header>
+
       {/* ===================== MAIN CONTENT ===================== */}
-      <main className="md:ml-64 min-h-screen pt-14 pb-24 md:pt-0 md:pb-0 flex flex-col">
+      <main className="md:ml-64 min-h-screen pt-14 pb-24 md:pt-16 md:pb-0 flex flex-col">
         <div className="p-4 md:p-6 flex-1">
           <Outlet />
         </div>
