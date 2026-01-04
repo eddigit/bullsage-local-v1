@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth, API } from "../App";
 import { Link } from "react-router-dom";
 import axios from "axios";
@@ -23,7 +23,9 @@ import {
   X,
   ChevronDown,
   Newspaper,
-  AlertCircle
+  AlertCircle,
+  HelpCircle,
+  Info
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -45,6 +47,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
+import {
+  Tooltip as UITooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../components/ui/tooltip";
 import {
   AreaChart,
   Area,
@@ -111,6 +119,10 @@ export default function DashboardPage() {
   // Add to watchlist state
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  
+  // Auto-refresh interval ref
+  const refreshIntervalRef = useRef(null);
+  const AUTO_REFRESH_INTERVAL = 30000; // 30 seconds
 
   const fetchNewsImpact = async () => {
     setLoadingNews(true);
@@ -193,6 +205,19 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchData();
     fetchNewsImpact();
+    
+    // Setup auto-refresh every 30 seconds for real-time data
+    refreshIntervalRef.current = setInterval(() => {
+      console.log("Auto-refreshing market data...");
+      fetchData();
+    }, AUTO_REFRESH_INTERVAL);
+    
+    // Cleanup on unmount
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
+    };
   }, []);
 
   const handleRefresh = () => {
@@ -417,164 +442,300 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {/* Portfolio */}
-        <Card className="glass border-white/5">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Portfolio Virtuel</p>
-                <p className="text-xl font-bold font-mono">{formatPrice(portfolioValue)}</p>
-                <p className={`text-xs font-mono ${portfolioChange >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
-                  {formatPercent(portfolioChange)}
-                </p>
-              </div>
-              <Wallet className="w-8 h-8 text-primary/50" />
+        <TooltipProvider>
+          <Card className="glass border-white/5 relative">
+            <div className="absolute top-2 right-2 flex items-center gap-1">
+              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+              <span className="text-[10px] text-emerald-500 font-mono">LIVE</span>
             </div>
-          </CardContent>
-        </Card>
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-1">
+                    <p className="text-xs text-muted-foreground">Portfolio Virtuel</p>
+                    <UITooltip>
+                      <TooltipTrigger>
+                        <HelpCircle className="w-3 h-3 text-muted-foreground hover:text-primary cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p className="font-semibold">💼 Portfolio Virtuel</p>
+                        <p className="text-xs mt-1">Valeur totale de vos investissements fictifs. Vous démarrez avec 10 000$ virtuels pour vous entraîner sans risque réel.</p>
+                        <p className="text-xs mt-1 text-muted-foreground">= Solde disponible + Valeur des positions</p>
+                      </TooltipContent>
+                    </UITooltip>
+                  </div>
+                  <p className="text-xl font-bold font-mono">{formatPrice(portfolioValue)}</p>
+                  <UITooltip>
+                    <TooltipTrigger>
+                      <p className={`text-xs font-mono cursor-help ${portfolioChange >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                        {formatPercent(portfolioChange)}
+                      </p>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="font-semibold">📈 Performance</p>
+                      <p className="text-xs mt-1">Variation depuis le capital initial de 10 000$.</p>
+                      <p className="text-xs mt-1 text-emerald-500">Vert = Profit</p>
+                      <p className="text-xs text-rose-500">Rouge = Perte</p>
+                    </TooltipContent>
+                  </UITooltip>
+                </div>
+                <Wallet className="w-8 h-8 text-primary/50" />
+              </div>
+            </CardContent>
+          </Card>
+        </TooltipProvider>
 
         {/* Fear & Greed */}
-        <Card className="glass border-white/5">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Fear & Greed</p>
-                <p className="text-xl font-bold font-mono">{fearGreed?.value || "-"}</p>
-                <p className={`text-xs ${
-                  parseInt(fearGreed?.value) <= 25 ? "text-rose-500" :
-                  parseInt(fearGreed?.value) >= 75 ? "text-emerald-500" : "text-yellow-500"
-                }`}>
-                  {fearGreed?.value_classification || "-"}
-                </p>
-              </div>
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                parseInt(fearGreed?.value) <= 25 ? "bg-rose-500/10" :
-                parseInt(fearGreed?.value) >= 75 ? "bg-emerald-500/10" : "bg-yellow-500/10"
-              }`}>
-                {parseInt(fearGreed?.value) <= 25 ? (
-                  <TrendingDown className="w-5 h-5 text-rose-500" />
-                ) : parseInt(fearGreed?.value) >= 75 ? (
-                  <TrendingUp className="w-5 h-5 text-emerald-500" />
-                ) : (
-                  <TrendingUp className="w-5 h-5 text-yellow-500" />
-                )}
-              </div>
+        <TooltipProvider>
+          <Card className="glass border-white/5 relative">
+            <div className="absolute top-2 right-2 flex items-center gap-1">
+              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+              <span className="text-[10px] text-emerald-500 font-mono">LIVE</span>
             </div>
-          </CardContent>
-        </Card>
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-1">
+                    <p className="text-xs text-muted-foreground">Fear & Greed</p>
+                    <UITooltip>
+                      <TooltipTrigger>
+                        <HelpCircle className="w-3 h-3 text-muted-foreground hover:text-primary cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p className="font-semibold">😨📊 Indice Fear & Greed</p>
+                        <p className="text-xs mt-1">Mesure l'émotion dominante du marché de 0 à 100.</p>
+                        <div className="text-xs mt-2 space-y-1">
+                          <p className="text-rose-400">0-25 = Peur extrême (opportunité d'achat?)</p>
+                          <p className="text-yellow-400">26-74 = Neutre / Indécision</p>
+                          <p className="text-emerald-400">75-100 = Cupidité (prudence!)</p>
+                        </div>
+                        <p className="text-xs mt-2 italic text-muted-foreground">"Soyez craintif quand les autres sont avides" - Warren Buffett</p>
+                      </TooltipContent>
+                    </UITooltip>
+                  </div>
+                  <p className="text-xl font-bold font-mono">{fearGreed?.value || "-"}</p>
+                  <UITooltip>
+                    <TooltipTrigger>
+                      <p className={`text-xs cursor-help ${
+                        parseInt(fearGreed?.value) <= 25 ? "text-rose-500" :
+                        parseInt(fearGreed?.value) >= 75 ? "text-emerald-500" : "text-yellow-500"
+                      }`}>
+                        {fearGreed?.value_classification || "-"}
+                      </p>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs">Classification actuelle du sentiment de marché</p>
+                    </TooltipContent>
+                  </UITooltip>
+                </div>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                  parseInt(fearGreed?.value) <= 25 ? "bg-rose-500/10" :
+                  parseInt(fearGreed?.value) >= 75 ? "bg-emerald-500/10" : "bg-yellow-500/10"
+                }`}>
+                  {parseInt(fearGreed?.value) <= 25 ? (
+                    <TrendingDown className="w-5 h-5 text-rose-500" />
+                  ) : parseInt(fearGreed?.value) >= 75 ? (
+                    <TrendingUp className="w-5 h-5 text-emerald-500" />
+                  ) : (
+                    <TrendingUp className="w-5 h-5 text-yellow-500" />
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TooltipProvider>
 
         {/* BTC Quick */}
-        <Card className="glass border-white/5">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Bitcoin</p>
-                <p className="text-xl font-bold font-mono">
-                  {formatPrice(markets.find(c => c.id === "bitcoin")?.current_price)}
-                </p>
-                <p className={`text-xs font-mono ${
-                  (markets.find(c => c.id === "bitcoin")?.price_change_percentage_24h || 0) >= 0 
-                    ? "text-emerald-500" : "text-rose-500"
-                }`}>
-                  {formatPercent(markets.find(c => c.id === "bitcoin")?.price_change_percentage_24h)}
-                </p>
-              </div>
-              <img src={markets.find(c => c.id === "bitcoin")?.image} alt="BTC" className="w-8 h-8" />
+        <TooltipProvider>
+          <Card className="glass border-white/5 relative">
+            <div className="absolute top-2 right-2 flex items-center gap-1">
+              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+              <span className="text-[10px] text-emerald-500 font-mono">LIVE</span>
             </div>
-          </CardContent>
-        </Card>
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-1">
+                    <p className="text-xs text-muted-foreground">Bitcoin</p>
+                    <UITooltip>
+                      <TooltipTrigger>
+                        <HelpCircle className="w-3 h-3 text-muted-foreground hover:text-primary cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p className="font-semibold">₿ Bitcoin (BTC)</p>
+                        <p className="text-xs mt-1">La première et plus importante cryptomonnaie. Son prix influence tout le marché crypto.</p>
+                        <p className="text-xs mt-2 text-muted-foreground">Dominance : Le BTC représente ~45-50% de la capitalisation totale du marché crypto.</p>
+                      </TooltipContent>
+                    </UITooltip>
+                  </div>
+                  <p className="text-xl font-bold font-mono">
+                    {formatPrice(markets.find(c => c.id === "bitcoin")?.current_price)}
+                  </p>
+                  <UITooltip>
+                    <TooltipTrigger>
+                      <p className={`text-xs font-mono cursor-help ${
+                        (markets.find(c => c.id === "bitcoin")?.price_change_percentage_24h || 0) >= 0 
+                          ? "text-emerald-500" : "text-rose-500"
+                      }`}>
+                        {formatPercent(markets.find(c => c.id === "bitcoin")?.price_change_percentage_24h)}
+                      </p>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs">Variation du prix sur les dernières 24 heures</p>
+                    </TooltipContent>
+                  </UITooltip>
+                </div>
+                <img src={markets.find(c => c.id === "bitcoin")?.image} alt="BTC" className="w-8 h-8" />
+              </div>
+            </CardContent>
+          </Card>
+        </TooltipProvider>
 
         {/* Watchlist count */}
-        <Card className="glass border-white/5">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Ma Watchlist</p>
-                <p className="text-xl font-bold font-mono">{watchlistCoins.length}</p>
-                <p className="text-xs text-muted-foreground">cryptos suivies</p>
+        <TooltipProvider>
+          <Card className="glass border-white/5">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-1">
+                    <p className="text-xs text-muted-foreground">Ma Watchlist</p>
+                    <UITooltip>
+                      <TooltipTrigger>
+                        <HelpCircle className="w-3 h-3 text-muted-foreground hover:text-primary cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p className="font-semibold">⭐ Watchlist</p>
+                        <p className="text-xs mt-1">Liste des cryptos que vous suivez de près. Ajoutez vos favorites pour les analyser rapidement.</p>
+                        <p className="text-xs mt-2 text-muted-foreground">Astuce : Cliquez sur "Ajouter" ci-dessous pour suivre de nouvelles cryptos.</p>
+                      </TooltipContent>
+                    </UITooltip>
+                  </div>
+                  <p className="text-xl font-bold font-mono">{watchlistCoins.length}</p>
+                  <p className="text-xs text-muted-foreground">cryptos suivies</p>
+                </div>
+                <Star className="w-8 h-8 text-yellow-500/50" />
               </div>
-              <Star className="w-8 h-8 text-yellow-500/50" />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </TooltipProvider>
       </div>
 
       {/* News Impact Section */}
-      <Card className="glass border-white/5">
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Newspaper className="w-4 h-4 text-violet-500" />
-              Actualités Impact Marché
-            </CardTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={fetchNewsImpact}
-              disabled={loadingNews}
-              className="text-xs text-muted-foreground hover:text-foreground"
-            >
-              <RefreshCw className={`w-3 h-3 mr-1 ${loadingNews ? "animate-spin" : ""}`} />
-              Actualiser
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-0">
-          {loadingNews && !newsImpact ? (
-            <div className="flex items-center justify-center py-4">
-              <Loader2 className="w-5 h-5 animate-spin text-primary" />
+      <TooltipProvider>
+        <Card className="glass border-white/5">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Newspaper className="w-4 h-4 text-violet-500" />
+                Actualités Impact Marché
+                <UITooltip>
+                  <TooltipTrigger>
+                    <HelpCircle className="w-3.5 h-3.5 text-muted-foreground hover:text-primary cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="font-semibold">📰 Analyse des Actualités</p>
+                    <p className="text-xs mt-1">L'IA analyse les dernières news crypto et prédit leur impact sur le marché.</p>
+                    <div className="text-xs mt-2 space-y-1">
+                      <p className="text-emerald-400">📈 HAUSSIER = News positive, prix susceptible de monter</p>
+                      <p className="text-rose-400">📉 BAISSIER = News négative, prix susceptible de baisser</p>
+                      <p className="text-yellow-400">➡️ NEUTRE = Impact limité ou incertain</p>
+                    </div>
+                  </TooltipContent>
+                </UITooltip>
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={fetchNewsImpact}
+                disabled={loadingNews}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                <RefreshCw className={`w-3 h-3 mr-1 ${loadingNews ? "animate-spin" : ""}`} />
+                Actualiser
+              </Button>
             </div>
-          ) : newsImpact?.summary?.length > 0 ? (
-            <div className="space-y-2">
-              {newsImpact.summary.map((item, idx) => (
-                <div
-                  key={idx}
-                  className={`p-2.5 rounded-lg flex items-start gap-3 ${
-                    item.impact === "HAUSSIER" ? "bg-emerald-500/5 border border-emerald-500/10" :
-                    item.impact === "BAISSIER" ? "bg-rose-500/5 border border-rose-500/10" :
-                    "bg-white/5 border border-white/5"
-                  }`}
-                >
-                  <div className={`mt-0.5 flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-sm ${
-                    item.impact === "HAUSSIER" ? "bg-emerald-500/20" :
-                    item.impact === "BAISSIER" ? "bg-rose-500/20" :
-                    "bg-yellow-500/20"
-                  }`}>
-                    {item.impact === "HAUSSIER" ? "📈" : item.impact === "BAISSIER" ? "📉" : "➡️"}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm leading-tight">{item.news}</p>
-                    <p className={`text-xs mt-1 font-medium ${
-                      item.impact === "HAUSSIER" ? "text-emerald-400" :
-                      item.impact === "BAISSIER" ? "text-rose-400" :
-                      "text-yellow-400"
-                    }`}>
-                      {item.action}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              Aucune actualité disponible
-            </p>
-          )}
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {loadingNews && !newsImpact ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="w-5 h-5 animate-spin text-primary" />
+              </div>
+            ) : newsImpact?.summary?.length > 0 ? (
+              <div className="space-y-2">
+                {newsImpact.summary.map((item, idx) => (
+                  <UITooltip key={idx}>
+                    <TooltipTrigger asChild>
+                      <div
+                        className={`p-2.5 rounded-lg flex items-start gap-3 cursor-help transition-all hover:scale-[1.01] ${
+                          item.impact === "HAUSSIER" ? "bg-emerald-500/5 border border-emerald-500/10" :
+                          item.impact === "BAISSIER" ? "bg-rose-500/5 border border-rose-500/10" :
+                          "bg-white/5 border border-white/5"
+                        }`}
+                      >
+                        <div className={`mt-0.5 flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-sm ${
+                          item.impact === "HAUSSIER" ? "bg-emerald-500/20" :
+                          item.impact === "BAISSIER" ? "bg-rose-500/20" :
+                          "bg-yellow-500/20"
+                        }`}>
+                          {item.impact === "HAUSSIER" ? "📈" : item.impact === "BAISSIER" ? "📉" : "➡️"}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm leading-tight">{item.news}</p>
+                          <p className={`text-xs mt-1 font-medium ${
+                            item.impact === "HAUSSIER" ? "text-emerald-400" :
+                            item.impact === "BAISSIER" ? "text-rose-400" :
+                            "text-yellow-400"
+                          }`}>
+                            {item.action}
+                          </p>
+                        </div>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="font-semibold">💡 Comment utiliser cette info ?</p>
+                      <p className="text-xs mt-1">{item.impact === "HAUSSIER" 
+                        ? "Cette news est positive. Considérez renforcer vos positions ou acheter si vous étiez indécis."
+                        : item.impact === "BAISSIER"
+                        ? "Cette news est négative. Considérez protéger vos positions ou attendre avant d'acheter."
+                        : "Impact incertain. Attendez plus de confirmation avant d'agir."
+                      }</p>
+                    </TooltipContent>
+                  </UITooltip>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Aucune actualité disponible
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </TooltipProvider>
 
       {/* Main Watchlist Section */}
-      <Card className="glass border-white/5">
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-xl flex items-center gap-2">
-                <Star className="w-5 h-5 text-yellow-500" />
-                Ma Watchlist Trading
-              </CardTitle>
-              <CardDescription>
-                Cliquez sur <span className="text-primary">Analyser</span> pour obtenir un signal IA en timeframe {TIMEFRAMES.find(t => t.value === selectedTimeframe)?.label}
-              </CardDescription>
-            </div>
+      <TooltipProvider>
+        <Card className="glass border-white/5">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <Star className="w-5 h-5 text-yellow-500" />
+                  Ma Watchlist Trading
+                  <UITooltip>
+                    <TooltipTrigger>
+                      <HelpCircle className="w-4 h-4 text-muted-foreground hover:text-primary cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="font-semibold">⭐ Watchlist Trading</p>
+                      <p className="text-xs mt-1">Vos cryptos favorites. Pour chacune, vous pouvez demander une analyse IA qui génère un signal de trading.</p>
+                      <p className="text-xs mt-2 text-primary">💡 Cliquez sur "Analyser" pour obtenir : Point d'entrée, Stop-Loss, et Take-Profit!</p>
+                    </TooltipContent>
+                  </UITooltip>
+                </CardTitle>
+                <CardDescription>
+                  Cliquez sur <span className="text-primary">Analyser</span> pour obtenir un signal IA en timeframe {TIMEFRAMES.find(t => t.value === selectedTimeframe)?.label}
+                </CardDescription>
+              </div>
             
             {/* Add to Watchlist Button */}
             <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
@@ -646,47 +807,97 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
                 return (
                   <Card 
                     key={coin.id} 
-                    className="glass border-white/10 overflow-hidden group hover:border-primary/30 transition-all"
+                    className="glass border-white/10 overflow-hidden group hover:border-primary/30 transition-all relative"
                     data-testid={`watchlist-card-${coin.id}`}
                   >
+                    {/* Live indicator */}
+                    <div className="absolute top-2 right-2 flex items-center gap-1 z-10">
+                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                      <span className="text-[9px] text-emerald-500 font-mono">LIVE</span>
+                    </div>
+                    
                     <CardContent className="p-4">
                       {/* Header */}
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3">
-                          <img src={coin.image} alt={coin.name} className="w-10 h-10 rounded-full" />
+                          <UITooltip>
+                            <TooltipTrigger>
+                              <img src={coin.image} alt={coin.name} className="w-10 h-10 rounded-full cursor-help hover:ring-2 hover:ring-primary/50 transition-all" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p className="font-semibold">{coin.name} ({coin.symbol.toUpperCase()})</p>
+                              <p className="text-xs mt-1">Rang #{coin.market_cap_rank || "N/A"} par capitalisation</p>
+                              <p className="text-xs text-muted-foreground mt-1">Cliquez sur "Analyser" pour un signal de trading IA</p>
+                            </TooltipContent>
+                          </UITooltip>
                           <div>
                             <p className="font-bold">{coin.name}</p>
-                            <p className="text-xs text-muted-foreground uppercase">{coin.symbol}/USD</p>
+                            <UITooltip>
+                              <TooltipTrigger>
+                                <p className="text-xs text-muted-foreground uppercase cursor-help">{coin.symbol}/USD</p>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">Paire de trading : {coin.symbol.toUpperCase()} contre Dollar US</p>
+                              </TooltipContent>
+                            </UITooltip>
                           </div>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeFromWatchlist(coin.id)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity hover:bg-rose-500/10 hover:text-rose-500"
-                          data-testid={`remove-${coin.id}`}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
+                        <UITooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeFromWatchlist(coin.id)}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity hover:bg-rose-500/10 hover:text-rose-500"
+                              data-testid={`remove-${coin.id}`}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">Retirer de la watchlist</p>
+                          </TooltipContent>
+                        </UITooltip>
                       </div>
 
                       {/* Price & Change */}
                       <div className="flex items-end justify-between mb-3">
                         <div>
-                          <p className="text-2xl font-bold font-mono">{formatPrice(coin.current_price)}</p>
-                          <div className={`flex items-center gap-1 ${isPositive ? "text-emerald-500" : "text-rose-500"}`}>
-                            {isPositive ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
-                            <span className="font-mono text-sm">{formatPercent(coin.price_change_percentage_24h)}</span>
-                            <span className="text-xs text-muted-foreground">24h</span>
-                          </div>
+                          <UITooltip>
+                            <TooltipTrigger>
+                              <p className="text-2xl font-bold font-mono cursor-help">{formatPrice(coin.current_price)}</p>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p className="font-semibold">💵 Prix Actuel</p>
+                              <p className="text-xs mt-1">Prix temps réel de {coin.name}. Mis à jour toutes les 30 secondes.</p>
+                              <p className="text-xs mt-1 text-muted-foreground">Ce prix fluctue constamment selon l'offre et la demande sur les exchanges.</p>
+                            </TooltipContent>
+                          </UITooltip>
+                          <UITooltip>
+                            <TooltipTrigger>
+                              <div className={`flex items-center gap-1 cursor-help ${isPositive ? "text-emerald-500" : "text-rose-500"}`}>
+                                {isPositive ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
+                                <span className="font-mono text-sm">{formatPercent(coin.price_change_percentage_24h)}</span>
+                                <span className="text-xs text-muted-foreground">24h</span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p className="font-semibold">📊 Variation 24h</p>
+                              <p className="text-xs mt-1">Évolution du prix sur les dernières 24 heures.</p>
+                              <p className="text-xs mt-1 text-emerald-400">Vert = Le prix a monté</p>
+                              <p className="text-xs text-rose-400">Rouge = Le prix a baissé</p>
+                            </TooltipContent>
+                          </UITooltip>
                         </div>
                         
                         {/* Mini Chart */}
                         {sparklineData.length > 0 && (
-                          <div className="w-20 h-12">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <AreaChart data={sparklineData}>
-                                <defs>
+                          <UITooltip>
+                            <TooltipTrigger>
+                              <div className="w-20 h-12 cursor-help">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <AreaChart data={sparklineData}>
+                                    <defs>
                                   <linearGradient id={`gradient-${coin.id}`} x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="5%" stopColor={isPositive ? "#10B981" : "#F43F5E"} stopOpacity={0.3} />
                                     <stop offset="95%" stopColor={isPositive ? "#10B981" : "#F43F5E"} stopOpacity={0} />
@@ -702,24 +913,61 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
                               </AreaChart>
                             </ResponsiveContainer>
                           </div>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p className="font-semibold">📈 Mini Graphique 7 jours</p>
+                              <p className="text-xs mt-1">Évolution du prix sur les 7 derniers jours. Donne une vue rapide de la tendance.</p>
+                              <p className="text-xs mt-1 text-muted-foreground">Vert = tendance haussière, Rouge = tendance baissière</p>
+                            </TooltipContent>
+                          </UITooltip>
                         )}
                       </div>
 
                       {/* High/Low */}
                       <div className="flex items-center justify-between text-xs text-muted-foreground mb-4">
-                        <span>Low: <span className="font-mono text-rose-400">{formatPrice(coin.low_24h)}</span></span>
-                        <span>High: <span className="font-mono text-emerald-400">{formatPrice(coin.high_24h)}</span></span>
+                        <UITooltip>
+                          <TooltipTrigger>
+                            <span className="cursor-help">Low: <span className="font-mono text-rose-400">{formatPrice(coin.low_24h)}</span></span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="font-semibold">📉 Plus Bas 24h</p>
+                            <p className="text-xs mt-1">Prix le plus bas atteint dans les dernières 24h. Zone de support potentielle.</p>
+                          </TooltipContent>
+                        </UITooltip>
+                        <UITooltip>
+                          <TooltipTrigger>
+                            <span className="cursor-help">High: <span className="font-mono text-emerald-400">{formatPrice(coin.high_24h)}</span></span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="font-semibold">📈 Plus Haut 24h</p>
+                            <p className="text-xs mt-1">Prix le plus haut atteint dans les dernières 24h. Zone de résistance potentielle.</p>
+                          </TooltipContent>
+                        </UITooltip>
                       </div>
 
                       {/* Analyze Button */}
-                      <Button
-                        onClick={() => analyzeCoin(coin)}
-                        className="w-full bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white font-bold"
-                        data-testid={`analyze-${coin.id}`}
-                      >
-                        <Sparkles className="w-4 h-4 mr-2" />
-                        Analyser ({TIMEFRAMES.find(t => t.value === selectedTimeframe)?.label})
-                      </Button>
+                      <UITooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            onClick={() => analyzeCoin(coin)}
+                            className="w-full bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white font-bold"
+                            data-testid={`analyze-${coin.id}`}
+                          >
+                            <Sparkles className="w-4 h-4 mr-2" />
+                            Analyser ({TIMEFRAMES.find(t => t.value === selectedTimeframe)?.label})
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p className="font-semibold">🤖 Analyse IA</p>
+                          <p className="text-xs mt-1">L'IA va analyser cette crypto et générer un signal de trading avec :</p>
+                          <ul className="text-xs mt-1 list-disc list-inside">
+                            <li>Point d'entrée recommandé</li>
+                            <li>Stop-Loss (limite de perte)</li>
+                            <li>Take-Profit (objectifs de gain)</li>
+                            <li>Niveau de confiance</li>
+                          </ul>
+                        </TooltipContent>
+                      </UITooltip>
                     </CardContent>
                   </Card>
                 );
@@ -740,6 +988,7 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
           )}
         </CardContent>
       </Card>
+      </TooltipProvider>
 
       {/* Analysis Dialog */}
       <Dialog open={analysisDialogOpen} onOpenChange={setAnalysisDialogOpen}>
@@ -936,44 +1185,81 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
       </Dialog>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Link to="/markets">
-          <Card className="glass border-white/5 card-hover cursor-pointer">
-            <CardContent className="pt-6 text-center">
-              <TrendingUp className="w-8 h-8 mx-auto text-blue-500 mb-2" />
-              <p className="font-medium">Tous les Marchés</p>
-              <p className="text-xs text-muted-foreground">50+ cryptos</p>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link to="/paper-trading">
-          <Card className="glass border-white/5 card-hover cursor-pointer">
-            <CardContent className="pt-6 text-center">
-              <Wallet className="w-8 h-8 mx-auto text-primary mb-2" />
-              <p className="font-medium">Paper Trading</p>
-              <p className="text-xs text-muted-foreground">S&apos;entraîner</p>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link to="/strategies">
-          <Card className="glass border-white/5 card-hover cursor-pointer">
-            <CardContent className="pt-6 text-center">
-              <Target className="w-8 h-8 mx-auto text-yellow-500 mb-2" />
-              <p className="font-medium">Stratégies</p>
-              <p className="text-xs text-muted-foreground">Mes règles</p>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link to="/assistant">
-          <Card className="glass border-violet-500/20 card-hover cursor-pointer">
-            <CardContent className="pt-6 text-center">
-              <Sparkles className="w-8 h-8 mx-auto text-violet-400 mb-2" />
-              <p className="font-medium">Assistant IA</p>
-              <p className="text-xs text-muted-foreground">Chat complet</p>
-            </CardContent>
-          </Card>
-        </Link>
-      </div>
+      <TooltipProvider>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <UITooltip>
+            <TooltipTrigger asChild>
+              <Link to="/markets">
+                <Card className="glass border-white/5 card-hover cursor-pointer">
+                  <CardContent className="pt-6 text-center">
+                    <TrendingUp className="w-8 h-8 mx-auto text-blue-500 mb-2" />
+                    <p className="font-medium">Tous les Marchés</p>
+                    <p className="text-xs text-muted-foreground">50+ cryptos</p>
+                  </CardContent>
+                </Card>
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              <p className="font-semibold">📊 Marchés</p>
+              <p className="text-xs mt-1">Voir toutes les cryptos disponibles, leurs prix, variations et capitalisation. Idéal pour découvrir de nouvelles opportunités.</p>
+            </TooltipContent>
+          </UITooltip>
+          
+          <UITooltip>
+            <TooltipTrigger asChild>
+              <Link to="/paper-trading">
+                <Card className="glass border-white/5 card-hover cursor-pointer">
+                  <CardContent className="pt-6 text-center">
+                    <Wallet className="w-8 h-8 mx-auto text-primary mb-2" />
+                    <p className="font-medium">Paper Trading</p>
+                    <p className="text-xs text-muted-foreground">S&apos;entraîner</p>
+                  </CardContent>
+                </Card>
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              <p className="font-semibold">💵 Paper Trading</p>
+              <p className="text-xs mt-1">Entraînez-vous au trading avec de l'argent fictif (10 000$). Achetez, vendez, et apprenez sans risquer votre capital réel!</p>
+            </TooltipContent>
+          </UITooltip>
+          
+          <UITooltip>
+            <TooltipTrigger asChild>
+              <Link to="/strategies">
+                <Card className="glass border-white/5 card-hover cursor-pointer">
+                  <CardContent className="pt-6 text-center">
+                    <Target className="w-8 h-8 mx-auto text-yellow-500 mb-2" />
+                    <p className="font-medium">Stratégies</p>
+                    <p className="text-xs text-muted-foreground">Mes règles</p>
+                  </CardContent>
+                </Card>
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              <p className="font-semibold">🎯 Stratégies</p>
+              <p className="text-xs mt-1">Définissez vos règles de trading personnelles : critères d'entrée, gestion du risque, objectifs. La discipline est la clé du succès!</p>
+            </TooltipContent>
+          </UITooltip>
+          
+          <UITooltip>
+            <TooltipTrigger asChild>
+              <Link to="/assistant">
+                <Card className="glass border-violet-500/20 card-hover cursor-pointer">
+                  <CardContent className="pt-6 text-center">
+                    <Sparkles className="w-8 h-8 mx-auto text-violet-400 mb-2" />
+                    <p className="font-medium">Assistant IA</p>
+                    <p className="text-xs text-muted-foreground">Chat complet</p>
+                  </CardContent>
+                </Card>
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              <p className="font-semibold">🤖 Assistant IA Bull Sage</p>
+              <p className="text-xs mt-1">Discutez avec l'IA pour poser des questions sur le trading, obtenir des explications détaillées, et demander des analyses personnalisées.</p>
+            </TooltipContent>
+          </UITooltip>
+        </div>
+      </TooltipProvider>
     </div>
   );
 }
