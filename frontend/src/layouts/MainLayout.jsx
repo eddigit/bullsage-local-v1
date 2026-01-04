@@ -39,8 +39,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
 
@@ -273,40 +271,6 @@ export default function MainLayout() {
               )}
             </nav>
           </ScrollArea>
-
-          {/* User Section */}
-          <div className="p-4 border-t border-white/5">
-            <NavLink 
-              to="/settings"
-              className="flex items-center gap-3 mb-4 p-2 -mx-2 rounded-xl hover:bg-white/5 transition-colors cursor-pointer group"
-            >
-              <Avatar className="w-10 h-10 ring-2 ring-transparent group-hover:ring-primary/30 transition-all">
-                <AvatarImage src={getAvatarUrl()} alt={user?.name} />
-                <AvatarFallback className="bg-secondary">
-                  {getInitials(user?.name)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium truncate">{user?.name}</p>
-                <div className="flex items-center gap-2">
-                  <p className="text-xs text-muted-foreground capitalize">{user?.trading_level}</p>
-                  {user?.points > 0 && (
-                    <span className="text-xs text-amber-400">⭐ {user.points} pts</span>
-                  )}
-                </div>
-              </div>
-              <Settings className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-            </NavLink>
-            <Button
-              variant="ghost"
-              className="w-full justify-start text-muted-foreground hover:text-destructive min-h-[44px]"
-              onClick={logout}
-              data-testid="logout-btn"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Déconnexion
-            </Button>
-          </div>
         </div>
       </aside>
 
@@ -370,62 +334,77 @@ export default function MainLayout() {
         {/* User Menu - Right side */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="flex items-center gap-3 px-3 py-2 h-auto hover:bg-white/5">
-              <Avatar className="w-9 h-9 ring-2 ring-transparent hover:ring-primary/30 transition-all">
+            <Button variant="ghost" className="flex items-center gap-2 px-3 py-2 h-auto hover:bg-white/5 rounded-xl border border-white/10">
+              <Avatar className="w-8 h-8">
                 <AvatarImage src={getAvatarUrl()} alt={user?.name} />
-                <AvatarFallback className="bg-secondary">
+                <AvatarFallback className="bg-primary/20 text-primary text-sm font-semibold">
                   {getInitials(user?.name)}
                 </AvatarFallback>
               </Avatar>
-              <div className="text-left hidden lg:block">
-                <p className="font-medium text-sm">{user?.name}</p>
-                <p className="text-xs text-muted-foreground capitalize">{user?.trading_level}</p>
-              </div>
+              <span className="font-medium text-sm hidden lg:block max-w-[120px] truncate">{user?.name}</span>
               <ChevronDown className="w-4 h-4 text-muted-foreground" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56 bg-background/95 backdrop-blur-xl border-white/10">
-            <DropdownMenuLabel className="font-normal">
-              <div className="flex flex-col space-y-1">
-                <p className="font-medium">{user?.name}</p>
-                <p className="text-xs text-muted-foreground">{user?.email}</p>
-                {user?.points > 0 && (
-                  <p className="text-xs text-amber-400">⭐ {user.points} points</p>
-                )}
+          <DropdownMenuContent align="end" className="w-64 bg-background/95 backdrop-blur-xl border border-white/10 shadow-xl">
+            {/* User Info Header */}
+            <div className="px-3 py-3 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <Avatar className="w-10 h-10">
+                  <AvatarImage src={getAvatarUrl()} alt={user?.name} />
+                  <AvatarFallback className="bg-primary/20 text-primary font-semibold">
+                    {getInitials(user?.name)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate">{user?.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                </div>
               </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator className="bg-white/10" />
-            <DropdownMenuItem asChild>
-              <NavLink to="/settings" className="flex items-center gap-2 cursor-pointer">
-                <User className="w-4 h-4" />
-                <span>Mon Profil</span>
-              </NavLink>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <NavLink to="/settings" className="flex items-center gap-2 cursor-pointer">
-                <Settings className="w-4 h-4" />
-                <span>Paramètres</span>
-              </NavLink>
-            </DropdownMenuItem>
+              {user?.points > 0 && (
+                <div className="mt-2 flex items-center gap-2 px-2 py-1.5 bg-amber-500/10 rounded-lg">
+                  <span className="text-amber-400">⭐</span>
+                  <span className="text-xs font-medium text-amber-400">{user.points} points</span>
+                </div>
+              )}
+            </div>
+            
+            {/* Menu Items */}
+            <div className="py-2">
+              <DropdownMenuItem asChild className="cursor-pointer px-3 py-2.5">
+                <NavLink to="/settings" className="flex items-center gap-3">
+                  <User className="w-4 h-4 text-muted-foreground" />
+                  <span>Mon Profil</span>
+                </NavLink>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild className="cursor-pointer px-3 py-2.5">
+                <NavLink to="/settings" className="flex items-center gap-3">
+                  <Settings className="w-4 h-4 text-muted-foreground" />
+                  <span>Paramètres</span>
+                </NavLink>
+              </DropdownMenuItem>
+            </div>
+            
             {user?.is_admin && (
-              <>
-                <DropdownMenuSeparator className="bg-white/10" />
-                <DropdownMenuItem asChild>
-                  <NavLink to="/admin" className="flex items-center gap-2 cursor-pointer text-violet-400">
+              <div className="py-2 border-t border-white/10">
+                <DropdownMenuItem asChild className="cursor-pointer px-3 py-2.5">
+                  <NavLink to="/admin" className="flex items-center gap-3 text-violet-400">
                     <Shield className="w-4 h-4" />
                     <span>Administration</span>
                   </NavLink>
                 </DropdownMenuItem>
-              </>
+              </div>
             )}
-            <DropdownMenuSeparator className="bg-white/10" />
-            <DropdownMenuItem 
-              onClick={logout}
-              className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Déconnexion</span>
-            </DropdownMenuItem>
+            
+            {/* Logout */}
+            <div className="py-2 border-t border-white/10">
+              <DropdownMenuItem 
+                onClick={logout}
+                className="cursor-pointer px-3 py-2.5 text-destructive focus:text-destructive focus:bg-destructive/10"
+              >
+                <LogOut className="w-4 h-4 mr-3" />
+                <span>Déconnexion</span>
+              </DropdownMenuItem>
+            </div>
           </DropdownMenuContent>
         </DropdownMenu>
       </header>
