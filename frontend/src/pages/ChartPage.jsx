@@ -50,6 +50,7 @@ const TOP_PAIRS = [
 
 // Timeframe options
 const TIMEFRAMES = [
+  { value: "15s", label: "15s", interval: "1m", refreshMs: 5000, isScalping: true },
   { value: "1m", label: "1m", interval: "1m", refreshMs: 10000 },
   { value: "5m", label: "5m", interval: "5m", refreshMs: 30000 },
   { value: "15m", label: "15m", interval: "15m", refreshMs: 60000 },
@@ -209,14 +210,19 @@ export default function ChartPage() {
     loadChartData(true);
   }, [loadChartData]);
 
-  // Auto-refresh
+  // Auto-refresh (activé pour le mode scalping 15s)
   useEffect(() => {
     const timeframe = TIMEFRAMES.find(t => t.value === selectedTimeframe);
     
-    // Removed auto-refresh to save API calls
-    // Users can manually refresh by changing timeframe or clicking refresh
     if (refreshIntervalRef.current) {
       clearInterval(refreshIntervalRef.current);
+    }
+
+    // Active l'auto-refresh pour le mode scalping 15s
+    if (timeframe?.isScalping) {
+      refreshIntervalRef.current = setInterval(() => {
+        loadChartData(false);
+      }, timeframe.refreshMs);
     }
 
     return () => {
@@ -323,6 +329,12 @@ export default function ChartPage() {
 
         {/* Timeframe & Refresh */}
         <div className="flex items-center gap-2">
+          {selectedTimeframe === "15s" && (
+            <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white border-0 animate-pulse">
+              ⚡ Mode Scalping
+            </Badge>
+          )}
+          
           <Badge variant="outline" className="text-emerald-500 border-emerald-500/30">
             <Wifi className="w-3 h-3 mr-1" />
             Live
@@ -347,11 +359,17 @@ export default function ChartPage() {
                 onClick={() => setSelectedTimeframe(tf.value)}
                 className={`px-3 py-1 text-xs font-medium transition-all ${
                   selectedTimeframe === tf.value
-                    ? "bg-primary text-black"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? tf.isScalping 
+                      ? "bg-gradient-to-r from-orange-500 to-red-500 text-white"
+                      : "bg-primary text-black"
+                    : tf.isScalping
+                      ? "text-orange-400 hover:text-orange-300"
+                      : "text-muted-foreground hover:text-foreground"
                 }`}
+                title={tf.isScalping ? "Mode Scalping - Rafraîchissement rapide" : ""}
               >
                 {tf.label}
+                {tf.isScalping && <span className="ml-1">⚡</span>}
               </Button>
             ))}
           </div>
