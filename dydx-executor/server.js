@@ -281,8 +281,18 @@ async function start() {
   console.log('='.repeat(60));
   
   if (!MNEMONIC) {
-    console.error('❌ DYDX_TESTNET_MNEMONIC non configuré dans .env');
-    process.exit(1);
+    console.warn('⚠️ DYDX_TESTNET_MNEMONIC non configuré');
+    console.warn('   Le serveur démarre en mode LECTURE SEULE');
+    console.warn('   Configurez la variable sur Render Dashboard pour activer le trading');
+    
+    // Démarrer quand même le serveur en mode lecture seule
+    app.listen(PORT, () => {
+      console.log(`\n🚀 Serveur démarré sur le port ${PORT} (MODE LECTURE SEULE)`);
+      console.log('\n📋 Endpoints disponibles:');
+      console.log(`   GET  /status     - Statut (non connecté)`);
+      console.log(`   POST /execute    - Retournera une erreur`);
+    });
+    return;
   }
   
   await initDydx();
