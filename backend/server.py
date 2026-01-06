@@ -7803,9 +7803,22 @@ if PRO_TRADER_AVAILABLE:
     app.include_router(pro_trader_router)
     logger.info("Pro Trader AI charge")
 
-# Inclure les routes dYdX
+# Inclure les routes dYdX (import direct pour éviter routes/__init__.py)
 try:
-    from routes.dydx import router as dydx_router
+    import importlib.util
+    import sys
+    import os
+    
+    # S'assurer que le dossier backend est dans le path
+    backend_dir = os.path.dirname(os.path.abspath(__file__))
+    if backend_dir not in sys.path:
+        sys.path.insert(0, backend_dir)
+    
+    dydx_module_path = os.path.join(backend_dir, "routes", "dydx.py")
+    spec = importlib.util.spec_from_file_location("dydx_routes", dydx_module_path)
+    dydx_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(dydx_module)
+    dydx_router = dydx_module.router
     app.include_router(dydx_router, prefix="/api")
     logger.info("✅ Routes dYdX chargées")
 except Exception as e:
