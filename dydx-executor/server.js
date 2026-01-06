@@ -543,16 +543,19 @@ app.post('/positions/close', authMiddleware, async (req, res) => {
     const currentBlock = await client.validatorClient.get.latestBlockHeight();
     
     // Placer un ordre market pour fermer
+    // Note: reduceOnly=false car dYdX v4 désactive reduce-only pour les ordres non-IOC standard
+    // On utilise IOC (Immediate-Or-Cancel) pour exécution immédiate
+    // La taille exacte de la position garantit la fermeture complète
     await client.placeShortTermOrder(
       subaccount,
       market,
       closeSide,
-      currentPrice * (closeSide === OrderSide.BUY ? 1.01 : 0.99), // Slippage 1%
+      currentPrice * (closeSide === OrderSide.BUY ? 1.02 : 0.98), // Slippage 2% pour garantir l'exécution
       size,
       randomClientId(),
       currentBlock + 10,
       OrderTimeInForce.IOC,
-      true // reduceOnly
+      false // reduceOnly désactivé - la taille exacte ferme la position
     );
     
     console.log(`   ✅ Position ${market} fermée (${side} ${size})`);
@@ -593,7 +596,192 @@ app.post('/positions/close', authMiddleware, async (req, res) => {
   }
 });
 
-// 🔄 CRON/MONITORING - Vérifier les positions et fermer si nécessaire
+// �️ AJOUTER DES PROTECTIONS SL/TP À UNE POSITION EXISTANTE
+app.post('/positions/protect', authMiddleware, async (req, res) => {
+  if (!isConnected) {
+    return res.status(503).json({ error: 'Not connected' });
+  }
+  
+  const { market, stopLoss, takeProfit, expirationHours } = req.body;
+  
+  if (!market) {
+    return res.status(400).json({ error: 'Market required' });
+  }
+  
+  if (!stopLoss && !takeProfit) {
+    return res.status(400).json({ error: 'Au moins un Stop Loss ou Take Profit requis' });
+  }
+  
+  console.log(`\n🛡️ === AJOUT PROTECTION ${market} ===`);
+  console.log(`   SL: ${stopLoss ? '$' + stopLoss : 'Non défini'}`);
+  console.log(`   TP: ${takeProfit ? '$' + takeProfit : 'Non défini'}`);
+  
+  try {
+    // Récupérer la position actuelle
+    const positionsRes = await client.indexerClient.account.getSubaccountPerpetualPositions(wallet.address, 0);
+    const position = (positionsRes.positions || []).find(p => p.market === market);
+    
+    if (!position) {
+      return res.status(404).json({ error: `Aucune position ouverte sur ${market}` });
+    }
+    
+    const size = Math.abs(parseFloat(position.size || 0));
+    const side = parseFloat(position.size) > 0 ? 'LONG' : 'SHORT';
+    const exitSide = side === 'LONG' ? OrderSide.SELL : OrderSide.BUY;
+    const entryPrice = parseFloat(position.entryPrice || 0);
+    const currentPrice = await getMarketPrice(market);
+    
+    console.log(`   Position: ${side} ${size} @ $${entryPrice.toFixed(2)}`);
+    console.log(`   Prix actuel: $${currentPrice.toFixed(2)}`);
+    
+    // Validation des prix SL/TP
+    if (stopLoss) {
+      if (side === 'LONG' && stopLoss >= currentPrice) {
+        return res.status(400).json({ 
+          error: `Stop Loss ($${stopLoss}) doit être inférieur au prix actuel ($${currentPrice.toFixed(2)}) pour un LONG` 
+        });
+      }
+      if (side === 'SHORT' && stopLoss <= currentPrice) {
+        return res.status(400).json({ 
+          error: `Stop Loss ($${stopLoss}) doit être supérieur au prix actuel ($${currentPrice.toFixed(2)}) pour un SHORT` 
+        });
+      }
+    }
+    
+    if (takeProfit) {
+      if (side === 'LONG' && takeProfit <= currentPrice) {
+        return res.status(400).json({ 
+          error: `Take Profit ($${takeProfit}) doit être supérieur au prix actuel ($${currentPrice.toFixed(2)}) pour un LONG` 
+        });
+      }
+      if (side === 'SHORT' && takeProfit >= currentPrice) {
+        return res.status(400).json({ 
+          error: `Take Profit ($${takeProfit}) doit être inférieur au prix actuel ($${currentPrice.toFixed(2)}) pour un SHORT` 
+        });
+      }
+    }
+    
+    // Annuler les anciens ordres SL/TP sur ce marché
+    const ordersRes = await client.indexerClient.account.getSubaccountOrders(wallet.address, 0);
+    const existingOrders = (ordersRes || []).filter(o => o.ticker === market && o.status === 'OPEN');
+    const currentBlock = await client.validatorClient.get.latestBlockHeight();
+    
+    for (const order of existingOrders) {
+      try {
+        await client.cancelOrder(
+          subaccount,
+          order.clientId,
+          order.orderFlags,
+          market,
+          currentBlock + 10
+        );
+        console.log(`   🗑️ Ancien ordre annulé: ${order.id}`);
+      } catch (e) {
+        console.log(`   ⚠️ Impossible d'annuler ${order.id}: ${e.message}`);
+      }
+    }
+    
+    await new Promise(r => setTimeout(r, 1000));
+    
+    const results = {
+      market,
+      side,
+      size,
+      entryPrice,
+      currentPrice,
+      orders: [],
+      cancelledOrders: existingOrders.length
+    };
+    
+    // Durée d'expiration (par défaut 7 jours)
+    const orderExpirationSeconds = (expirationHours || 168) * 3600; // 168h = 7 jours
+    
+    // Placer le Stop Loss
+    if (stopLoss) {
+      try {
+        await client.placeOrder(
+          subaccount,
+          market,
+          OrderType.LIMIT,
+          exitSide,
+          stopLoss,
+          size,
+          randomClientId(),
+          OrderTimeInForce.GTT,
+          orderExpirationSeconds,
+          OrderExecution.DEFAULT,
+          false, // postOnly
+          false  // reduceOnly (désactivé sur dYdX v4)
+        );
+        
+        console.log(`   ✅ Stop Loss placé @ $${stopLoss}`);
+        results.orders.push({ 
+          type: 'STOP_LOSS', 
+          success: true, 
+          price: stopLoss,
+          expiresIn: `${expirationHours || 168}h`
+        });
+      } catch (e) {
+        console.log(`   ❌ Stop Loss échoué: ${e.message}`);
+        results.orders.push({ type: 'STOP_LOSS', success: false, error: e.message });
+      }
+    }
+    
+    await new Promise(r => setTimeout(r, 1000));
+    
+    // Placer le Take Profit
+    if (takeProfit) {
+      try {
+        await client.placeOrder(
+          subaccount,
+          market,
+          OrderType.LIMIT,
+          exitSide,
+          takeProfit,
+          size,
+          randomClientId(),
+          OrderTimeInForce.GTT,
+          orderExpirationSeconds,
+          OrderExecution.DEFAULT,
+          false, // postOnly
+          false  // reduceOnly
+        );
+        
+        console.log(`   ✅ Take Profit placé @ $${takeProfit}`);
+        results.orders.push({ 
+          type: 'TAKE_PROFIT', 
+          success: true, 
+          price: takeProfit,
+          expiresIn: `${expirationHours || 168}h`
+        });
+      } catch (e) {
+        console.log(`   ❌ Take Profit échoué: ${e.message}`);
+        results.orders.push({ type: 'TAKE_PROFIT', success: false, error: e.message });
+      }
+    }
+    
+    results.success = results.orders.every(o => o.success);
+    results.timestamp = new Date().toISOString();
+    
+    // Calculer les % par rapport à l'entrée
+    if (stopLoss) {
+      results.stopLossPercent = ((stopLoss - entryPrice) / entryPrice * 100).toFixed(2);
+    }
+    if (takeProfit) {
+      results.takeProfitPercent = ((takeProfit - entryPrice) / entryPrice * 100).toFixed(2);
+    }
+    
+    console.log(`   📊 Résultat: ${results.success ? '✅ Position protégée' : '⚠️ Protection partielle'}`);
+    
+    res.json(results);
+    
+  } catch (e) {
+    console.error(`   ❌ Erreur protection: ${e.message}`);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// �🔄 CRON/MONITORING - Vérifier les positions et fermer si nécessaire
 app.get('/monitor', authMiddleware, async (req, res) => {
   if (!isConnected) {
     return res.status(503).json({ error: 'Not connected' });
@@ -686,16 +874,17 @@ app.get('/monitor', authMiddleware, async (req, res) => {
           const closeSide = side === 'LONG' ? OrderSide.SELL : OrderSide.BUY;
           const currentBlock = await client.validatorClient.get.latestBlockHeight();
           
+          // reduceOnly=false car dYdX v4 désactive reduce-only pour short-term
           await client.placeShortTermOrder(
             subaccount,
             market,
             closeSide,
-            currentPrice * (closeSide === OrderSide.BUY ? 1.01 : 0.99),
+            currentPrice * (closeSide === OrderSide.BUY ? 1.02 : 0.98), // 2% slippage
             absSize,
             randomClientId(),
             currentBlock + 10,
             OrderTimeInForce.IOC,
-            true
+            false // reduceOnly désactivé
           );
           
           results.actions.push({

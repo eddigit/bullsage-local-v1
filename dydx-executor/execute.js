@@ -81,17 +81,21 @@ async function executeFullSignal(client, subaccount, signal) {
   const slBlock = await client.validatorClient.get.latestBlockHeight();
   
   try {
-    // Sur dYdX v4, les ordres reduce-only doivent être short-term IOC
-    const slTx = await client.placeShortTermOrder(
+    // Sur dYdX v4, utiliser des ordres long-term (GTT) pour SL/TP
+    // Les ordres short-term avec reduce-only sont désactivés
+    const slTx = await client.placeOrder(
       subaccount,
       signal.market,
+      OrderType.STOP_LIMIT,
       slSide,
       signal.stopLoss,
       signal.size,
       slClientId,
-      slBlock + 20, // Donne plus de temps
-      OrderTimeInForce.IOC,
-      true   // reduceOnly
+      OrderTimeInForce.GTT,
+      86400, // 24 heures
+      OrderExecution.DEFAULT,
+      false, // postOnly
+      false  // reduceOnly désactivé
     );
     
     console.log(`   ✅ Stop Loss placé @ $${signal.stopLoss.toLocaleString()}`);
@@ -129,16 +133,20 @@ async function executeFullSignal(client, subaccount, signal) {
   const tpBlock = await client.validatorClient.get.latestBlockHeight();
   
   try {
-    const tpTx = await client.placeShortTermOrder(
+    // Ordre long-term pour Take Profit
+    const tpTx = await client.placeOrder(
       subaccount,
       signal.market,
+      OrderType.LIMIT,
       slSide,
       signal.takeProfit,
       signal.size,
       tpClientId,
-      tpBlock + 20,
-      OrderTimeInForce.IOC,
-      true   // reduceOnly
+      OrderTimeInForce.GTT,
+      86400, // 24 heures
+      OrderExecution.DEFAULT,
+      false, // postOnly
+      false  // reduceOnly désactivé
     );
     
     console.log(`   ✅ Take Profit placé @ $${signal.takeProfit.toLocaleString()}`);

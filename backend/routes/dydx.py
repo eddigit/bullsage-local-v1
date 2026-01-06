@@ -698,6 +698,68 @@ async def close_dydx_position(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class ProtectPositionRequest(BaseModel):
+    """Requête pour protéger une position avec SL/TP"""
+    market: str
+    stopLoss: Optional[float] = None
+    takeProfit: Optional[float] = None
+    expirationHours: Optional[int] = 168  # 7 jours par défaut
+
+
+@router.post("/positions/protect")
+async def protect_dydx_position(
+    request: ProtectPositionRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Ajoute des protections Stop Loss et/ou Take Profit à une position existante
+    """
+    import httpx
+    from core.config import settings
+    
+    if not request.stopLoss and not request.takeProfit:
+        raise HTTPException(status_code=400, detail="Au moins un Stop Loss ou Take Profit requis")
+    
+    try:
+        executor_url = getattr(settings, 'DYDX_EXECUTOR_URL', 'http://localhost:3001')
+        api_secret = getattr(settings, 'DYDX_API_SECRET', '')
+        
+        headers = {"X-API-Key": api_secret} if api_secret else {}
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{executor_url}/positions/protect",
+                json={
+                    "market": request.market, 
+                    "stopLoss": request.stopLoss,
+                    "takeProfit": request.takeProfit,
+                    "expirationHours": request.expirationHours
+                },
+                headers=headers
+            )
+            
+            result = response.json()
+            
+            # Logger l'action
+            await db.dydx_actions.insert_one({
+                "user_id": current_user["id"],
+                "action": "protect_position",
+                "market": request.market,
+                "stopLoss": request.stopLoss,
+                "takeProfit": request.takeProfit,
+                "result": result,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            })
+            
+            return result
+    except httpx.HTTPStatusError as e:
+        error_detail = e.response.json() if e.response.content else str(e)
+        raise HTTPException(status_code=e.response.status_code, detail=error_detail)
+    except Exception as e:
+        logger.error(f"Erreur protection position: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/monitor")
 async def monitor_dydx_positions(current_user: dict = Depends(get_current_user)):
     """

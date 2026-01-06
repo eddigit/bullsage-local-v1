@@ -32,12 +32,24 @@ import {
   Zap,
   Eye,
   BarChart3,
-  AlertCircle
+  AlertCircle,
+  Lock,
+  ShieldCheck
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Progress } from "../components/ui/progress";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog";
 import {
   Tooltip,
   TooltipContent,
@@ -58,6 +70,11 @@ export default function DydxPositionsPage() {
   const [closingPosition, setClosingPosition] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  
+  // États pour le modal de protection
+  const [protectModal, setProtectModal] = useState({ open: false, position: null });
+  const [protectForm, setProtectForm] = useState({ stopLoss: '', takeProfit: '' });
+  const [protecting, setProtecting] = useState(false);
 
   // Charger les positions
   const loadPositions = useCallback(async (silent = false) => {
@@ -102,6 +119,64 @@ export default function DydxPositionsPage() {
       toast.error(`Erreur: ${error.response?.data?.detail || error.message}`);
     } finally {
       setClosingPosition(null);
+    }
+  };
+
+  // Ouvrir le modal de protection
+  const openProtectModal = (position) => {
+    const currentPrice = position.currentPrice;
+    const side = position.side;
+    
+    // Suggérer des valeurs par défaut
+    let suggestedSL, suggestedTP;
+    if (side === 'LONG') {
+      suggestedSL = (currentPrice * 0.95).toFixed(2); // -5%
+      suggestedTP = (currentPrice * 1.10).toFixed(2); // +10%
+    } else {
+      suggestedSL = (currentPrice * 1.05).toFixed(2); // +5%
+      suggestedTP = (currentPrice * 0.90).toFixed(2); // -10%
+    }
+    
+    setProtectForm({
+      stopLoss: position.stopLoss?.price || suggestedSL,
+      takeProfit: position.takeProfit?.price || suggestedTP
+    });
+    setProtectModal({ open: true, position });
+  };
+
+  // Protéger une position
+  const protectPosition = async () => {
+    if (!protectForm.stopLoss && !protectForm.takeProfit) {
+      toast.error("Définissez au moins un Stop Loss ou Take Profit");
+      return;
+    }
+    
+    setProtecting(true);
+    
+    try {
+      const response = await axios.post(`${API}/dydx/positions/protect`, {
+        market: protectModal.position.market,
+        stopLoss: protectForm.stopLoss ? parseFloat(protectForm.stopLoss) : null,
+        takeProfit: protectForm.takeProfit ? parseFloat(protectForm.takeProfit) : null,
+        expirationHours: 168 // 7 jours
+      });
+      
+      if (response.data.success) {
+        toast.success(`🛡️ Position ${protectModal.position.market} protégée !`);
+        setProtectModal({ open: false, position: null });
+        loadPositions();
+      } else {
+        const errors = response.data.orders?.filter(o => !o.success);
+        if (errors?.length > 0) {
+          toast.error(`Erreur: ${errors[0].error}`);
+        } else {
+          throw new Error("Échec de la protection");
+        }
+      }
+    } catch (error) {
+      toast.error(`Erreur: ${error.response?.data?.detail?.error || error.response?.data?.detail || error.message}`);
+    } finally {
+      setProtecting(false);
     }
   };
 
@@ -377,6 +452,26 @@ export default function DydxPositionsPage() {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
+                            variant={position.hasProtection ? "outline" : "default"}
+                            size="sm"
+                            onClick={() => openProtectModal(position)}
+                            className={!position.hasProtection ? "bg-yellow-600 hover:bg-yellow-700" : ""}
+                          >
+                            {position.hasProtection ? (
+                              <ShieldCheck className="w-4 h-4 text-green-400" />
+                            ) : (
+                              <Shield className="w-4 h-4" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {position.hasProtection ? "Modifier la protection" : "Ajouter une protection SL/TP"}
+                        </TooltipContent>
+                      </Tooltip>
+                      
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
                             variant="destructive"
                             size="sm"
                             onClick={() => closePosition(position.market)}
@@ -459,6 +554,188 @@ export default function DydxPositionsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Modal de protection */}
+        <Dialog open={protectModal.open} onOpenChange={(open) => !open && setProtectModal({ open: false, position: null })}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-yellow-400" />
+                Protéger la position {protectModal.position?.market}
+              </DialogTitle>
+              <DialogDescription>
+                Définissez un Stop Loss et/ou Take Profit pour sécuriser votre position
+              </DialogDescription>
+            </DialogHeader>
+            
+            {protectModal.position && (
+              <div className="space-y-4">
+                {/* Infos position */}
+                <div className="p-3 rounded-lg bg-slate-800/50 space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Position</span>
+                    <Badge className={protectModal.position.side === 'LONG' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}>
+                      {protectModal.position.side}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Prix d'entrée</span>
+                    <span className="font-mono">${protectModal.position.entryPrice?.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Prix actuel</span>
+                    <span className="font-mono">${protectModal.position.currentPrice?.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">PnL actuel</span>
+                    <span className={`font-bold ${protectModal.position.unrealizedPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {protectModal.position.unrealizedPnl >= 0 ? '+' : ''}${protectModal.position.unrealizedPnl?.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Stop Loss */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 text-red-400">
+                    <StopCircle className="w-4 h-4" />
+                    Stop Loss (protection contre les pertes)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder={protectModal.position.side === 'LONG' ? "Prix inférieur au marché" : "Prix supérieur au marché"}
+                    value={protectForm.stopLoss}
+                    onChange={(e) => setProtectForm({ ...protectForm, stopLoss: e.target.value })}
+                    className="font-mono"
+                  />
+                  {protectForm.stopLoss && (
+                    <p className="text-xs text-muted-foreground">
+                      {((parseFloat(protectForm.stopLoss) - protectModal.position.entryPrice) / protectModal.position.entryPrice * 100).toFixed(2)}% par rapport à l'entrée
+                    </p>
+                  )}
+                </div>
+
+                {/* Take Profit */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 text-green-400">
+                    <Target className="w-4 h-4" />
+                    Take Profit (verrouillage des gains)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder={protectModal.position.side === 'LONG' ? "Prix supérieur au marché" : "Prix inférieur au marché"}
+                    value={protectForm.takeProfit}
+                    onChange={(e) => setProtectForm({ ...protectForm, takeProfit: e.target.value })}
+                    className="font-mono"
+                  />
+                  {protectForm.takeProfit && (
+                    <p className="text-xs text-muted-foreground">
+                      {((parseFloat(protectForm.takeProfit) - protectModal.position.entryPrice) / protectModal.position.entryPrice * 100).toFixed(2)}% par rapport à l'entrée
+                    </p>
+                  )}
+                </div>
+
+                {/* Boutons rapides */}
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">Suggestions rapides</Label>
+                  <div className="flex gap-2 flex-wrap">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const price = protectModal.position.currentPrice;
+                        const side = protectModal.position.side;
+                        setProtectForm({
+                          stopLoss: (side === 'LONG' ? price * 0.97 : price * 1.03).toFixed(2),
+                          takeProfit: (side === 'LONG' ? price * 1.05 : price * 0.95).toFixed(2)
+                        });
+                      }}
+                    >
+                      Serré (3%/5%)
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const price = protectModal.position.currentPrice;
+                        const side = protectModal.position.side;
+                        setProtectForm({
+                          stopLoss: (side === 'LONG' ? price * 0.95 : price * 1.05).toFixed(2),
+                          takeProfit: (side === 'LONG' ? price * 1.10 : price * 0.90).toFixed(2)
+                        });
+                      }}
+                    >
+                      Normal (5%/10%)
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const price = protectModal.position.currentPrice;
+                        const side = protectModal.position.side;
+                        setProtectForm({
+                          stopLoss: (side === 'LONG' ? price * 0.90 : price * 1.10).toFixed(2),
+                          takeProfit: (side === 'LONG' ? price * 1.20 : price * 0.80).toFixed(2)
+                        });
+                      }}
+                    >
+                      Large (10%/20%)
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        // Verrouiller au prix actuel (position gagnante)
+                        const price = protectModal.position.currentPrice;
+                        const entry = protectModal.position.entryPrice;
+                        const side = protectModal.position.side;
+                        
+                        if (side === 'LONG') {
+                          setProtectForm({
+                            stopLoss: (price * 0.99).toFixed(2), // SL juste sous le prix actuel
+                            takeProfit: (price * 1.05).toFixed(2)
+                          });
+                        } else {
+                          setProtectForm({
+                            stopLoss: (price * 1.01).toFixed(2), // SL juste au-dessus du prix actuel
+                            takeProfit: (price * 0.95).toFixed(2)
+                          });
+                        }
+                      }}
+                      className="border-green-500/50 text-green-400"
+                    >
+                      🔒 Verrouiller gains
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setProtectModal({ open: false, position: null })}>
+                Annuler
+              </Button>
+              <Button 
+                onClick={protectPosition} 
+                disabled={protecting || (!protectForm.stopLoss && !protectForm.takeProfit)}
+                className="bg-yellow-600 hover:bg-yellow-700"
+              >
+                {protecting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Protection...
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-4 h-4 mr-2" />
+                    Protéger la position
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </TooltipProvider>
   );
