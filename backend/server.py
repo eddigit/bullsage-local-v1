@@ -7803,6 +7803,14 @@ if PRO_TRADER_AVAILABLE:
     app.include_router(pro_trader_router)
     logger.info("Pro Trader AI charge")
 
+# Inclure les routes dYdX
+try:
+    from routes.dydx import router as dydx_router
+    app.include_router(dydx_router, prefix="/api")
+    logger.info("✅ Routes dYdX chargées")
+except ImportError as e:
+    logger.warning(f"⚠️ Routes dYdX non disponibles: {e}")
+
 # Mount static files for uploads
 app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
