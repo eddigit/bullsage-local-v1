@@ -34,7 +34,7 @@ try:
     from services.pro_trader_routes import pro_trader_router
     PRO_TRADER_AVAILABLE = True
 except ImportError as e:
-    print(f"⚠️ Pro Trader AI non disponible: {e}")
+    print(f"Pro Trader AI non disponible: {e}")
     PRO_TRADER_AVAILABLE = False
 
 ROOT_DIR = Path(__file__).parent
@@ -7801,7 +7801,7 @@ if ADVANCED_ROUTES_AVAILABLE:
 # Inclure Pro Trader AI si disponible
 if PRO_TRADER_AVAILABLE:
     app.include_router(pro_trader_router)
-    logger.info("🧠 Pro Trader AI chargé")
+    logger.info("Pro Trader AI charge")
 
 # Mount static files for uploads
 app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")

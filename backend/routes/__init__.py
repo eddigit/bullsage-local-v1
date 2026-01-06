@@ -19,6 +19,13 @@ from .health import router as health_router
 from .wallet import router as wallet_router
 from .defi_scanner import router as defi_scanner_router
 
+# Import optionnel du routeur dYdX
+try:
+    from .dydx import router as dydx_router
+    DYDX_ROUTER_AVAILABLE = True
+except ImportError:
+    DYDX_ROUTER_AVAILABLE = False
+
 # Create main API router
 api_router = APIRouter(prefix="/api")
 
@@ -40,3 +47,7 @@ api_router.include_router(settings_router)
 api_router.include_router(health_router)
 api_router.include_router(wallet_router)
 api_router.include_router(defi_scanner_router)
+
+# Inclure le routeur dYdX si disponible
+if DYDX_ROUTER_AVAILABLE:
+    api_router.include_router(dydx_router)

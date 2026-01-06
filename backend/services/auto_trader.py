@@ -1,7 +1,7 @@
 """
 Service d'Auto-Trading pour BULL SAGE
 Exécution automatique des signaux avec gestion de risque stricte
-Mode Paper Trading uniquement pour la sécurité
+Supporte Paper Trading ET dYdX réel
 """
 
 import asyncio
@@ -13,6 +13,14 @@ import logging
 import uuid
 
 logger = logging.getLogger(__name__)
+
+# Import optionnel du dYdX trader
+try:
+    from services.dydx_trader import dydx_testnet_trader, DydxSignal
+    DYDX_AVAILABLE = True
+except ImportError:
+    DYDX_AVAILABLE = False
+    logger.warning("⚠️ dYdX Trader non disponible")
 
 
 class TradeStatus(Enum):
@@ -44,6 +52,10 @@ class AutoTradeConfig:
     risk_per_trade_percent: float = 1.0
     trailing_stop_enabled: bool = False
     trailing_stop_percent: float = 2.0
+    # Nouvelles options dYdX
+    dydx_enabled: bool = False  # Active l'exécution sur dYdX
+    dydx_network: str = "testnet"  # "testnet" ou "mainnet"
+    dydx_auto_execute: bool = False  # Exécute automatiquement sur dYdX
 
 
 @dataclass
@@ -296,7 +308,7 @@ class AutoTrader:
                               signal: Dict,
                               position: Dict,
                               current_price: float) -> Dict:
-        """Exécute un trade Paper Trading"""
+        """Exécute un trade Paper Trading + dYdX si activé"""
         
         trade_id = str(uuid.uuid4())
         side = "long" if signal.get("direction") == "BULLISH" else "short"
@@ -322,10 +334,47 @@ class AutoTrader:
             self.active_trades[user_id] = []
         self.active_trades[user_id].append(trade)
         
+        # Résultat dYdX
+        dydx_result = None
+        dydx_signal_json = None
+        
+        # Exécution sur dYdX si disponible et activé
+        config = self.configs.get(user_id)
+        if DYDX_AVAILABLE and config and config.dydx_enabled:
+            try:
+                # Créer le signal dYdX
+                dydx_signal = DydxSignal(
+                    market=dydx_testnet_trader.get_market(symbol),
+                    direction="LONG" if side == "long" else "SHORT",
+                    entry_price=current_price,
+                    stop_loss=position["stop_loss"],
+                    take_profit=position["take_profit"],
+                    size=position["quantity"],
+                    confidence=signal.get("confluence_score", 0),
+                    reason=signal.get("reason", "Signal automatique Bull Sage")
+                )
+                
+                # Exporter le JSON
+                dydx_signal_json = dydx_signal.to_json()
+                
+                # Exécuter si auto_execute est activé
+                if config.dydx_auto_execute:
+                    # Charger l'adresse wallet de l'utilisateur
+                    if self.db:
+                        user_dydx_config = await self.db.dydx_configs.find_one({"user_id": user_id})
+                        if user_dydx_config and user_dydx_config.get("wallet_address"):
+                            dydx_testnet_trader.wallet_address = user_dydx_config["wallet_address"]
+                            dydx_result = await dydx_testnet_trader.execute_signal(dydx_signal)
+                            logger.info(f"🔗 dYdX: {dydx_result.get('message', 'Signal envoyé')}")
+                
+            except Exception as e:
+                logger.error(f"❌ Erreur dYdX: {e}")
+                dydx_result = {"success": False, "error": str(e)}
+        
         # Sauvegarder en base
         if self.db:
             try:
-                await self.db.auto_trades.insert_one({
+                trade_doc = {
                     "id": trade_id,
                     "user_id": user_id,
                     "symbol": symbol.upper(),
@@ -338,8 +387,12 @@ class AutoTrader:
                     "status": "open",
                     "signal_score": signal.get("confluence_score", 0),
                     "signal_reason": signal.get("reason", "Signal automatique"),
-                    "created_at": datetime.utcnow()
-                })
+                    "created_at": datetime.utcnow(),
+                    # Nouveau: données dYdX
+                    "dydx_signal": dydx_signal_json,
+                    "dydx_execution": dydx_result
+                }
+                await self.db.auto_trades.insert_one(trade_doc)
                 
                 # Déduire du capital
                 await self.db.users.update_one(

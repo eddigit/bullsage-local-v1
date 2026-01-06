@@ -29,6 +29,16 @@ FINNHUB_API_KEY = os.environ.get('FINNHUB_API_KEY')
 FRED_API_KEY = os.environ.get('FRED_API_KEY')
 MARKETAUX_API_KEY = os.environ.get('MARKETAUX_API_KEY')
 
+# dYdX Configuration
+DYDX_TESTNET_MNEMONIC = os.environ.get('DYDX_TESTNET_MNEMONIC', '')
+DYDX_TESTNET_ADDRESS = os.environ.get('DYDX_TESTNET_ADDRESS', '')
+DYDX_MAINNET_MNEMONIC = os.environ.get('DYDX_MAINNET_MNEMONIC', '')
+DYDX_MAINNET_ADDRESS = os.environ.get('DYDX_MAINNET_ADDRESS', '')
+
+# dYdX Executor Service (Node.js)
+DYDX_EXECUTOR_URL = os.environ.get('DYDX_EXECUTOR_URL', 'http://localhost:3001')
+DYDX_API_SECRET = os.environ.get('DYDX_API_SECRET', '')
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)

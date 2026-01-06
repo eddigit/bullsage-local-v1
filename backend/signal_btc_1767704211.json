@@ -1,0 +1,12 @@
+{
+  "market": "BTC-USD",
+  "direction": "LONG",
+  "entry": 93862.21,
+  "stop_loss": 91984.97,
+  "take_profit": 97616.7,
+  "size": 0.001,
+  "leverage": 10,
+  "timestamp": "2026-01-06T12:56:51.098396+00:00",
+  "confidence": 85.0,
+  "reason": "Test BULL SAGE - Signal automatique"
+}

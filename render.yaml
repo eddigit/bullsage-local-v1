@@ -31,6 +31,37 @@ services:
         sync: false
       - key: PYTHON_VERSION
         value: 3.11.0
+      # dYdX Executor URL (internal communication)
+      - key: DYDX_EXECUTOR_URL
+        fromService:
+          name: bullsage-dydx-executor
+          type: web
+          property: hostport
+      - key: DYDX_API_SECRET
+        generateValue: true
+    autoDeploy: true
+
+  # dYdX Order Executor Service (Node.js)
+  - type: web
+    name: bullsage-dydx-executor
+    env: node
+    buildCommand: npm ci
+    startCommand: node server.js
+    rootDir: dydx-executor
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DYDX_TESTNET_MNEMONIC
+        sync: false
+      - key: DYDX_TESTNET_ADDRESS
+        sync: false
+      - key: DYDX_API_SECRET
+        fromService:
+          name: bullsage-api
+          type: web
+          envVarKey: DYDX_API_SECRET
+      - key: DYDX_NETWORK
+        value: testnet
     autoDeploy: true
 
   # Frontend Static Site

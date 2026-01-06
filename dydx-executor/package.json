@@ -1,0 +1,29 @@
+{
+  "name": "bullsage-dydx-executor",
+  "version": "1.0.0",
+  "description": "Bull Sage - dYdX v4 Order Executor Service",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "execute": "node execute.js"
+  },
+  "keywords": ["dydx", "trading", "crypto"],
+  "author": "Bull Sage",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "type": "commonjs",
+  "dependencies": {
+    "@dydxprotocol/v4-client-js": "^3.4.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.3",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}
