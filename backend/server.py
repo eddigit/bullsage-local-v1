@@ -7808,8 +7808,10 @@ try:
     from routes.dydx import router as dydx_router
     app.include_router(dydx_router, prefix="/api")
     logger.info("✅ Routes dYdX chargées")
-except ImportError as e:
-    logger.warning(f"⚠️ Routes dYdX non disponibles: {e}")
+except Exception as e:
+    logger.error(f"❌ Erreur chargement routes dYdX: {type(e).__name__}: {e}")
+    import traceback
+    traceback.print_exc()
 
 # Mount static files for uploads
 app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
