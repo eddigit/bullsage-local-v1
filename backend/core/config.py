@@ -45,3 +45,17 @@ CRON_API_KEY = os.environ.get('CRON_API_KEY', '')
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+
+# Objet settings pour accès unifié aux configurations
+class Settings:
+    """Configuration centralisée pour l'application"""
+    DYDX_EXECUTOR_URL = DYDX_EXECUTOR_URL
+    DYDX_API_SECRET = DYDX_API_SECRET
+    DYDX_TESTNET_MNEMONIC = DYDX_TESTNET_MNEMONIC
+    DYDX_TESTNET_ADDRESS = DYDX_TESTNET_ADDRESS
+    CRON_API_KEY = CRON_API_KEY
+    JWT_SECRET = JWT_SECRET
+    JWT_ALGORITHM = JWT_ALGORITHM
+
+settings = Settings()
