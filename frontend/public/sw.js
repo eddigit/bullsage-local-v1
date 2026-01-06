@@ -1,4 +1,5 @@
 // BULL SAGE Service Worker - MINIMAL (no caching)
+// v2.0.1 - Force refresh 2026-01-06
 
 self.addEventListener('install', () => {
   self.skipWaiting();
