@@ -382,18 +382,36 @@ const TradeOpportunity = ({ opportunity, onSelect, onApplyTrade, applying, onExe
             </TooltipContent>
           </Tooltip>
 
+          {/* Avertissement si pullback requis */}
+          {opportunity.urgency === "WAIT_PULLBACK" && (
+            <div className="mt-2 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+              <p className="text-xs text-yellow-400 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" />
+                <span><strong>Pullback recommandé:</strong> Attendez un repli vers {opportunity.entry_price?.toLocaleString()} avant d'entrer</span>
+              </p>
+            </div>
+          )}
+
           {/* Bouton Exécuter sur dYdX */}
           <div className="mt-2 flex gap-2">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="outline"
-                  className={`flex-1 gap-2 border-purple-500/50 text-purple-400 hover:bg-purple-500/20 ${
-                    executedDydx ? 'bg-purple-500/20' : ''
-                  }`}
+                  className={`flex-1 gap-2 ${
+                    opportunity.urgency === "WAIT_PULLBACK" 
+                      ? 'border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/20' 
+                      : 'border-purple-500/50 text-purple-400 hover:bg-purple-500/20'
+                  } ${executedDydx ? 'bg-purple-500/20' : ''}`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    onExecuteDydx(opportunity);
+                    if (opportunity.urgency === "WAIT_PULLBACK") {
+                      if (window.confirm(`⚠️ Ce trade recommande d'attendre un PULLBACK vers ${opportunity.entry_price?.toLocaleString()}.\n\nVoulez-vous quand même exécuter MAINTENANT au prix du marché ?`)) {
+                        onExecuteDydx(opportunity);
+                      }
+                    } else {
+                      onExecuteDydx(opportunity);
+                    }
                   }}
                   disabled={executingDydx || executedDydx}
                 >
@@ -406,6 +424,11 @@ const TradeOpportunity = ({ opportunity, onSelect, onApplyTrade, applying, onExe
                     <>
                       <CheckCircle2 className="w-4 h-4 text-green-400" />
                       Exécuté sur dYdX !
+                    </>
+                  ) : opportunity.urgency === "WAIT_PULLBACK" ? (
+                    <>
+                      <AlertTriangle className="w-4 h-4" />
+                      ⏳ Exécuter malgré pullback
                     </>
                   ) : (
                     <>
@@ -421,6 +444,9 @@ const TradeOpportunity = ({ opportunity, onSelect, onApplyTrade, applying, onExe
                 <p className="text-sm mt-1">• Entry automatique au prix marché</p>
                 <p className="text-sm">• Stop Loss placé automatiquement</p>
                 <p className="text-sm">• Take Profit placé automatiquement</p>
+                {opportunity.urgency === "WAIT_PULLBACK" && (
+                  <p className="text-sm text-yellow-400 mt-2">⚠️ ATTENTION: Un pullback est recommandé avant d'entrer !</p>
+                )}
                 <p className="text-sm text-yellow-400 mt-2">⚠️ Fonds testnet requis sur votre wallet dYdX</p>
               </TooltipContent>
             </Tooltip>
@@ -577,6 +603,13 @@ export default function ProTraderPage() {
   const [applyingSymbol, setApplyingSymbol] = useState(null);
   const [executingDydx, setExecutingDydx] = useState({});
   const [executedDydx, setExecutedDydx] = useState({});
+  
+  // Configuration du montant à engager sur dYdX
+  const [dydxTradeConfig, setDydxTradeConfig] = useState({
+    mode: 'percentage', // 'percentage' ou 'fixed'
+    percentage: 5, // % du portefeuille
+    fixedAmount: 100, // Montant fixe en USDC
+  });
 
   // Exécuter sur dYdX Testnet
   const executeDydx = async (opportunity) => {
@@ -587,22 +620,53 @@ export default function ProTraderPage() {
       const signal = {
         market: `${symbol}-USD`,
         direction: opportunity.direction,
+        // Nouveau: configuration du montant
+        sizeMode: dydxTradeConfig.mode,
+        percentageOfPortfolio: dydxTradeConfig.percentage,
+        fixedAmountUSDC: dydxTradeConfig.fixedAmount,
+        // Fallback si le serveur ne supporte pas encore le nouveau format
         size: symbol === 'BTC' ? 0.001 : symbol === 'ETH' ? 0.01 : 0.1,
         stop_loss_pct: opportunity.stop && opportunity.entry 
           ? Math.abs((opportunity.entry - opportunity.stop) / opportunity.entry * 100)
           : 2,
         take_profit_pct: opportunity.tp1 && opportunity.entry
           ? Math.abs((opportunity.tp1 - opportunity.entry) / opportunity.entry * 100)
-          : 4
+          : 4,
+        // Documentation du trade (pullback inclus)
+        metadata: {
+          urgency: opportunity.urgency || "IMMEDIATE",
+          recommended_entry: opportunity.entry_price || opportunity.entry,
+          wait_pullback: opportunity.urgency === "WAIT_PULLBACK",
+          pullback_target: opportunity.urgency === "WAIT_PULLBACK" ? (opportunity.entry_price || opportunity.entry) : null,
+          confidence: opportunity.confidence,
+          quality: opportunity.quality,
+          rr_ratio: opportunity.rr_ratio,
+          signals: opportunity.signals,
+          trade_type: opportunity.trade_type,
+          timeframe: opportunity.timeframe,
+          estimated_duration: opportunity.estimated_duration,
+          executed_at: new Date().toISOString(),
+          trade_config: {
+            mode: dydxTradeConfig.mode,
+            percentage: dydxTradeConfig.percentage,
+            fixed_amount: dydxTradeConfig.fixedAmount
+          }
+        }
       };
 
-      const response = await axios.post(`${API}/dydx/signal/create`, signal);
+      const response = await axios.post(`${API}/dydx/signal/quick`, signal);
       
       if (response.data.success || response.data.signal) {
         setExecutedDydx(prev => ({ ...prev, [symbol]: true }));
+        
+        // Message adapté selon l'urgence
+        const pullbackWarning = opportunity.urgency === "WAIT_PULLBACK" 
+          ? `\n⚠️ Note: Pullback était recommandé vers ${opportunity.entry_price || opportunity.entry}`
+          : '';
+        
         toast.success(
           `🚀 Trade ${opportunity.direction} ${symbol} exécuté sur dYdX!\n` +
-          `Mode: ${response.data.mode || 'live'}`,
+          `Mode: ${response.data.mode || 'live'}${pullbackWarning}`,
           { duration: 5000 }
         );
       } else {
@@ -841,6 +905,120 @@ export default function ProTraderPage() {
         </div>
       </div>
       
+      {/* Configuration dYdX */}
+      <Card className="border-purple-500/30 bg-purple-500/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Zap className="w-5 h-5 text-purple-400" />
+            Configuration Exécution dYdX
+            <Badge variant="outline" className="text-purple-400 border-purple-500/50">Testnet</Badge>
+          </CardTitle>
+          <CardDescription>
+            Définissez le montant à engager pour chaque trade exécuté sur dYdX
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Mode de calcul */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <DollarSign className="w-4 h-4 text-muted-foreground" />
+                Mode de calcul
+              </label>
+              <Select 
+                value={dydxTradeConfig.mode} 
+                onValueChange={(v) => setDydxTradeConfig(prev => ({ ...prev, mode: v }))}
+              >
+                <SelectTrigger className="border-purple-500/30">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="percentage">📊 % du portefeuille</SelectItem>
+                  <SelectItem value="fixed">💵 Montant fixe (USDC)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Pourcentage du portefeuille */}
+            {dydxTradeConfig.mode === 'percentage' && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-muted-foreground" />
+                  % du portefeuille
+                </label>
+                <Select 
+                  value={String(dydxTradeConfig.percentage)} 
+                  onValueChange={(v) => setDydxTradeConfig(prev => ({ ...prev, percentage: Number(v) }))}
+                >
+                  <SelectTrigger className="border-purple-500/30">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1% - Ultra conservateur</SelectItem>
+                    <SelectItem value="2">2% - Conservateur</SelectItem>
+                    <SelectItem value="5">5% - Modéré</SelectItem>
+                    <SelectItem value="10">10% - Agressif</SelectItem>
+                    <SelectItem value="25">25% - Très agressif</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  💡 Risque recommandé: 2-5% par trade
+                </p>
+              </div>
+            )}
+
+            {/* Montant fixe */}
+            {dydxTradeConfig.mode === 'fixed' && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <DollarSign className="w-4 h-4 text-muted-foreground" />
+                  Montant fixe (USDC)
+                </label>
+                <Select 
+                  value={String(dydxTradeConfig.fixedAmount)} 
+                  onValueChange={(v) => setDydxTradeConfig(prev => ({ ...prev, fixedAmount: Number(v) }))}
+                >
+                  <SelectTrigger className="border-purple-500/30">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="50">$50 USDC</SelectItem>
+                    <SelectItem value="100">$100 USDC</SelectItem>
+                    <SelectItem value="250">$250 USDC</SelectItem>
+                    <SelectItem value="500">$500 USDC</SelectItem>
+                    <SelectItem value="1000">$1,000 USDC</SelectItem>
+                    <SelectItem value="2500">$2,500 USDC</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Récapitulatif */}
+            <div className="p-3 bg-purple-500/10 rounded-lg border border-purple-500/30">
+              <div className="text-sm font-medium text-purple-400 mb-1">Configuration actuelle</div>
+              <div className="text-lg font-bold">
+                {dydxTradeConfig.mode === 'percentage' 
+                  ? `${dydxTradeConfig.percentage}% du portefeuille`
+                  : `$${dydxTradeConfig.fixedAmount} USDC`
+                }
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                par trade exécuté sur dYdX
+              </div>
+            </div>
+          </div>
+
+          {/* Avertissement pullback */}
+          <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <span className="font-medium text-yellow-400">Documentation des trades:</span>
+              <span className="text-muted-foreground"> Chaque trade enregistre l'urgence (IMMEDIATE/WAIT_PULLBACK), le prix d'entrée recommandé, la qualité du setup, et les métadonnées complètes.</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Scan Message */}
       {scanMessage && (
         <Card className="bg-muted/50">

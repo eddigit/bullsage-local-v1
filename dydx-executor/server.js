@@ -158,17 +158,100 @@ app.post('/execute', authMiddleware, async (req, res) => {
     return res.status(503).json({ error: 'Not connected to dYdX' });
   }
   
-  const { market, direction, entry, stopLoss, takeProfit, size } = req.body;
+  const { 
+    market, 
+    direction, 
+    entry, 
+    stopLoss, 
+    takeProfit, 
+    size,
+    // Nouveau: configuration du montant
+    sizeMode,
+    percentageOfPortfolio,
+    fixedAmountUSDC,
+    // Métadonnées pour documentation
+    metadata
+  } = req.body;
   
-  if (!market || !direction || !size) {
-    return res.status(400).json({ error: 'Missing required fields: market, direction, size' });
+  if (!market || !direction) {
+    return res.status(400).json({ error: 'Missing required fields: market, direction' });
   }
   
   console.log(`\n🎯 Signal reçu: ${direction} ${market}`);
   console.log(`   Entry: $${entry || 'market'} | SL: $${stopLoss} | TP: $${takeProfit}`);
+  if (metadata) {
+    console.log(`   📋 Métadonnées:`, JSON.stringify(metadata, null, 2));
+  }
+  
+  // Calculer la taille de position basée sur le mode
+  let calculatedSize = size || 0;
+  let sizeInfo = { mode: 'fixed', value: size };
+  
+  try {
+    // Récupérer le prix actuel du marché
+    const markets = await client.indexerClient.markets.getPerpetualMarkets();
+    const marketData = markets.markets[market];
+    const currentPrice = parseFloat(marketData?.oraclePrice || entry || 0);
+    const minOrderSize = parseFloat(marketData?.stepBaseQuantums || 0.001) / 1e9;
+    
+    if (sizeMode === 'percentage' && percentageOfPortfolio) {
+      // Calculer basé sur le % du portefeuille
+      const account = await client.indexerClient.account.getSubaccount(wallet.address, 0);
+      const equity = parseFloat(account.subaccount?.equity || '0');
+      const freeCollateral = parseFloat(account.subaccount?.freeCollateral || equity);
+      
+      const amountUSDC = freeCollateral * (percentageOfPortfolio / 100);
+      calculatedSize = amountUSDC / currentPrice;
+      
+      console.log(`   💼 Portefeuille: $${equity.toFixed(2)}`);
+      console.log(`   📊 ${percentageOfPortfolio}% = $${amountUSDC.toFixed(2)} → ${calculatedSize.toFixed(6)} ${market.replace('-USD', '')}`);
+      
+      sizeInfo = {
+        mode: 'percentage',
+        percentage: percentageOfPortfolio,
+        equity: equity,
+        amountUSDC: amountUSDC,
+        calculatedSize: calculatedSize
+      };
+    } else if (sizeMode === 'fixed' && fixedAmountUSDC) {
+      // Montant fixe en USDC
+      calculatedSize = fixedAmountUSDC / currentPrice;
+      
+      console.log(`   💵 Montant fixe: $${fixedAmountUSDC} → ${calculatedSize.toFixed(6)} ${market.replace('-USD', '')}`);
+      
+      sizeInfo = {
+        mode: 'fixed',
+        amountUSDC: fixedAmountUSDC,
+        calculatedSize: calculatedSize
+      };
+    }
+    
+    // Arrondir à la précision minimale du marché
+    if (minOrderSize > 0) {
+      calculatedSize = Math.floor(calculatedSize / minOrderSize) * minOrderSize;
+    }
+    
+    // Vérification taille minimum
+    if (calculatedSize < minOrderSize) {
+      console.log(`   ⚠️ Taille trop petite (${calculatedSize} < ${minOrderSize})`);
+      calculatedSize = minOrderSize;
+    }
+    
+    console.log(`   📦 Taille finale: ${calculatedSize}`);
+    
+  } catch (e) {
+    console.log(`   ⚠️ Erreur calcul taille: ${e.message}, utilisation size par défaut`);
+    if (!calculatedSize || calculatedSize <= 0) {
+      // Fallback par défaut selon le marché
+      if (market.includes('BTC')) calculatedSize = 0.001;
+      else if (market.includes('ETH')) calculatedSize = 0.01;
+      else calculatedSize = 0.1;
+    }
+  }
   
   const results = {
-    signal: { market, direction, entry, stopLoss, takeProfit, size },
+    signal: { market, direction, entry, stopLoss, takeProfit, size: calculatedSize, sizeInfo },
+    metadata: metadata || {},
     orders: [],
     success: false,
     timestamp: new Date().toISOString()
@@ -189,7 +272,7 @@ app.post('/execute', authMiddleware, async (req, res) => {
         market,
         entrySide,
         entryPrice * (direction === 'LONG' ? 1.005 : 0.995),
-        size,
+        calculatedSize,
         entryClientId,
         currentBlock + 10,
         OrderTimeInForce.IOC,
@@ -197,7 +280,7 @@ app.post('/execute', authMiddleware, async (req, res) => {
       );
       
       console.log(`   ✅ Entry placé`);
-      results.orders.push({ type: 'ENTRY', success: true, price: entryPrice });
+      results.orders.push({ type: 'ENTRY', success: true, price: entryPrice, size: calculatedSize });
     } catch (e) {
       console.log(`   ❌ Entry échoué: ${e.message}`);
       results.orders.push({ type: 'ENTRY', success: false, error: e.message });
@@ -217,7 +300,7 @@ app.post('/execute', authMiddleware, async (req, res) => {
           OrderType.LIMIT,
           exitSide,
           stopLoss,
-          size,
+          calculatedSize,
           randomClientId(),
           OrderTimeInForce.GTT,
           86400,
@@ -242,7 +325,7 @@ app.post('/execute', authMiddleware, async (req, res) => {
           OrderType.LIMIT,
           exitSide,
           takeProfit,
-          size,
+          calculatedSize,
           randomClientId(),
           OrderTimeInForce.GTT,
           86400,

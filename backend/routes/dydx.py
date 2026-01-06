@@ -40,6 +40,20 @@ class DydxSignalRequest(BaseModel):
     auto_execute: bool = False  # Si True, exécute directement sur dYdX
 
 
+class DydxQuickSignalRequest(BaseModel):
+    """Format simplifié depuis le frontend Pro Trader AI"""
+    market: str  # ex: "BTC-USD", "ETH-USD"
+    direction: str  # "LONG" ou "SHORT"
+    size: float = 0.01
+    # Nouveau: configuration du montant
+    sizeMode: Optional[str] = None  # 'percentage' ou 'fixed'
+    percentageOfPortfolio: Optional[float] = None  # % du portefeuille (ex: 5)
+    fixedAmountUSDC: Optional[float] = None  # Montant fixe en USDC (ex: 100)
+    stop_loss_pct: float = 2.0  # % de SL
+    take_profit_pct: float = 4.0  # % de TP
+    metadata: Optional[dict] = None  # Documentation du trade (urgency, confidence, trade_config, etc.)
+
+
 class DydxExecuteRequest(BaseModel):
     """Requête pour exécuter un signal existant"""
     signal_id: str
@@ -237,6 +251,166 @@ async def create_dydx_signal(
             result["warning"] = "Wallet non configuré - Signal créé mais non exécuté"
     
     return result
+
+
+@router.post("/signal/quick")
+async def quick_create_dydx_signal(
+    request: DydxQuickSignalRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Route simplifiée pour le frontend Pro Trader AI
+    
+    Format attendu:
+    - market: "BTC-USD", "ETH-USD", "SOL-USD"
+    - direction: "LONG" ou "SHORT"
+    - size: 0.001 pour BTC, 0.01 pour ETH, 0.1 pour SOL
+    - stop_loss_pct: pourcentage de SL (ex: 2.0 = 2%)
+    - take_profit_pct: pourcentage de TP (ex: 4.0 = 4%)
+    - metadata: { urgency, confidence, wait_pullback, ... }
+    """
+    import httpx
+    from core.config import settings
+    
+    # Extraire le symbol
+    symbol = request.market.replace("-USD", "").replace("-PERP", "")
+    
+    # Récupérer le prix actuel
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            price_response = await client.get(
+                f"https://indexer.v4testnet.dydx.exchange/v4/perpetualMarkets"
+            )
+            markets_data = price_response.json()
+            market_key = f"{symbol}-USD"
+            
+            if market_key in markets_data.get("markets", {}):
+                current_price = float(markets_data["markets"][market_key].get("oraclePrice", 0))
+            else:
+                # Fallback estimation
+                current_price = 100000 if symbol == "BTC" else 3500 if symbol == "ETH" else 150
+    except Exception as e:
+        logger.warning(f"Erreur prix dYdX: {e}")
+        current_price = 100000 if symbol == "BTC" else 3500 if symbol == "ETH" else 150
+    
+    # Calculer SL et TP
+    if request.direction == "LONG":
+        stop_loss = current_price * (1 - request.stop_loss_pct / 100)
+        take_profit = current_price * (1 + request.take_profit_pct / 100)
+    else:
+        stop_loss = current_price * (1 + request.stop_loss_pct / 100)
+        take_profit = current_price * (1 - request.take_profit_pct / 100)
+    
+    # Créer le signal
+    signal = dydx_testnet_trader.create_signal_from_analysis(
+        symbol=symbol,
+        signal_type=request.direction,
+        entry_price=current_price,
+        stop_loss=stop_loss,
+        take_profit=take_profit,
+        size=request.size,
+        confidence=request.metadata.get("confidence", 0) if request.metadata else 0,
+        reason=f"Pro Trader AI - {request.metadata.get('urgency', 'IMMEDIATE')}" if request.metadata else "Pro Trader AI"
+    )
+    
+    # Documenter l'urgence et le pullback
+    metadata = request.metadata or {}
+    urgency = metadata.get("urgency", "IMMEDIATE")
+    wait_pullback = metadata.get("wait_pullback", False)
+    
+    # Sauvegarder avec toutes les métadonnées
+    signal_doc = {
+        "id": f"quick_{datetime.now().strftime('%Y%m%d%H%M%S')}",
+        "user_id": current_user["id"],
+        **signal.to_json(),
+        "status": "pending",
+        "source": "pro_trader_ai",
+        "metadata": {
+            "urgency": urgency,
+            "wait_pullback": wait_pullback,
+            "recommended_entry": metadata.get("recommended_entry"),
+            "confidence": metadata.get("confidence"),
+            "rr_ratio": metadata.get("rr_ratio"),
+            "signals": metadata.get("signals"),
+            "executed_at": metadata.get("executed_at")
+        },
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.dydx_signals.insert_one(signal_doc)
+    
+    # Exécuter via le Node.js executor
+    execution_result = None
+    try:
+        executor_url = getattr(settings, 'DYDX_EXECUTOR_URL', 'http://localhost:3001')
+        api_secret = getattr(settings, 'DYDX_API_SECRET', '')
+        
+        headers = {"X-API-Secret": api_secret} if api_secret else {}
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # Construire le payload avec les nouvelles options de taille
+            execute_payload = {
+                "market": signal.market,
+                "direction": signal.direction,
+                "size": request.size,
+                "stopLoss": stop_loss,
+                "takeProfit": take_profit,
+                "stop_loss_pct": request.stop_loss_pct,
+                "take_profit_pct": request.take_profit_pct,
+                # Nouveau: configuration du montant
+                "sizeMode": request.sizeMode,
+                "percentageOfPortfolio": request.percentageOfPortfolio,
+                "fixedAmountUSDC": request.fixedAmountUSDC,
+                # Métadonnées pour documentation
+                "metadata": {
+                    "urgency": urgency,
+                    "wait_pullback": wait_pullback,
+                    "recommended_entry": metadata.get("recommended_entry"),
+                    "confidence": metadata.get("confidence"),
+                    "quality": metadata.get("quality"),
+                    "rr_ratio": metadata.get("rr_ratio"),
+                    "signals": metadata.get("signals"),
+                    "trade_type": metadata.get("trade_type"),
+                    "timeframe": metadata.get("timeframe"),
+                    "estimated_duration": metadata.get("estimated_duration"),
+                    "trade_config": metadata.get("trade_config"),
+                    "executed_at": metadata.get("executed_at")
+                }
+            }
+            
+            response = await client.post(
+                f"{executor_url}/execute",
+                json=execute_payload,
+                headers=headers
+            )
+            execution_result = response.json()
+            
+            # Mettre à jour le statut
+            success = execution_result.get("success", False)
+            await db.dydx_signals.update_one(
+                {"id": signal_doc["id"]},
+                {"$set": {
+                    "status": "executed" if success else "failed",
+                    "execution_result": execution_result,
+                    "executed_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+    except Exception as e:
+        logger.error(f"Erreur exécution dYdX: {e}")
+        execution_result = {"success": False, "error": str(e)}
+    
+    # Log l'urgence
+    if wait_pullback:
+        logger.warning(f"⚠️ Trade {signal.market} exécuté malgré WAIT_PULLBACK recommandé")
+    
+    return {
+        "success": execution_result.get("success", False) if execution_result else False,
+        "signal": signal.to_json(),
+        "signal_id": signal_doc["id"],
+        "execution": execution_result,
+        "mode": execution_result.get("mode", "unknown") if execution_result else "error",
+        "metadata": signal_doc["metadata"]
+    }
 
 
 @router.post("/signal/execute/{signal_id}")
