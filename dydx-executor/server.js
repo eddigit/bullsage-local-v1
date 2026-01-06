@@ -257,6 +257,45 @@ app.post('/execute', authMiddleware, async (req, res) => {
     timestamp: new Date().toISOString()
   };
   
+  // Calculer la durée d'expiration des ordres basée sur le trade_type
+  let orderExpirationSeconds = 86400; // Par défaut 24h
+  const tradeType = metadata?.trade_type || 'INTRADAY';
+  const estimatedDuration = metadata?.estimated_duration || '';
+  
+  // Mapper le trade_type vers une durée d'expiration appropriée
+  const expirationByTradeType = {
+    'SCALPING': 3600,        // 1 heure
+    'INTRADAY': 86400,       // 24 heures
+    'INTRADAY+': 172800,     // 48 heures
+    'SWING': 604800,         // 7 jours
+    'POSITION': 2592000      // 30 jours
+  };
+  
+  orderExpirationSeconds = expirationByTradeType[tradeType] || 86400;
+  
+  // Si on a une durée estimée plus précise, essayer de l'utiliser
+  if (estimatedDuration) {
+    const durationMatch = estimatedDuration.match(/(\d+)\s*(heure|hour|jour|day|semaine|week)/i);
+    if (durationMatch) {
+      const value = parseInt(durationMatch[1]);
+      const unit = durationMatch[2].toLowerCase();
+      
+      if (unit.includes('heure') || unit.includes('hour')) {
+        orderExpirationSeconds = value * 3600 * 1.5; // +50% marge
+      } else if (unit.includes('jour') || unit.includes('day')) {
+        orderExpirationSeconds = value * 86400 * 1.5;
+      } else if (unit.includes('semaine') || unit.includes('week')) {
+        orderExpirationSeconds = value * 604800 * 1.5;
+      }
+    }
+  }
+  
+  // Minimum 1h, maximum 30 jours
+  orderExpirationSeconds = Math.max(3600, Math.min(orderExpirationSeconds, 2592000));
+  
+  const expirationHours = (orderExpirationSeconds / 3600).toFixed(1);
+  console.log(`   ⏱️ Type: ${tradeType} | Expiration ordres: ${expirationHours}h`);
+  
   try {
     const currentBlock = await client.validatorClient.get.latestBlockHeight();
     const entrySide = direction === 'LONG' ? OrderSide.BUY : OrderSide.SELL;
@@ -303,13 +342,13 @@ app.post('/execute', authMiddleware, async (req, res) => {
           calculatedSize,
           randomClientId(),
           OrderTimeInForce.GTT,
-          86400,
+          orderExpirationSeconds, // Durée dynamique selon le trade_type
           OrderExecution.DEFAULT,
           false,
           false
         );
-        console.log(`   ✅ Stop Loss placé @ $${stopLoss}`);
-        results.orders.push({ type: 'STOP_LOSS', success: true, price: stopLoss });
+        console.log(`   ✅ Stop Loss placé @ $${stopLoss} (expire: ${expirationHours}h)`);
+        results.orders.push({ type: 'STOP_LOSS', success: true, price: stopLoss, expiresIn: orderExpirationSeconds });
       } catch (e) {
         console.log(`   ⚠️ SL échoué: ${e.message}`);
         results.orders.push({ type: 'STOP_LOSS', success: false, error: e.message });
@@ -328,21 +367,31 @@ app.post('/execute', authMiddleware, async (req, res) => {
           calculatedSize,
           randomClientId(),
           OrderTimeInForce.GTT,
-          86400,
+          orderExpirationSeconds, // Durée dynamique selon le trade_type
           OrderExecution.DEFAULT,
           false,
           false
         );
-        console.log(`   ✅ Take Profit placé @ $${takeProfit}`);
-        results.orders.push({ type: 'TAKE_PROFIT', success: true, price: takeProfit });
+        console.log(`   ✅ Take Profit placé @ $${takeProfit} (expire: ${expirationHours}h)`);
+        results.orders.push({ type: 'TAKE_PROFIT', success: true, price: takeProfit, expiresIn: orderExpirationSeconds });
       } catch (e) {
         console.log(`   ⚠️ TP échoué: ${e.message}`);
         results.orders.push({ type: 'TAKE_PROFIT', success: false, error: e.message });
       }
     }
     
+    // Ajouter les infos de timing dans les résultats
+    results.timing = {
+      trade_type: tradeType,
+      estimated_duration: estimatedDuration,
+      order_expiration_seconds: orderExpirationSeconds,
+      order_expiration_hours: parseFloat(expirationHours),
+      orders_expire_at: new Date(Date.now() + orderExpirationSeconds * 1000).toISOString()
+    };
+    
     results.success = results.orders.some(o => o.success);
     console.log(`   📊 Résultat: ${results.success ? '✅ OK' : '❌ Échec'}`);
+    console.log(`   📅 Ordres expirent: ${results.timing.orders_expire_at}`);
     
     res.json(results);
     
