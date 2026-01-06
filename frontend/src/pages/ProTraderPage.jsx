@@ -23,7 +23,8 @@ import {
   ChevronRight,
   Activity,
   Rocket,
-  PlayCircle
+  PlayCircle,
+  ExternalLink
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -174,7 +175,7 @@ const TradeTypeBadge = ({ tradeType, timeframe, estimatedDuration }) => {
 };
 
 // Composant pour une opportunité de trade
-const TradeOpportunity = ({ opportunity, onSelect, onApplyTrade, applying }) => {
+const TradeOpportunity = ({ opportunity, onSelect, onApplyTrade, applying, onExecuteDydx, executingDydx, executedDydx }) => {
   const isHot = opportunity.quality === "A+" || (opportunity.quality === "A" && opportunity.urgency === "IMMEDIATE");
   
   return (
@@ -380,6 +381,69 @@ const TradeOpportunity = ({ opportunity, onSelect, onApplyTrade, applying }) => 
               <p className="text-sm text-blue-400 mt-2">💡 Ce trade sera ouvert en Paper Trading (argent virtuel)</p>
             </TooltipContent>
           </Tooltip>
+
+          {/* Bouton Exécuter sur dYdX */}
+          <div className="mt-2 flex gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={`flex-1 gap-2 border-purple-500/50 text-purple-400 hover:bg-purple-500/20 ${
+                    executedDydx ? 'bg-purple-500/20' : ''
+                  }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onExecuteDydx(opportunity);
+                  }}
+                  disabled={executingDydx || executedDydx}
+                >
+                  {executingDydx ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Exécution dYdX...
+                    </>
+                  ) : executedDydx ? (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 text-green-400" />
+                      Exécuté sur dYdX !
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-4 h-4" />
+                      🚀 Exécuter sur dYdX Testnet
+                    </>
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-sm bg-slate-900 text-white p-3">
+                <p className="font-bold text-purple-400 mb-2">⚡ Exécution RÉELLE sur dYdX</p>
+                <p className="text-sm">Ce trade sera exécuté directement sur dYdX Testnet.</p>
+                <p className="text-sm mt-1">• Entry automatique au prix marché</p>
+                <p className="text-sm">• Stop Loss placé automatiquement</p>
+                <p className="text-sm">• Take Profit placé automatiquement</p>
+                <p className="text-sm text-yellow-400 mt-2">⚠️ Fonds testnet requis sur votre wallet dYdX</p>
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="border border-purple-500/30 hover:bg-purple-500/20"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.open('https://v4.testnet.dydx.exchange/portfolio/positions', '_blank');
+                  }}
+                >
+                  <ExternalLink className="w-4 h-4 text-purple-400" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>Voir mes positions sur dYdX</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -511,6 +575,46 @@ export default function ProTraderPage() {
   const [marketOverview, setMarketOverview] = useState([]);
   const [scanMessage, setScanMessage] = useState("");
   const [applyingSymbol, setApplyingSymbol] = useState(null);
+  const [executingDydx, setExecutingDydx] = useState({});
+  const [executedDydx, setExecutedDydx] = useState({});
+
+  // Exécuter sur dYdX Testnet
+  const executeDydx = async (opportunity) => {
+    const symbol = opportunity.symbol;
+    setExecutingDydx(prev => ({ ...prev, [symbol]: true }));
+    
+    try {
+      const signal = {
+        market: `${symbol}-USD`,
+        direction: opportunity.direction,
+        size: symbol === 'BTC' ? 0.001 : symbol === 'ETH' ? 0.01 : 0.1,
+        stop_loss_pct: opportunity.stop && opportunity.entry 
+          ? Math.abs((opportunity.entry - opportunity.stop) / opportunity.entry * 100)
+          : 2,
+        take_profit_pct: opportunity.tp1 && opportunity.entry
+          ? Math.abs((opportunity.tp1 - opportunity.entry) / opportunity.entry * 100)
+          : 4
+      };
+
+      const response = await axios.post(`${API}/dydx/signal/create`, signal);
+      
+      if (response.data.success || response.data.signal) {
+        setExecutedDydx(prev => ({ ...prev, [symbol]: true }));
+        toast.success(
+          `🚀 Trade ${opportunity.direction} ${symbol} exécuté sur dYdX!\n` +
+          `Mode: ${response.data.mode || 'live'}`,
+          { duration: 5000 }
+        );
+      } else {
+        throw new Error(response.data.error || 'Erreur inconnue');
+      }
+    } catch (error) {
+      console.error("Erreur dYdX:", error);
+      toast.error(`Erreur dYdX: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setExecutingDydx(prev => ({ ...prev, [symbol]: false }));
+    }
+  };
 
   // Appliquer un trade dans Paper Trading
   const applyTrade = async (opportunity) => {
@@ -724,6 +828,9 @@ export default function ProTraderPage() {
                           onSelect={loadQuickAnalysis}
                           onApplyTrade={applyTrade}
                           applying={applyingSymbol === opp.symbol}
+                          onExecuteDydx={executeDydx}
+                          executingDydx={executingDydx[opp.symbol]}
+                          executedDydx={executedDydx[opp.symbol]}
                         />
                     ))}
                   </div>
