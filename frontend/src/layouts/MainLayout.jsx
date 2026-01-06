@@ -30,7 +30,8 @@ import {
   CandlestickChart,
   Mail,
   Newspaper,
-  ChevronDown
+  ChevronDown,
+  Activity
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { ScrollArea } from "../components/ui/scroll-area";
@@ -289,6 +290,19 @@ export default function MainLayout() {
           >
             <Brain className="w-4 h-4" />
             <span>Pro Trader AI</span>
+          </NavLink>
+
+          <NavLink
+            to="/dydx-positions"
+            className={`
+              flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
+              bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500
+              text-white transition-all duration-200 shadow-lg shadow-purple-600/20
+              ${location.pathname === '/dydx-positions' ? 'ring-2 ring-white/30' : ''}
+            `}
+          >
+            <Activity className="w-4 h-4" />
+            <span>Positions dYdX</span>
           </NavLink>
           
           <NavLink

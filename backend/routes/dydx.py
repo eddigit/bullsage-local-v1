@@ -612,3 +612,175 @@ async def auto_execute_signal(
     logger.info(f"🎯 Auto-execute: {signal.direction} {signal.market}")
     
     return result
+
+# ============ POSITIONS & MONITORING (Proxy vers Node.js) ============
+
+class ClosePositionRequest(BaseModel):
+    """Requête pour fermer une position"""
+    market: str
+    reason: Optional[str] = "manual"
+
+
+@router.get("/positions/detailed")
+async def get_dydx_positions_detailed(current_user: dict = Depends(get_current_user)):
+    """
+    Récupère les positions détaillées avec PnL et ordres de protection
+    Proxy vers le serveur Node.js dYdX Executor
+    """
+    import httpx
+    from core.config import settings
+    
+    try:
+        executor_url = getattr(settings, 'DYDX_EXECUTOR_URL', 'http://localhost:3001')
+        api_secret = getattr(settings, 'DYDX_API_SECRET', '')
+        
+        headers = {"X-API-Key": api_secret} if api_secret else {}
+        
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get(
+                f"{executor_url}/positions/detailed",
+                headers=headers
+            )
+            
+            if response.status_code == 503:
+                return {
+                    "error": "dYdX Executor non connecté",
+                    "positions": [],
+                    "equity": 0,
+                    "freeCollateral": 0
+                }
+            
+            return response.json()
+    except Exception as e:
+        logger.error(f"Erreur positions détaillées: {e}")
+        raise HTTPException(status_code=503, detail=f"Erreur connexion dYdX: {str(e)}")
+
+
+@router.post("/positions/close")
+async def close_dydx_position(
+    request: ClosePositionRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Ferme une position sur dYdX
+    """
+    import httpx
+    from core.config import settings
+    
+    try:
+        executor_url = getattr(settings, 'DYDX_EXECUTOR_URL', 'http://localhost:3001')
+        api_secret = getattr(settings, 'DYDX_API_SECRET', '')
+        
+        headers = {"X-API-Key": api_secret} if api_secret else {}
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{executor_url}/positions/close",
+                json={"market": request.market, "reason": request.reason},
+                headers=headers
+            )
+            
+            result = response.json()
+            
+            # Logger l'action
+            await db.dydx_actions.insert_one({
+                "user_id": current_user["id"],
+                "action": "close_position",
+                "market": request.market,
+                "reason": request.reason,
+                "result": result,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            })
+            
+            return result
+    except Exception as e:
+        logger.error(f"Erreur fermeture position: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/monitor")
+async def monitor_dydx_positions(current_user: dict = Depends(get_current_user)):
+    """
+    Lance un check de monitoring des positions
+    Vérifie les protections et ferme automatiquement si nécessaire
+    """
+    import httpx
+    from core.config import settings
+    
+    try:
+        executor_url = getattr(settings, 'DYDX_EXECUTOR_URL', 'http://localhost:3001')
+        api_secret = getattr(settings, 'DYDX_API_SECRET', '')
+        
+        headers = {"X-API-Key": api_secret} if api_secret else {}
+        
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.get(
+                f"{executor_url}/monitor",
+                headers=headers
+            )
+            
+            result = response.json()
+            
+            # Logger le monitoring
+            await db.dydx_monitoring.insert_one({
+                "user_id": current_user["id"],
+                "result": result,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            })
+            
+            return result
+    except Exception as e:
+        logger.error(f"Erreur monitoring: {e}")
+        raise HTTPException(status_code=503, detail=str(e))
+
+
+# Endpoint public pour cron job externe (sans auth)
+@router.get("/cron/monitor")
+async def cron_monitor_positions():
+    """
+    Endpoint pour cron job externe (Render, UptimeRobot, etc.)
+    Vérifie et protège les positions automatiquement
+    
+    Appeler toutes les 5 minutes via:
+    - Render Cron Job
+    - UptimeRobot
+    - cron-job.org
+    """
+    import httpx
+    from core.config import settings
+    
+    try:
+        executor_url = getattr(settings, 'DYDX_EXECUTOR_URL', 'http://localhost:3001')
+        api_secret = getattr(settings, 'DYDX_API_SECRET', '')
+        
+        headers = {"X-API-Key": api_secret} if api_secret else {}
+        
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.get(
+                f"{executor_url}/monitor",
+                headers=headers
+            )
+            
+            result = response.json()
+            
+            # Logger
+            await db.dydx_cron_logs.insert_one({
+                "type": "monitor",
+                "result": result,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            })
+            
+            return {
+                "status": "ok",
+                "positions": result.get("summary", {}).get("totalPositions", 0),
+                "alerts": len(result.get("alerts", [])),
+                "actions": len(result.get("actions", [])),
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+    except Exception as e:
+        logger.error(f"Erreur cron monitoring: {e}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }

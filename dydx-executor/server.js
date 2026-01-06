@@ -406,6 +406,330 @@ async function getMarketPrice(market) {
   return parseFloat(markets.markets[market]?.oraclePrice || 0);
 }
 
+// ============ POSITIONS DÉTAILLÉES & MONITORING ============
+
+// Positions avec PnL et ordres associés
+app.get('/positions/detailed', async (req, res) => {
+  if (!isConnected) {
+    return res.status(503).json({ error: 'Not connected' });
+  }
+  
+  try {
+    // Récupérer positions, ordres et prix
+    const [positionsRes, ordersRes, markets] = await Promise.all([
+      client.indexerClient.account.getSubaccountPerpetualPositions(wallet.address, 0),
+      client.indexerClient.account.getSubaccountOrders(wallet.address, 0),
+      client.indexerClient.markets.getPerpetualMarkets()
+    ]);
+    
+    const positions = positionsRes.positions || [];
+    const allOrders = ordersRes || [];
+    
+    const detailedPositions = positions.map(pos => {
+      const market = pos.market;
+      const marketData = markets.markets[market];
+      const currentPrice = parseFloat(marketData?.oraclePrice || 0);
+      const size = parseFloat(pos.size || 0);
+      const entryPrice = parseFloat(pos.entryPrice || 0);
+      const side = size > 0 ? 'LONG' : 'SHORT';
+      const absSize = Math.abs(size);
+      
+      // Calculer PnL
+      let unrealizedPnl = 0;
+      let pnlPercent = 0;
+      if (side === 'LONG') {
+        unrealizedPnl = (currentPrice - entryPrice) * absSize;
+        pnlPercent = ((currentPrice - entryPrice) / entryPrice) * 100;
+      } else {
+        unrealizedPnl = (entryPrice - currentPrice) * absSize;
+        pnlPercent = ((entryPrice - currentPrice) / entryPrice) * 100;
+      }
+      
+      // Trouver les ordres associés (SL/TP)
+      const relatedOrders = allOrders.filter(o => o.ticker === market && o.status === 'OPEN');
+      const stopLoss = relatedOrders.find(o => {
+        const orderSide = o.side;
+        const price = parseFloat(o.price);
+        if (side === 'LONG') {
+          return orderSide === 'SELL' && price < currentPrice;
+        } else {
+          return orderSide === 'BUY' && price > currentPrice;
+        }
+      });
+      const takeProfit = relatedOrders.find(o => {
+        const orderSide = o.side;
+        const price = parseFloat(o.price);
+        if (side === 'LONG') {
+          return orderSide === 'SELL' && price > currentPrice;
+        } else {
+          return orderSide === 'BUY' && price < currentPrice;
+        }
+      });
+      
+      return {
+        market,
+        side,
+        size: absSize,
+        entryPrice,
+        currentPrice,
+        unrealizedPnl: parseFloat(unrealizedPnl.toFixed(2)),
+        pnlPercent: parseFloat(pnlPercent.toFixed(2)),
+        status: unrealizedPnl >= 0 ? 'WINNING' : 'LOSING',
+        stopLoss: stopLoss ? {
+          price: parseFloat(stopLoss.price),
+          orderId: stopLoss.id,
+          expiresAt: stopLoss.goodTilBlockTime
+        } : null,
+        takeProfit: takeProfit ? {
+          price: parseFloat(takeProfit.price),
+          orderId: takeProfit.id,
+          expiresAt: takeProfit.goodTilBlockTime
+        } : null,
+        hasProtection: !!(stopLoss || takeProfit),
+        createdAt: pos.createdAt,
+        relatedOrders: relatedOrders.length
+      };
+    });
+    
+    // Compte
+    const account = await client.indexerClient.account.getSubaccount(wallet.address, 0);
+    const equity = parseFloat(account.subaccount?.equity || '0');
+    const freeCollateral = parseFloat(account.subaccount?.freeCollateral || '0');
+    
+    res.json({
+      wallet: wallet.address,
+      equity,
+      freeCollateral,
+      positionsCount: detailedPositions.length,
+      totalUnrealizedPnl: parseFloat(detailedPositions.reduce((sum, p) => sum + p.unrealizedPnl, 0).toFixed(2)),
+      positions: detailedPositions,
+      unprotectedPositions: detailedPositions.filter(p => !p.hasProtection).length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Fermer une position (market order)
+app.post('/positions/close', authMiddleware, async (req, res) => {
+  if (!isConnected) {
+    return res.status(503).json({ error: 'Not connected' });
+  }
+  
+  const { market, reason } = req.body;
+  
+  if (!market) {
+    return res.status(400).json({ error: 'Market required' });
+  }
+  
+  console.log(`\n🔒 Fermeture position ${market} - Raison: ${reason || 'manual'}`);
+  
+  try {
+    // Récupérer la position actuelle
+    const positionsRes = await client.indexerClient.account.getSubaccountPerpetualPositions(wallet.address, 0);
+    const position = (positionsRes.positions || []).find(p => p.market === market);
+    
+    if (!position) {
+      return res.status(404).json({ error: `Aucune position ouverte sur ${market}` });
+    }
+    
+    const size = Math.abs(parseFloat(position.size || 0));
+    const side = parseFloat(position.size) > 0 ? 'LONG' : 'SHORT';
+    const closeSide = side === 'LONG' ? OrderSide.SELL : OrderSide.BUY;
+    
+    // Prix actuel
+    const currentPrice = await getMarketPrice(market);
+    const currentBlock = await client.validatorClient.get.latestBlockHeight();
+    
+    // Placer un ordre market pour fermer
+    await client.placeShortTermOrder(
+      subaccount,
+      market,
+      closeSide,
+      currentPrice * (closeSide === OrderSide.BUY ? 1.01 : 0.99), // Slippage 1%
+      size,
+      randomClientId(),
+      currentBlock + 10,
+      OrderTimeInForce.IOC,
+      true // reduceOnly
+    );
+    
+    console.log(`   ✅ Position ${market} fermée (${side} ${size})`);
+    
+    // Annuler les ordres SL/TP restants
+    const ordersRes = await client.indexerClient.account.getSubaccountOrders(wallet.address, 0);
+    const relatedOrders = (ordersRes || []).filter(o => o.ticker === market && o.status === 'OPEN');
+    
+    for (const order of relatedOrders) {
+      try {
+        await client.cancelOrder(
+          subaccount,
+          order.clientId,
+          order.orderFlags,
+          market,
+          currentBlock + 10
+        );
+        console.log(`   🗑️ Ordre annulé: ${order.id}`);
+      } catch (e) {
+        console.log(`   ⚠️ Impossible d'annuler ${order.id}: ${e.message}`);
+      }
+    }
+    
+    res.json({
+      success: true,
+      market,
+      side,
+      size,
+      closePrice: currentPrice,
+      reason: reason || 'manual',
+      cancelledOrders: relatedOrders.length,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (e) {
+    console.error(`   ❌ Erreur fermeture: ${e.message}`);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 🔄 CRON/MONITORING - Vérifier les positions et fermer si nécessaire
+app.get('/monitor', authMiddleware, async (req, res) => {
+  if (!isConnected) {
+    return res.status(503).json({ error: 'Not connected' });
+  }
+  
+  console.log('\n🔍 === MONITORING DES POSITIONS ===');
+  
+  try {
+    const results = {
+      timestamp: new Date().toISOString(),
+      positions: [],
+      actions: [],
+      alerts: []
+    };
+    
+    // Récupérer positions et ordres
+    const [positionsRes, ordersRes, markets] = await Promise.all([
+      client.indexerClient.account.getSubaccountPerpetualPositions(wallet.address, 0),
+      client.indexerClient.account.getSubaccountOrders(wallet.address, 0),
+      client.indexerClient.markets.getPerpetualMarkets()
+    ]);
+    
+    const positions = positionsRes.positions || [];
+    const allOrders = ordersRes || [];
+    
+    console.log(`   📊 ${positions.length} positions ouvertes`);
+    
+    for (const pos of positions) {
+      const market = pos.market;
+      const marketData = markets.markets[market];
+      const currentPrice = parseFloat(marketData?.oraclePrice || 0);
+      const size = parseFloat(pos.size || 0);
+      const entryPrice = parseFloat(pos.entryPrice || 0);
+      const side = size > 0 ? 'LONG' : 'SHORT';
+      const absSize = Math.abs(size);
+      
+      // Calculer PnL
+      let pnlPercent = 0;
+      if (side === 'LONG') {
+        pnlPercent = ((currentPrice - entryPrice) / entryPrice) * 100;
+      } else {
+        pnlPercent = ((entryPrice - currentPrice) / entryPrice) * 100;
+      }
+      
+      // Vérifier les ordres de protection
+      const relatedOrders = allOrders.filter(o => o.ticker === market && o.status === 'OPEN');
+      const hasProtection = relatedOrders.length > 0;
+      
+      const posInfo = {
+        market,
+        side,
+        size: absSize,
+        entryPrice,
+        currentPrice,
+        pnlPercent: parseFloat(pnlPercent.toFixed(2)),
+        hasProtection,
+        ordersCount: relatedOrders.length
+      };
+      
+      results.positions.push(posInfo);
+      
+      console.log(`   ${side === 'LONG' ? '🟢' : '🔴'} ${market}: ${pnlPercent.toFixed(2)}% ${hasProtection ? '✅' : '⚠️ SANS PROTECTION'}`);
+      
+      // ALERTES
+      if (!hasProtection) {
+        results.alerts.push({
+          type: 'NO_PROTECTION',
+          market,
+          message: `Position ${market} sans Stop Loss ni Take Profit!`,
+          pnlPercent: posInfo.pnlPercent
+        });
+      }
+      
+      // Si perte > 5% sans protection, ALERTE CRITIQUE
+      if (!hasProtection && pnlPercent < -5) {
+        results.alerts.push({
+          type: 'CRITICAL_LOSS',
+          market,
+          message: `⚠️ CRITIQUE: ${market} perd ${Math.abs(pnlPercent).toFixed(2)}% sans protection!`,
+          pnlPercent: posInfo.pnlPercent
+        });
+        console.log(`   ⚠️ ALERTE CRITIQUE: ${market} -${Math.abs(pnlPercent).toFixed(2)}%`);
+      }
+      
+      // Auto-close si perte > 10% sans protection (sécurité)
+      if (!hasProtection && pnlPercent < -10) {
+        console.log(`   🚨 AUTO-FERMETURE: ${market} perte > 10%`);
+        
+        try {
+          const closeSide = side === 'LONG' ? OrderSide.SELL : OrderSide.BUY;
+          const currentBlock = await client.validatorClient.get.latestBlockHeight();
+          
+          await client.placeShortTermOrder(
+            subaccount,
+            market,
+            closeSide,
+            currentPrice * (closeSide === OrderSide.BUY ? 1.01 : 0.99),
+            absSize,
+            randomClientId(),
+            currentBlock + 10,
+            OrderTimeInForce.IOC,
+            true
+          );
+          
+          results.actions.push({
+            type: 'AUTO_CLOSE',
+            market,
+            reason: 'Loss > 10% without protection',
+            pnlPercent: posInfo.pnlPercent
+          });
+          
+          console.log(`   ✅ ${market} fermé automatiquement`);
+        } catch (e) {
+          console.log(`   ❌ Échec fermeture auto: ${e.message}`);
+        }
+      }
+    }
+    
+    results.summary = {
+      totalPositions: positions.length,
+      protectedPositions: results.positions.filter(p => p.hasProtection).length,
+      unprotectedPositions: results.positions.filter(p => !p.hasProtection).length,
+      criticalAlerts: results.alerts.filter(a => a.type === 'CRITICAL_LOSS').length,
+      actionsPerformed: results.actions.length
+    };
+    
+    console.log(`   📋 Résumé: ${results.summary.protectedPositions}/${results.summary.totalPositions} protégées`);
+    
+    res.json(results);
+    
+  } catch (e) {
+    console.error(`   ❌ Erreur monitoring: ${e.message}`);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Démarrer le serveur
 async function start() {
   console.log('='.repeat(60));
