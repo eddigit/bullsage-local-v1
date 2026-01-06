@@ -39,6 +39,9 @@ DYDX_MAINNET_ADDRESS = os.environ.get('DYDX_MAINNET_ADDRESS', '')
 DYDX_EXECUTOR_URL = os.environ.get('DYDX_EXECUTOR_URL', 'http://localhost:3001')
 DYDX_API_SECRET = os.environ.get('DYDX_API_SECRET', '')
 
+# Cron Job API Key (pour cron-job.org)
+CRON_API_KEY = os.environ.get('CRON_API_KEY', '')
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)

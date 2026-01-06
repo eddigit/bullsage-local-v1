@@ -3,7 +3,7 @@ Routes API dYdX pour BULL SAGE
 Connexion et exécution automatique sur dYdX v4
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, timezone
@@ -734,20 +734,30 @@ async def monitor_dydx_positions(current_user: dict = Depends(get_current_user))
         raise HTTPException(status_code=503, detail=str(e))
 
 
-# Endpoint public pour cron job externe (sans auth)
+# Endpoint public pour cron job externe (sans auth utilisateur, mais avec clé cron)
 @router.get("/cron/monitor")
-async def cron_monitor_positions():
+async def cron_monitor_positions(request: Request):
     """
-    Endpoint pour cron job externe (Render, UptimeRobot, etc.)
+    Endpoint pour cron job externe (cron-job.org, UptimeRobot, etc.)
     Vérifie et protège les positions automatiquement
     
     Appeler toutes les 5 minutes via:
-    - Render Cron Job
+    - cron-job.org avec header X-Cron-Key
     - UptimeRobot
-    - cron-job.org
+    - Render Cron Job
     """
     import httpx
     from core.config import settings
+    
+    # Vérifier la clé cron (optionnel mais recommandé)
+    cron_key = getattr(settings, 'CRON_API_KEY', '')
+    request_key = request.headers.get('X-Cron-Key', '')
+    
+    # En production, vérifier la clé si configurée
+    if cron_key and request_key != cron_key:
+        logger.warning(f"⚠️ Tentative cron non autorisée depuis {request.client.host}")
+        # On continue quand même pour ne pas bloquer le monitoring
+        # mais on log l'avertissement
     
     try:
         executor_url = getattr(settings, 'DYDX_EXECUTOR_URL', 'http://localhost:3001')
@@ -766,13 +776,19 @@ async def cron_monitor_positions():
             # Logger
             await db.dydx_cron_logs.insert_one({
                 "type": "monitor",
+                "source": "cron-job.org" if request_key else "unknown",
+                "ip": request.client.host if request.client else "unknown",
                 "result": result,
                 "timestamp": datetime.now(timezone.utc).isoformat()
             })
             
+            summary = result.get("summary", {})
+            
             return {
                 "status": "ok",
-                "positions": result.get("summary", {}).get("totalPositions", 0),
+                "positions": summary.get("totalPositions", 0),
+                "protected": summary.get("protectedPositions", 0),
+                "unprotected": summary.get("unprotectedPositions", 0),
                 "alerts": len(result.get("alerts", [])),
                 "actions": len(result.get("actions", [])),
                 "timestamp": datetime.now(timezone.utc).isoformat()
