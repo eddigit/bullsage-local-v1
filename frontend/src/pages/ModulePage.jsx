@@ -396,7 +396,7 @@ export default function ModulePage() {
   const handleCelebrationClose = () => {
     setShowCelebration(false);
     if (quizResult?.passed) {
-      navigate("/academy");
+      navigate("/dashboard/academy");
     }
   };
 
@@ -415,7 +415,7 @@ export default function ModulePage() {
     return (
       <div className="text-center py-12">
         <p className="text-muted-foreground">Module non trouvé</p>
-        <Button onClick={() => navigate("/academy")} className="mt-4">
+        <Button onClick={() => navigate("/dashboard/academy")} className="mt-4">
           Retour à l&apos;Académie
         </Button>
       </div>
@@ -436,7 +436,7 @@ export default function ModulePage() {
       <div className="flex items-center gap-4">
         <Button 
           variant="ghost" 
-          onClick={() => currentView === "lessons" ? navigate("/academy") : setCurrentView("lessons")}
+          onClick={() => currentView === "lessons" ? navigate("/dashboard/academy") : setCurrentView("lessons")}
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Retour

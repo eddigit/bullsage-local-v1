@@ -403,9 +403,9 @@ export default function OnboardingPage() {
       
       // Redirect based on profile
       if (experienceLevel === "beginner" || tradingGoals.includes("learn")) {
-        navigate("/academy");
+        navigate("/dashboard/academy");
       } else {
-        navigate("/");
+        navigate("/dashboard");
       }
     } catch (error) {
       console.error("Error completing onboarding:", error);

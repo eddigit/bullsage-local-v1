@@ -4,6 +4,7 @@ import { Toaster } from "sonner";
 import axios from "axios";
 
 // Pages
+import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -182,13 +183,21 @@ function App() {
         />
         <BrowserRouter>
           <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
+            {/* Landing page for non-authenticated users */}
+            <Route path="/" element={
+              user ? <Navigate to="/dashboard" replace /> : <LandingPage />
+            } />
+            <Route path="/login" element={
+              user ? <Navigate to="/dashboard" replace /> : <LoginPage />
+            } />
+            <Route path="/register" element={
+              user ? <Navigate to="/dashboard" replace /> : <RegisterPage />
+            } />
             <Route path="/onboarding" element={
               user ? <OnboardingPage /> : <Navigate to="/login" replace />
             } />
             
-            <Route path="/" element={
+            <Route path="/dashboard" element={
               <ProtectedRoute>
                 <MainLayout />
               </ProtectedRoute>

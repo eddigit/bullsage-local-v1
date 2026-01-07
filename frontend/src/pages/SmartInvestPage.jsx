@@ -512,7 +512,7 @@ export default function SmartInvestPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="flex flex-col gap-2 mt-6">
-              <Link to="/paper-trading" className="w-full">
+              <Link to="/dashboard/paper-trading" className="w-full">
                 <Button className="w-full bg-violet-600 hover:bg-violet-700">
                   Voir mon Portfolio
                 </Button>

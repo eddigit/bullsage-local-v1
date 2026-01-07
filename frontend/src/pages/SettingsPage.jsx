@@ -379,7 +379,7 @@ export default function SettingsPage() {
             <CardDescription>Accès réservé aux administrateurs</CardDescription>
           </CardHeader>
           <CardContent>
-            <Link to="/admin">
+            <Link to="/dashboard/admin">
               <Button className="w-full bg-amber-600 hover:bg-amber-700 text-white">
                 <Shield className="w-4 h-4 mr-2" />
                 Accéder au tableau de bord admin

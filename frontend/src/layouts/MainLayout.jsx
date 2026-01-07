@@ -58,29 +58,29 @@ import {
 
 // Main navigation items - SIMPLIFIÉ
 const navigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Cockpit Trading", href: "/cockpit", icon: Sun, highlight: true },
-  { name: "Graphique", href: "/chart", icon: CandlestickChart },
-  { name: "Paper Trading", href: "/paper-trading", icon: Wallet },
-  { name: "Journal", href: "/journal", icon: BookOpen },
-  { name: "Assistant IA", href: "/assistant", icon: MessageCircle },
-  { name: "Académie", href: "/academy", icon: GraduationCap, highlight: true },
-  { name: "Paramètres", href: "/settings", icon: Settings },
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Cockpit Trading", href: "/dashboard/cockpit", icon: Sun, highlight: true },
+  { name: "Graphique", href: "/dashboard/chart", icon: CandlestickChart },
+  { name: "Paper Trading", href: "/dashboard/paper-trading", icon: Wallet },
+  { name: "Journal", href: "/dashboard/journal", icon: BookOpen },
+  { name: "Assistant IA", href: "/dashboard/assistant", icon: MessageCircle },
+  { name: "Académie", href: "/dashboard/academy", icon: GraduationCap, highlight: true },
+  { name: "Paramètres", href: "/dashboard/settings", icon: Settings },
 ];
 
 // Admin navigation
 const adminNavigation = [
-  { name: "Administration", href: "/admin", icon: Shield, admin: true },
-  { name: "Newsletter", href: "/admin/newsletter", icon: Mail, admin: true },
-  { name: "Clés API", href: "/admin/api-keys", icon: Key, admin: true },
+  { name: "Administration", href: "/dashboard/admin", icon: Shield, admin: true },
+  { name: "Newsletter", href: "/dashboard/admin/newsletter", icon: Mail, admin: true },
+  { name: "Clés API", href: "/dashboard/admin/api-keys", icon: Key, admin: true },
 ];
 
 // Bottom bar items (mobile) - 5 main items - SIMPLIFIÉ
 const bottomNavItems = [
-  { name: "Accueil", href: "/", icon: Home },
-  { name: "Cockpit", href: "/cockpit", icon: Sun },
-  { name: "Graphique", href: "/chart", icon: CandlestickChart },
-  { name: "Académie", href: "/academy", icon: GraduationCap },
+  { name: "Accueil", href: "/dashboard", icon: Home },
+  { name: "Cockpit", href: "/dashboard/cockpit", icon: Sun },
+  { name: "Graphique", href: "/dashboard/chart", icon: CandlestickChart },
+  { name: "Académie", href: "/dashboard/academy", icon: GraduationCap },
   { name: "Plus", href: null, icon: MoreHorizontal, isMore: true },
 ];
 
@@ -225,7 +225,7 @@ export default function MainLayout() {
               Installer
             </Button>
           )}
-          <NavLink to="/settings">
+          <NavLink to="/dashboard/settings">
             <Avatar className="w-8 h-8 ring-2 ring-transparent hover:ring-primary/30 transition-all">
               <AvatarImage src={getAvatarUrl()} alt={user?.name} />
               <AvatarFallback className="bg-secondary text-sm">
@@ -280,12 +280,12 @@ export default function MainLayout() {
         {/* Quick Action Buttons - Left side */}
         <div className="flex items-center gap-2">
           <NavLink
-            to="/pro-trader"
+            to="/dashboard/pro-trader"
             className={`
               flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
               bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500
               text-white transition-all duration-200 shadow-lg shadow-blue-600/20
-              ${location.pathname === '/pro-trader' ? 'ring-2 ring-white/30' : ''}
+              ${location.pathname === '/dashboard/pro-trader' ? 'ring-2 ring-white/30' : ''}
             `}
           >
             <Brain className="w-4 h-4" />
@@ -293,12 +293,12 @@ export default function MainLayout() {
           </NavLink>
 
           <NavLink
-            to="/dydx-positions"
+            to="/dashboard/dydx-positions"
             className={`
               flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
               bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500
               text-white transition-all duration-200 shadow-lg shadow-purple-600/20
-              ${location.pathname === '/dydx-positions' ? 'ring-2 ring-white/30' : ''}
+              ${location.pathname === '/dashboard/dydx-positions' ? 'ring-2 ring-white/30' : ''}
             `}
           >
             <Activity className="w-4 h-4" />
@@ -306,12 +306,12 @@ export default function MainLayout() {
           </NavLink>
           
           <NavLink
-            to="/opportunity-scanner"
+            to="/dashboard/opportunity-scanner"
             className={`
               flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
               bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400
               text-white transition-all duration-200 shadow-lg shadow-amber-600/20
-              ${location.pathname === '/opportunity-scanner' ? 'ring-2 ring-white/30' : ''}
+              ${location.pathname === '/dashboard/opportunity-scanner' ? 'ring-2 ring-white/30' : ''}
             `}
           >
             <Search className="w-4 h-4" />
@@ -319,12 +319,12 @@ export default function MainLayout() {
           </NavLink>
           
           <NavLink
-            to="/smart-invest"
+            to="/dashboard/smart-invest"
             className={`
               flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
               bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500
               text-white transition-all duration-200 shadow-lg shadow-violet-600/20
-              ${location.pathname === '/smart-invest' ? 'ring-2 ring-white/30' : ''}
+              ${location.pathname === '/dashboard/smart-invest' ? 'ring-2 ring-white/30' : ''}
             `}
           >
             <Zap className="w-4 h-4" />
@@ -332,12 +332,12 @@ export default function MainLayout() {
           </NavLink>
           
           <NavLink
-            to="/auto-trading"
+            to="/dashboard/auto-trading"
             className={`
               flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
               bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500
               text-white transition-all duration-200 shadow-lg shadow-emerald-600/20
-              ${location.pathname === '/auto-trading' ? 'ring-2 ring-white/30' : ''}
+              ${location.pathname === '/dashboard/auto-trading' ? 'ring-2 ring-white/30' : ''}
             `}
           >
             <Bot className="w-4 h-4" />
@@ -385,13 +385,13 @@ export default function MainLayout() {
             {/* Menu Items */}
             <div className="py-2">
               <DropdownMenuItem asChild className="cursor-pointer px-3 py-2.5">
-                <NavLink to="/settings" className="flex items-center gap-3">
+                <NavLink to="/dashboard/settings" className="flex items-center gap-3">
                   <User className="w-4 h-4 text-muted-foreground" />
                   <span>Mon Profil</span>
                 </NavLink>
               </DropdownMenuItem>
               <DropdownMenuItem asChild className="cursor-pointer px-3 py-2.5">
-                <NavLink to="/settings" className="flex items-center gap-3">
+                <NavLink to="/dashboard/settings" className="flex items-center gap-3">
                   <Settings className="w-4 h-4 text-muted-foreground" />
                   <span>Paramètres</span>
                 </NavLink>
@@ -401,7 +401,7 @@ export default function MainLayout() {
             {user?.is_admin && (
               <div className="py-2 border-t border-white/10">
                 <DropdownMenuItem asChild className="cursor-pointer px-3 py-2.5">
-                  <NavLink to="/admin" className="flex items-center gap-3 text-violet-400">
+                  <NavLink to="/dashboard/admin" className="flex items-center gap-3 text-violet-400">
                     <Shield className="w-4 h-4" />
                     <span>Administration</span>
                   </NavLink>
@@ -503,7 +503,7 @@ export default function MainLayout() {
                 <p className="text-sm text-muted-foreground capitalize">{user?.trading_level}</p>
               </div>
               <NavLink 
-                to="/settings"
+                to="/dashboard/settings"
                 onClick={() => setMoreMenuOpen(false)}
                 className="p-2 rounded-full hover:bg-white/5"
               >

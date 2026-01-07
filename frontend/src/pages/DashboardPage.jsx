@@ -1058,7 +1058,7 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
                     <RefreshCw className="w-4 h-4 mr-2" />
                     Nouvelle analyse
                   </Button>
-                  <Link to="/assistant" className="flex-1">
+                  <Link to="/dashboard/assistant" className="flex-1">
                     <Button className="w-full bg-violet-500 hover:bg-violet-600">
                       <Sparkles className="w-4 h-4 mr-2" />
                       Discussion détaillée
@@ -1174,7 +1174,7 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
               <RefreshCw className={`w-4 h-4 mr-2 ${scanning ? "animate-spin" : ""}`} />
               Re-scanner
             </Button>
-            <Link to="/trading" className="flex-1">
+            <Link to="/dashboard/trading" className="flex-1">
               <Button className="w-full bg-violet-500 hover:bg-violet-600">
                 <Zap className="w-4 h-4 mr-2" />
                 Analyser en détail
@@ -1189,7 +1189,7 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <UITooltip>
             <TooltipTrigger asChild>
-              <Link to="/markets">
+              <Link to="/dashboard/markets">
                 <Card className="glass border-white/5 card-hover cursor-pointer">
                   <CardContent className="pt-6 text-center">
                     <TrendingUp className="w-8 h-8 mx-auto text-blue-500 mb-2" />
@@ -1207,7 +1207,7 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
           
           <UITooltip>
             <TooltipTrigger asChild>
-              <Link to="/paper-trading">
+              <Link to="/dashboard/paper-trading">
                 <Card className="glass border-white/5 card-hover cursor-pointer">
                   <CardContent className="pt-6 text-center">
                     <Wallet className="w-8 h-8 mx-auto text-primary mb-2" />
@@ -1225,7 +1225,7 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
           
           <UITooltip>
             <TooltipTrigger asChild>
-              <Link to="/strategies">
+              <Link to="/dashboard/strategies">
                 <Card className="glass border-white/5 card-hover cursor-pointer">
                   <CardContent className="pt-6 text-center">
                     <Target className="w-8 h-8 mx-auto text-yellow-500 mb-2" />
@@ -1243,7 +1243,7 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
           
           <UITooltip>
             <TooltipTrigger asChild>
-              <Link to="/assistant">
+              <Link to="/dashboard/assistant">
                 <Card className="glass border-violet-500/20 card-hover cursor-pointer">
                   <CardContent className="pt-6 text-center">
                     <Sparkles className="w-8 h-8 mx-auto text-violet-400 mb-2" />

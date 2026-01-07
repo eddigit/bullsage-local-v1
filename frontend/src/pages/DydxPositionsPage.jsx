@@ -349,7 +349,7 @@ export default function DydxPositionsPage() {
               </p>
               <Button 
                 className="mt-4"
-                onClick={() => window.location.href = '/pro-trader'}
+                onClick={() => window.location.href = '/dashboard/pro-trader'}
               >
                 <Zap className="w-4 h-4 mr-2" />
                 Aller à Pro Trader AI

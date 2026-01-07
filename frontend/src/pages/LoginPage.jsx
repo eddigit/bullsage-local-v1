@@ -28,7 +28,7 @@ export default function LoginPage() {
       toast.success("Connexion réussie !");
       // Attendre un tick pour que le state React soit propagé
       setTimeout(() => {
-        window.location.href = "/";
+        window.location.href = "/dashboard";
       }, 100);
     } catch (error) {
       toast.error(error.response?.data?.detail || "Erreur de connexion");
@@ -131,6 +131,15 @@ export default function LoginPage() {
         <p className="text-center text-xs text-muted-foreground mt-6">
           En vous connectant, vous acceptez nos conditions d&apos;utilisation
         </p>
+
+        <div className="mt-4 text-center">
+          <Link 
+            to="/" 
+            className="text-sm text-muted-foreground hover:text-white transition-colors"
+          >
+            ← Retour à l'accueil
+          </Link>
+        </div>
       </div>
     </div>
   );

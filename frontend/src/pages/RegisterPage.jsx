@@ -174,6 +174,15 @@ export default function RegisterPage() {
         <p className="text-center text-xs text-muted-foreground mt-6">
           Solde virtuel de 10,000$ offert pour le paper trading
         </p>
+
+        <div className="mt-4 text-center">
+          <Link 
+            to="/" 
+            className="text-sm text-muted-foreground hover:text-white transition-colors"
+          >
+            ← Retour à l'accueil
+          </Link>
+        </div>
       </div>
     </div>
   );
