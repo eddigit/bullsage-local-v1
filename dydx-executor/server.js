@@ -548,10 +548,12 @@ app.get('/positions/detailed', async (req, res) => {
       client.indexerClient.markets.getPerpetualMarkets()
     ]);
     
-    // Filtrer les positions avec taille 0 (positions fermées mais encore dans l'API)
+    // Filtrer les positions fermées (status CLOSED ou taille 0)
     const positions = (positionsRes.positions || []).filter(pos => {
       const size = parseFloat(pos.size || 0);
-      return Math.abs(size) > 0.00001; // Seuil pour éviter les erreurs de flottants
+      const status = pos.status || '';
+      // Garder uniquement les positions OPEN avec une taille non nulle
+      return status === 'OPEN' && Math.abs(size) > 0.00001;
     });
     const allOrders = ordersRes || [];
     

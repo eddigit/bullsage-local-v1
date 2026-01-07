@@ -345,7 +345,9 @@ async def quick_create_dydx_signal(
         executor_url = getattr(settings, 'DYDX_EXECUTOR_URL', 'http://localhost:3001')
         api_secret = getattr(settings, 'DYDX_API_SECRET', '')
         
-        headers = {"X-API-Secret": api_secret} if api_secret else {}
+        logger.info(f"🎯 Exécution dYdX: {signal.market} {signal.direction} via {executor_url}")
+        
+        headers = {"X-API-Key": api_secret} if api_secret else {}
         
         async with httpx.AsyncClient(timeout=30.0) as client:
             # Construire le payload avec les nouvelles options de taille
