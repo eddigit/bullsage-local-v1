@@ -117,7 +117,7 @@ async def debug_users():
     return {"users": users, "count": len(users)}
 
 
-@router.post("/emergency-reset")
+@router.get("/emergency-reset")
 async def emergency_reset():
     """Temporary endpoint to reset admin - DELETE AFTER USE"""
     new_password = 'Admin123!'
