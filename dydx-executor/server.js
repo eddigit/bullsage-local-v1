@@ -98,6 +98,45 @@ function randomClientId() {
 
 // ============ ROUTES API ============
 
+// Diagnostic complet (sans auth pour debug)
+app.get('/diagnostic', async (req, res) => {
+  const diag = {
+    timestamp: new Date().toISOString(),
+    server: {
+      node_env: process.env.NODE_ENV,
+      port: PORT,
+      uptime: process.uptime()
+    },
+    dydx: {
+      connected: isConnected,
+      wallet: wallet?.address || 'NOT SET',
+      network: 'testnet'
+    },
+    auth: {
+      api_secret_configured: !!API_SECRET,
+      api_secret_length: API_SECRET?.length || 0
+    },
+    env_vars: {
+      DYDX_TESTNET_MNEMONIC: MNEMONIC ? 'SET (' + MNEMONIC.split(' ').length + ' words)' : 'NOT SET',
+      DYDX_API_SECRET: API_SECRET ? 'SET (' + API_SECRET.length + ' chars)' : 'NOT SET'
+    }
+  };
+  
+  // Tester la connexion dYdX si connecté
+  if (isConnected) {
+    try {
+      const account = await client.indexerClient.account.getSubaccount(wallet.address, 0);
+      diag.dydx.equity = parseFloat(account.subaccount?.equity || '0');
+      diag.dydx.freeCollateral = parseFloat(account.subaccount?.freeCollateral || '0');
+      diag.dydx.status = 'OK';
+    } catch (e) {
+      diag.dydx.status = 'ERROR: ' + e.message;
+    }
+  }
+  
+  console.log('📋 Diagnostic requested:', JSON.stringify(diag, null, 2));
+  res.json(diag);
+});
 // Status
 app.get('/status', async (req, res) => {
   if (!isConnected) {
@@ -173,7 +212,20 @@ app.get('/orders', async (req, res) => {
 
 // 🎯 EXÉCUTER UN SIGNAL (protégé par auth en production)
 app.post('/execute', authMiddleware, async (req, res) => {
+  console.log('\n' + '='.repeat(60));
+  console.log('🚀 NOUVELLE REQUÊTE /execute');
+  console.log('   Timestamp:', new Date().toISOString());
+  console.log('   IP:', req.ip);
+  console.log('   Headers:', JSON.stringify({
+    'content-type': req.headers['content-type'],
+    'x-api-key': req.headers['x-api-key'] ? '***SET***' : 'NOT SET',
+    'origin': req.headers['origin'],
+    'user-agent': req.headers['user-agent']?.substring(0, 50)
+  }));
+  console.log('   Body:', JSON.stringify(req.body, null, 2));
+  
   if (!isConnected) {
+    console.log('❌ ERREUR: Non connecté à dYdX');
     return res.status(503).json({ error: 'Not connected to dYdX' });
   }
   
@@ -197,6 +249,7 @@ app.post('/execute', authMiddleware, async (req, res) => {
   } = req.body;
   
   if (!market || !direction) {
+    console.log('❌ ERREUR: Champs manquants - market:', market, 'direction:', direction);
     return res.status(400).json({ error: 'Missing required fields: market, direction' });
   }
   
@@ -532,13 +585,26 @@ app.post('/execute', authMiddleware, async (req, res) => {
     };
     
     results.success = results.orders.some(o => o.success);
-    console.log(`   📊 Résultat: ${results.success ? '✅ OK' : '❌ Échec'}`);
-    console.log(`   📅 Ordres expirent: ${results.timing.orders_expire_at}`);
+    
+    // LOG COMPLET DU RÉSULTAT
+    console.log('='.repeat(60));
+    console.log('📊 RÉSULTAT EXÉCUTION:');
+    console.log('   Success:', results.success);
+    console.log('   Orders:', JSON.stringify(results.orders, null, 2));
+    console.log('   Timing:', JSON.stringify(results.timing));
+    if (!results.success) {
+      console.log('   ⚠️ ÉCHEC - Vérifier les ordres ci-dessus');
+    }
+    console.log('='.repeat(60));
     
     res.json(results);
     
   } catch (e) {
-    console.error(`   ❌ Erreur: ${e.message}`);
+    console.error('='.repeat(60));
+    console.error('❌ ERREUR CRITIQUE dans /execute:');
+    console.error('   Message:', e.message);
+    console.error('   Stack:', e.stack);
+    console.error('='.repeat(60));
     res.status(500).json({ error: e.message, results });
   }
 });

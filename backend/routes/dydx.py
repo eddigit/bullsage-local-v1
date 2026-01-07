@@ -61,6 +61,48 @@ class DydxExecuteRequest(BaseModel):
 
 # ==================== ENDPOINTS ====================
 
+@router.get("/diagnostic")
+async def get_dydx_diagnostic():
+    """
+    Diagnostic complet de la configuration dYdX
+    Endpoint public pour debug
+    """
+    import httpx
+    from core.config import settings
+    
+    diag = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "backend_config": {
+            "DYDX_EXECUTOR_URL": getattr(settings, 'DYDX_EXECUTOR_URL', 'NOT SET'),
+            "DYDX_API_SECRET": 'SET (' + str(len(getattr(settings, 'DYDX_API_SECRET', ''))) + ' chars)' if getattr(settings, 'DYDX_API_SECRET', '') else 'NOT SET'
+        },
+        "executor_status": None,
+        "executor_diagnostic": None
+    }
+    
+    # Tester la connexion au executor
+    executor_url = getattr(settings, 'DYDX_EXECUTOR_URL', None)
+    if not executor_url or 'localhost' in executor_url:
+        executor_url = 'https://bullsage-dydx-executor.onrender.com'
+        diag["backend_config"]["fallback_url"] = executor_url
+    
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            # Status basique
+            status_resp = await client.get(f"{executor_url}/status")
+            diag["executor_status"] = status_resp.json() if status_resp.status_code == 200 else f"HTTP {status_resp.status_code}"
+            
+            # Diagnostic détaillé
+            diag_resp = await client.get(f"{executor_url}/diagnostic")
+            diag["executor_diagnostic"] = diag_resp.json() if diag_resp.status_code == 200 else f"HTTP {diag_resp.status_code}"
+            
+    except Exception as e:
+        diag["executor_error"] = str(e)
+    
+    logger.info(f"📋 Diagnostic dYdX: {diag}")
+    return diag
+
+
 @router.get("/status")
 async def get_dydx_status(current_user: dict = Depends(get_current_user)):
     """
@@ -339,51 +381,70 @@ async def quick_create_dydx_signal(
     
     await db.dydx_signals.insert_one(signal_doc)
     
-    # Exécuter via le Node.js executor
+    # ============================================================
+    # EXÉCUTION VIA NODE.JS EXECUTOR - LOGS COMPLETS
+    # ============================================================
     execution_result = None
     try:
+        # Configuration
         executor_url = getattr(settings, 'DYDX_EXECUTOR_URL', None)
+        api_secret = getattr(settings, 'DYDX_API_SECRET', '')
+        
+        # Log configuration
+        logger.info("=" * 60)
+        logger.info("🚀 DÉBUT EXÉCUTION DYDX")
+        logger.info(f"   Signal: {signal.direction} {signal.market}")
+        logger.info(f"   Size: {request.size}")
+        logger.info(f"   SL%: {request.stop_loss_pct} | TP%: {request.take_profit_pct}")
+        logger.info(f"   DYDX_EXECUTOR_URL env: {executor_url}")
+        logger.info(f"   DYDX_API_SECRET: {'SET (' + str(len(api_secret)) + ' chars)' if api_secret else 'NOT SET'}")
+        
         # Fallback vers URL publique si non configuré ou localhost
         if not executor_url or 'localhost' in executor_url:
             executor_url = 'https://bullsage-dydx-executor.onrender.com'
-        api_secret = getattr(settings, 'DYDX_API_SECRET', '')
+            logger.info(f"   ➡️ Fallback URL: {executor_url}")
         
-        logger.info(f"🎯 Exécution dYdX: {signal.market} {signal.direction} via {executor_url}")
+        logger.info(f"   URL finale: {executor_url}")
         
-        headers = {"X-API-Key": api_secret} if api_secret else {}
+        headers = {}
+        if api_secret:
+            headers["X-API-Key"] = api_secret
+            logger.info(f"   Header X-API-Key: SET")
+        else:
+            logger.warning(f"   ⚠️ Aucun header d'auth envoyé!")
+        
+        # Payload
+        execute_payload = {
+            "market": signal.market,
+            "direction": signal.direction,
+            "size": request.size,
+            "stopLoss": stop_loss,
+            "takeProfit": take_profit,
+            "stop_loss_pct": request.stop_loss_pct,
+            "take_profit_pct": request.take_profit_pct,
+            "sizeMode": request.sizeMode,
+            "percentageOfPortfolio": request.percentageOfPortfolio,
+            "fixedAmountUSDC": request.fixedAmountUSDC,
+            "metadata": {
+                "urgency": urgency,
+                "wait_pullback": wait_pullback,
+                "recommended_entry": metadata.get("recommended_entry"),
+                "confidence": metadata.get("confidence"),
+                "quality": metadata.get("quality"),
+                "rr_ratio": metadata.get("rr_ratio"),
+                "signals": metadata.get("signals"),
+                "trade_type": metadata.get("trade_type"),
+                "timeframe": metadata.get("timeframe"),
+                "estimated_duration": metadata.get("estimated_duration"),
+                "trade_config": metadata.get("trade_config"),
+                "executed_at": metadata.get("executed_at")
+            }
+        }
+        
+        logger.info(f"   Payload: {execute_payload}")
         
         async with httpx.AsyncClient(timeout=30.0) as client:
-            # Construire le payload avec les nouvelles options de taille
-            execute_payload = {
-                "market": signal.market,
-                "direction": signal.direction,
-                "size": request.size,
-                "stopLoss": stop_loss,
-                "takeProfit": take_profit,
-                "stop_loss_pct": request.stop_loss_pct,
-                "take_profit_pct": request.take_profit_pct,
-                # Nouveau: configuration du montant
-                "sizeMode": request.sizeMode,
-                "percentageOfPortfolio": request.percentageOfPortfolio,
-                "fixedAmountUSDC": request.fixedAmountUSDC,
-                # Métadonnées pour documentation
-                "metadata": {
-                    "urgency": urgency,
-                    "wait_pullback": wait_pullback,
-                    "recommended_entry": metadata.get("recommended_entry"),
-                    "confidence": metadata.get("confidence"),
-                    "quality": metadata.get("quality"),
-                    "rr_ratio": metadata.get("rr_ratio"),
-                    "signals": metadata.get("signals"),
-                    "trade_type": metadata.get("trade_type"),
-                    "timeframe": metadata.get("timeframe"),
-                    "estimated_duration": metadata.get("estimated_duration"),
-                    "trade_config": metadata.get("trade_config"),
-                    "executed_at": metadata.get("executed_at")
-                }
-            }
-            
-            logger.info(f"📤 Envoi à {executor_url}/execute: {signal.market} {signal.direction}")
+            logger.info(f"📤 POST {executor_url}/execute")
             
             response = await client.post(
                 f"{executor_url}/execute",
@@ -391,19 +452,29 @@ async def quick_create_dydx_signal(
                 headers=headers
             )
             
-            logger.info(f"📥 Réponse dYdX executor: status={response.status_code}")
+            logger.info(f"📥 Réponse HTTP: {response.status_code}")
+            logger.info(f"   Headers réponse: {dict(response.headers)}")
+            logger.info(f"   Body: {response.text[:500]}")
             
             if response.status_code == 401:
-                logger.error(f"❌ Authentification échouée vers dYdX executor")
+                logger.error("❌ ERREUR 401: Authentification échouée")
+                logger.error(f"   Le secret API ne correspond pas entre backend et executor")
                 execution_result = {"success": False, "error": "Unauthorized - API key mismatch"}
+            elif response.status_code == 503:
+                logger.error("❌ ERREUR 503: dYdX executor non connecté à dYdX")
+                execution_result = {"success": False, "error": "dYdX executor not connected"}
             elif response.status_code != 200:
-                logger.error(f"❌ Erreur HTTP {response.status_code}: {response.text}")
-                execution_result = {"success": False, "error": f"HTTP {response.status_code}"}
+                logger.error(f"❌ ERREUR HTTP {response.status_code}: {response.text}")
+                execution_result = {"success": False, "error": f"HTTP {response.status_code}: {response.text}"}
             else:
                 execution_result = response.json()
-                logger.info(f"✅ Exécution réussie: {execution_result}")
+                if execution_result.get("success"):
+                    logger.info(f"✅ SUCCÈS: Trade exécuté!")
+                    logger.info(f"   Orders: {execution_result.get('orders', [])}")
+                else:
+                    logger.error(f"❌ ÉCHEC: {execution_result.get('error', 'Unknown')}")
             
-            # Mettre à jour le statut
+            # Sauvegarder en base
             success = execution_result.get("success", False)
             await db.dydx_signals.update_one(
                 {"id": signal_doc["id"]},
@@ -413,8 +484,20 @@ async def quick_create_dydx_signal(
                     "executed_at": datetime.now(timezone.utc).isoformat()
                 }}
             )
+            
+        logger.info("=" * 60)
+        
+    except httpx.ConnectError as e:
+        logger.error(f"❌ ERREUR CONNEXION: Impossible de joindre {executor_url}")
+        logger.error(f"   Détail: {str(e)}")
+        execution_result = {"success": False, "error": f"Connection failed: {str(e)}"}
+    except httpx.TimeoutException as e:
+        logger.error(f"❌ TIMEOUT: La requête a dépassé 30 secondes")
+        execution_result = {"success": False, "error": "Timeout"}
     except Exception as e:
-        logger.error(f"Erreur exécution dYdX: {e}")
+        logger.error(f"❌ ERREUR INATTENDUE: {type(e).__name__}: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
         execution_result = {"success": False, "error": str(e)}
     
     # Log l'urgence
