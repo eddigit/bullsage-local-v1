@@ -342,7 +342,10 @@ async def quick_create_dydx_signal(
     # Exécuter via le Node.js executor
     execution_result = None
     try:
-        executor_url = getattr(settings, 'DYDX_EXECUTOR_URL', 'http://localhost:3001')
+        executor_url = getattr(settings, 'DYDX_EXECUTOR_URL', None)
+        # Fallback vers URL publique si non configuré ou localhost
+        if not executor_url or 'localhost' in executor_url:
+            executor_url = 'https://bullsage-dydx-executor.onrender.com'
         api_secret = getattr(settings, 'DYDX_API_SECRET', '')
         
         logger.info(f"🎯 Exécution dYdX: {signal.market} {signal.direction} via {executor_url}")
@@ -380,12 +383,25 @@ async def quick_create_dydx_signal(
                 }
             }
             
+            logger.info(f"📤 Envoi à {executor_url}/execute: {signal.market} {signal.direction}")
+            
             response = await client.post(
                 f"{executor_url}/execute",
                 json=execute_payload,
                 headers=headers
             )
-            execution_result = response.json()
+            
+            logger.info(f"📥 Réponse dYdX executor: status={response.status_code}")
+            
+            if response.status_code == 401:
+                logger.error(f"❌ Authentification échouée vers dYdX executor")
+                execution_result = {"success": False, "error": "Unauthorized - API key mismatch"}
+            elif response.status_code != 200:
+                logger.error(f"❌ Erreur HTTP {response.status_code}: {response.text}")
+                execution_result = {"success": False, "error": f"HTTP {response.status_code}"}
+            else:
+                execution_result = response.json()
+                logger.info(f"✅ Exécution réussie: {execution_result}")
             
             # Mettre à jour le statut
             success = execution_result.get("success", False)

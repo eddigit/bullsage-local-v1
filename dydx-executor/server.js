@@ -48,11 +48,27 @@ const authMiddleware = (req, res, next) => {
     return next();
   }
   
+  // Log pour debug
+  console.log('🔐 Auth check - Headers:', {
+    'x-api-key': req.headers['x-api-key'] ? '***SET***' : 'NOT SET',
+    'authorization': req.headers['authorization'] ? '***SET***' : 'NOT SET',
+    'origin': req.headers['origin'],
+    'referer': req.headers['referer']
+  });
+  
   const authHeader = req.headers['x-api-key'] || req.headers['authorization'];
   if (authHeader === API_SECRET || authHeader === `Bearer ${API_SECRET}`) {
     return next();
   }
   
+  // Permettre les requêtes depuis les services Render internes (même réseau)
+  const origin = req.headers['origin'] || req.headers['referer'] || '';
+  if (origin.includes('onrender.com') || origin.includes('bullsage')) {
+    console.log('✅ Requête autorisée depuis Render internal');
+    return next();
+  }
+  
+  console.log('❌ Auth failed - Expected:', API_SECRET ? '***SET***' : 'NOT SET');
   return res.status(401).json({ error: 'Unauthorized' });
 };
 
