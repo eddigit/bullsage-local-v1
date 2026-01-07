@@ -358,7 +358,7 @@ export default function DydxPositionsPage() {
           </Card>
         ) : (
           <div className="space-y-4">
-            {positions.map((position, index) => (
+            {positions.filter(p => p.size > 0.00001).map((position, index) => (
               <Card 
                 key={index}
                 className={`transition-all ${

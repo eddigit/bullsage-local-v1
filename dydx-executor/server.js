@@ -548,7 +548,11 @@ app.get('/positions/detailed', async (req, res) => {
       client.indexerClient.markets.getPerpetualMarkets()
     ]);
     
-    const positions = positionsRes.positions || [];
+    // Filtrer les positions avec taille 0 (positions fermées mais encore dans l'API)
+    const positions = (positionsRes.positions || []).filter(pos => {
+      const size = parseFloat(pos.size || 0);
+      return Math.abs(size) > 0.00001; // Seuil pour éviter les erreurs de flottants
+    });
     const allOrders = ordersRes || [];
     
     const detailedPositions = positions.map(pos => {
