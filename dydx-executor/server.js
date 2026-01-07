@@ -38,6 +38,9 @@ let wallet = null;
 let subaccount = null;
 let isConnected = false;
 
+// 🆕 Stockage en mémoire des ordres pullback en attente
+const pendingPullbacks = new Map();
+
 // Middleware d'authentification pour les routes sensibles (production)
 const authMiddleware = (req, res, next) => {
   // En développement local, pas de vérification
@@ -169,6 +172,10 @@ app.post('/execute', authMiddleware, async (req, res) => {
     sizeMode,
     percentageOfPortfolio,
     fixedAmountUSDC,
+    // 🆕 Mode d'entrée: 'market' (immédiat) ou 'pullback' (ordre limite)
+    entryMode = 'market',
+    // Expiration de l'ordre d'entrée pullback en heures (défaut: 4h)
+    pullbackExpirationHours = 4,
     // Métadonnées pour documentation
     metadata
   } = req.body;
@@ -177,8 +184,13 @@ app.post('/execute', authMiddleware, async (req, res) => {
     return res.status(400).json({ error: 'Missing required fields: market, direction' });
   }
   
+  // Valider le mode d'entrée
+  const validEntryModes = ['market', 'pullback'];
+  const normalizedEntryMode = validEntryModes.includes(entryMode?.toLowerCase()) ? entryMode.toLowerCase() : 'market';
+  
   console.log(`\n🎯 Signal reçu: ${direction} ${market}`);
   console.log(`   Entry: $${entry || 'market'} | SL: $${stopLoss} | TP: $${takeProfit}`);
+  console.log(`   📥 Mode d'entrée: ${normalizedEntryMode.toUpperCase()}${normalizedEntryMode === 'pullback' ? ` (expire: ${pullbackExpirationHours}h)` : ''}`);
   if (metadata) {
     console.log(`   📋 Métadonnées:`, JSON.stringify(metadata, null, 2));
   }
@@ -302,24 +314,138 @@ app.post('/execute', authMiddleware, async (req, res) => {
     const exitSide = direction === 'LONG' ? OrderSide.SELL : OrderSide.BUY;
     
     // 1. Ordre d'entrée
-    const entryPrice = entry || (await getMarketPrice(market));
+    const currentMarketPrice = await getMarketPrice(market);
+    const entryPrice = entry || currentMarketPrice;
     const entryClientId = randomClientId();
     
+    // Calculer l'expiration de l'ordre pullback en secondes
+    const pullbackExpirationSeconds = Math.max(1800, Math.min(pullbackExpirationHours * 3600, 604800)); // Min 30min, Max 7 jours
+    
+    // Vérifier si le pullback est logique
+    const isPullbackValid = normalizedEntryMode === 'pullback' && entry && (
+      (direction === 'LONG' && entry < currentMarketPrice) || // Long: on attend que le prix descende
+      (direction === 'SHORT' && entry > currentMarketPrice)   // Short: on attend que le prix monte
+    );
+    
     try {
-      await client.placeShortTermOrder(
-        subaccount,
-        market,
-        entrySide,
-        entryPrice * (direction === 'LONG' ? 1.005 : 0.995),
-        calculatedSize,
-        entryClientId,
-        currentBlock + 10,
-        OrderTimeInForce.IOC,
-        false
-      );
-      
-      console.log(`   ✅ Entry placé`);
-      results.orders.push({ type: 'ENTRY', success: true, price: entryPrice, size: calculatedSize });
+      if (normalizedEntryMode === 'pullback' && entry) {
+        // 🆕 MODE PULLBACK: Ordre limite qui attend que le prix revienne
+        
+        if (!isPullbackValid) {
+          // Le prix actuel est déjà au niveau du pullback ou mieux
+          console.log(`   ⚠️ Prix actuel ($${currentMarketPrice.toFixed(2)}) déjà ${direction === 'LONG' ? 'en dessous' : 'au-dessus'} du pullback ($${entry})`);
+          console.log(`   🔄 Basculement en mode MARKET`);
+          
+          // Exécuter en market si le pullback n'a plus de sens
+          await client.placeShortTermOrder(
+            subaccount,
+            market,
+            entrySide,
+            currentMarketPrice * (direction === 'LONG' ? 1.005 : 0.995),
+            calculatedSize,
+            entryClientId,
+            currentBlock + 10,
+            OrderTimeInForce.IOC,
+            false
+          );
+          
+          console.log(`   ✅ Entry MARKET placé @ ~$${currentMarketPrice.toFixed(2)}`);
+          results.orders.push({ 
+            type: 'ENTRY', 
+            success: true, 
+            mode: 'market_fallback',
+            price: currentMarketPrice, 
+            size: calculatedSize,
+            note: 'Pullback ignoré - prix déjà favorable'
+          });
+        } else {
+          // Placer un ordre limite au prix du pullback
+          await client.placeOrder(
+            subaccount,
+            market,
+            OrderType.LIMIT,
+            entrySide,
+            entryPrice,
+            calculatedSize,
+            entryClientId,
+            OrderTimeInForce.GTT,
+            pullbackExpirationSeconds,
+            OrderExecution.DEFAULT,
+            true, // postOnly = true pour s'assurer d'être maker
+            false
+          );
+          
+          const pullbackPercent = ((currentMarketPrice - entryPrice) / currentMarketPrice * 100).toFixed(2);
+          console.log(`   ✅ Entry PULLBACK placé @ $${entryPrice} (${pullbackPercent}% ${direction === 'LONG' ? 'plus bas' : 'plus haut'})`);
+          console.log(`   ⏳ En attente du pullback - expire dans ${pullbackExpirationHours}h`);
+          
+          results.orders.push({ 
+            type: 'ENTRY', 
+            success: true, 
+            mode: 'pullback',
+            price: entryPrice, 
+            currentPrice: currentMarketPrice,
+            pullbackPercent: parseFloat(pullbackPercent),
+            size: calculatedSize,
+            expiresIn: pullbackExpirationSeconds,
+            expiresAt: new Date(Date.now() + pullbackExpirationSeconds * 1000).toISOString(),
+            status: 'PENDING_PULLBACK'
+          });
+          
+          // NOTE: Pour le mode pullback, on NE place PAS les SL/TP immédiatement
+          // car la position n'existe pas encore. Ils seront placés quand l'ordre sera exécuté.
+          results.pullbackMode = true;
+          results.pullbackInfo = {
+            entryPrice: entryPrice,
+            currentPrice: currentMarketPrice,
+            pullbackPercent: parseFloat(pullbackPercent),
+            expiresAt: new Date(Date.now() + pullbackExpirationSeconds * 1000).toISOString(),
+            note: 'Les SL/TP seront activés automatiquement quand le pullback sera atteint'
+          };
+          results.pendingSLTP = {
+            stopLoss: stopLoss,
+            takeProfit: takeProfit,
+            note: 'En attente de l\'exécution de l\'ordre d\'entrée'
+          };
+          
+          // 🆕 Enregistrer le pullback pour monitoring automatique
+          const pullbackKey = `${market}_${entryClientId}`;
+          pendingPullbacks.set(pullbackKey, {
+            market,
+            direction,
+            entryPrice,
+            size: calculatedSize,
+            stopLoss,
+            takeProfit,
+            clientId: entryClientId,
+            expiresAt: new Date(Date.now() + pullbackExpirationSeconds * 1000).toISOString(),
+            createdAt: new Date().toISOString(),
+            status: 'PENDING'
+          });
+          
+          results.success = true;
+          console.log(`   📊 Mode PULLBACK actif - SL/TP en attente (clé: ${pullbackKey})`);
+          
+          // Retourner tôt pour le mode pullback
+          return res.json(results);
+        }
+      } else {
+        // MODE MARKET: Exécution immédiate (comportement actuel)
+        await client.placeShortTermOrder(
+          subaccount,
+          market,
+          entrySide,
+          entryPrice * (direction === 'LONG' ? 1.005 : 0.995),
+          calculatedSize,
+          entryClientId,
+          currentBlock + 10,
+          OrderTimeInForce.IOC,
+          false
+        );
+        
+        console.log(`   ✅ Entry MARKET placé`);
+        results.orders.push({ type: 'ENTRY', success: true, mode: 'market', price: entryPrice, size: calculatedSize });
+      }
     } catch (e) {
       console.log(`   ❌ Entry échoué: ${e.message}`);
       results.orders.push({ type: 'ENTRY', success: false, error: e.message });
@@ -916,6 +1042,206 @@ app.get('/monitor', authMiddleware, async (req, res) => {
   } catch (e) {
     console.error(`   ❌ Erreur monitoring: ${e.message}`);
     res.status(500).json({ error: e.message });
+  }
+});
+
+// ============ PULLBACK MONITORING ============
+
+// Enregistrer un ordre pullback avec ses SL/TP en attente
+app.post('/pullback/register', authMiddleware, async (req, res) => {
+  const { market, direction, entryPrice, size, stopLoss, takeProfit, expiresAt, clientId } = req.body;
+  
+  if (!market || !direction || !size) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+  
+  const pullbackData = {
+    market,
+    direction,
+    entryPrice,
+    size,
+    stopLoss,
+    takeProfit,
+    expiresAt,
+    clientId,
+    createdAt: new Date().toISOString(),
+    status: 'PENDING'
+  };
+  
+  pendingPullbacks.set(`${market}_${clientId || Date.now()}`, pullbackData);
+  
+  console.log(`📥 Pullback enregistré: ${direction} ${market} @ $${entryPrice}`);
+  
+  res.json({ success: true, pullback: pullbackData });
+});
+
+// Vérifier les ordres pullback et activer les SL/TP si exécutés
+app.get('/pullback/check', authMiddleware, async (req, res) => {
+  if (!isConnected) {
+    return res.status(503).json({ error: 'Not connected' });
+  }
+  
+  console.log(`\n🔍 Vérification des pullbacks en attente...`);
+  
+  const results = {
+    checked: [],
+    activated: [],
+    expired: [],
+    pending: []
+  };
+  
+  try {
+    // Récupérer les positions actuelles
+    const [positionsRes, ordersRes] = await Promise.all([
+      client.indexerClient.account.getSubaccountPerpetualPositions(wallet.address, 0),
+      client.indexerClient.account.getSubaccountOrders(wallet.address, 0)
+    ]);
+    
+    const positions = positionsRes.positions || [];
+    const openOrders = (ordersRes || []).filter(o => o.status === 'OPEN');
+    
+    for (const [key, pullback] of pendingPullbacks.entries()) {
+      results.checked.push(key);
+      
+      const now = new Date();
+      const expiresAt = new Date(pullback.expiresAt);
+      
+      // Vérifier si expiré
+      if (expiresAt < now) {
+        console.log(`   ⏰ Pullback expiré: ${pullback.market}`);
+        pullback.status = 'EXPIRED';
+        results.expired.push(pullback);
+        pendingPullbacks.delete(key);
+        continue;
+      }
+      
+      // Vérifier si une position existe maintenant (= pullback exécuté)
+      const position = positions.find(p => p.market === pullback.market);
+      
+      if (position && Math.abs(parseFloat(position.size)) >= pullback.size * 0.95) {
+        console.log(`   ✅ Pullback exécuté pour ${pullback.market}! Activation SL/TP...`);
+        
+        const size = Math.abs(parseFloat(position.size));
+        const direction = parseFloat(position.size) > 0 ? 'LONG' : 'SHORT';
+        const exitSide = direction === 'LONG' ? OrderSide.SELL : OrderSide.BUY;
+        
+        const activatedOrders = [];
+        
+        // Placer le Stop Loss
+        if (pullback.stopLoss) {
+          try {
+            await client.placeOrder(
+              subaccount,
+              pullback.market,
+              OrderType.LIMIT,
+              exitSide,
+              pullback.stopLoss,
+              size,
+              randomClientId(),
+              OrderTimeInForce.GTT,
+              604800, // 7 jours
+              OrderExecution.DEFAULT,
+              false,
+              false
+            );
+            console.log(`      ✅ SL activé @ $${pullback.stopLoss}`);
+            activatedOrders.push({ type: 'STOP_LOSS', price: pullback.stopLoss });
+          } catch (e) {
+            console.log(`      ⚠️ SL échoué: ${e.message}`);
+          }
+        }
+        
+        // Placer le Take Profit
+        if (pullback.takeProfit) {
+          try {
+            await client.placeOrder(
+              subaccount,
+              pullback.market,
+              OrderType.LIMIT,
+              exitSide,
+              pullback.takeProfit,
+              size,
+              randomClientId(),
+              OrderTimeInForce.GTT,
+              604800, // 7 jours
+              OrderExecution.DEFAULT,
+              false,
+              false
+            );
+            console.log(`      ✅ TP activé @ $${pullback.takeProfit}`);
+            activatedOrders.push({ type: 'TAKE_PROFIT', price: pullback.takeProfit });
+          } catch (e) {
+            console.log(`      ⚠️ TP échoué: ${e.message}`);
+          }
+        }
+        
+        pullback.status = 'ACTIVATED';
+        pullback.activatedOrders = activatedOrders;
+        pullback.activatedAt = new Date().toISOString();
+        results.activated.push(pullback);
+        pendingPullbacks.delete(key);
+      } else {
+        // Toujours en attente
+        results.pending.push(pullback);
+      }
+    }
+    
+    console.log(`   📊 Résultat: ${results.activated.length} activés, ${results.expired.length} expirés, ${results.pending.length} en attente`);
+    
+    res.json({
+      success: true,
+      timestamp: new Date().toISOString(),
+      ...results
+    });
+    
+  } catch (e) {
+    console.error(`   ❌ Erreur vérification pullback: ${e.message}`);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Liste des pullbacks en attente
+app.get('/pullback/pending', authMiddleware, (req, res) => {
+  const pending = Array.from(pendingPullbacks.values());
+  res.json({
+    count: pending.length,
+    pullbacks: pending
+  });
+});
+
+// Annuler un pullback
+app.delete('/pullback/:market', authMiddleware, async (req, res) => {
+  const { market } = req.params;
+  
+  let deleted = false;
+  for (const [key, pullback] of pendingPullbacks.entries()) {
+    if (pullback.market === market) {
+      pendingPullbacks.delete(key);
+      deleted = true;
+      
+      // Annuler aussi l'ordre limite sur dYdX si on est connecté
+      if (isConnected && pullback.clientId) {
+        try {
+          const currentBlock = await client.validatorClient.get.latestBlockHeight();
+          await client.cancelOrder(
+            subaccount,
+            pullback.clientId,
+            0,
+            market,
+            currentBlock + 10
+          );
+          console.log(`   🗑️ Ordre pullback annulé pour ${market}`);
+        } catch (e) {
+          console.log(`   ⚠️ Impossible d'annuler l'ordre: ${e.message}`);
+        }
+      }
+    }
+  }
+  
+  if (deleted) {
+    res.json({ success: true, message: `Pullback ${market} annulé` });
+  } else {
+    res.status(404).json({ error: `Pas de pullback en attente pour ${market}` });
   }
 });
 
