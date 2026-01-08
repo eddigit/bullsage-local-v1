@@ -7826,13 +7826,27 @@ except Exception as e:
     import traceback
     traceback.print_exc()
 
+# Inclure les routes Webhook pour automatisation Claude
+try:
+    from routes.webhook import router as webhook_router
+    app.include_router(webhook_router, prefix="/api")
+    logger.info("✅ Routes Webhook chargées pour automatisation Claude")
+except Exception as e:
+    logger.warning(f"⚠️ Routes Webhook non disponibles: {e}")
+    import traceback
+    traceback.print_exc()
+
 # Mount static files for uploads
 app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
+
+# Configuration CORS depuis variable d'environnement
+CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '*')
+cors_origins_list = CORS_ORIGINS.split(',') if CORS_ORIGINS != '*' else ["*"]
 
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=["*"],  # DEV MODE: Tout autoriser
+    allow_origins=cors_origins_list,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],

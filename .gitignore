@@ -30,16 +30,23 @@ next-env.d.ts
 dist/
 dist
 
-# Environment files - GARDER pour déploiement facile
-# Les .env sont commités pour ce projet privé
-# .env
-# .env.local
-# .env.*.local
-# backend/.env
-# frontend/.env
+# Environment files - NE PAS COMMITER
+# Les secrets doivent etre configures via Render/variables d'environnement
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+dydx-executor/.env
+
+# Garder les exemples
 !.env.example
 !backend/.env.example
 !frontend/.env.example
+!dydx-executor/.env.example
+
+# Claude Code cache
+.claude/
 
 *token.json*
 *credentials.json*

@@ -26,6 +26,14 @@ try:
 except ImportError:
     DYDX_ROUTER_AVAILABLE = False
 
+# Import optionnel du routeur Webhook (pour automatisation Claude)
+try:
+    from .webhook import router as webhook_router
+    WEBHOOK_ROUTER_AVAILABLE = True
+except ImportError as e:
+    WEBHOOK_ROUTER_AVAILABLE = False
+    print(f"⚠️ Webhook router non disponible: {e}")
+
 # Create main API router
 api_router = APIRouter(prefix="/api")
 
@@ -51,3 +59,7 @@ api_router.include_router(defi_scanner_router)
 # Inclure le routeur dYdX si disponible
 if DYDX_ROUTER_AVAILABLE:
     api_router.include_router(dydx_router)
+
+# Inclure le routeur Webhook si disponible
+if WEBHOOK_ROUTER_AVAILABLE:
+    api_router.include_router(webhook_router)

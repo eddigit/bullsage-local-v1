@@ -42,6 +42,9 @@ DYDX_API_SECRET = os.environ.get('DYDX_API_SECRET', '')
 # Cron Job API Key (pour cron-job.org)
 CRON_API_KEY = os.environ.get('CRON_API_KEY', '')
 
+# Claude Webhook Token (pour automatisation trading)
+CLAUDE_WEBHOOK_TOKEN = os.environ.get('CLAUDE_WEBHOOK_TOKEN', '')
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
