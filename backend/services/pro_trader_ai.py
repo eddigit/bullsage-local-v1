@@ -512,6 +512,12 @@ class ProTraderAI:
         """
         🎯 Génère une recommandation de trade complète
         Comme un trader pro vous conseillerait
+        
+        RÈGLES ULTRA-STRICTES (après les pertes SOL/XRP):
+        - Ne recommande un trade que si TOUTES les conditions sont alignées
+        - En cas de doute → TOUJOURS WAIT
+        - SHORT = INTERDIT sauf conditions extrêmes (3/3 bearish + RSI > 80)
+        - Minimum qualité A pour trader
         """
         
         analysis = await self.analyze_asset(symbol)
@@ -519,37 +525,78 @@ class ProTraderAI:
         if "error" in analysis:
             return analysis
         
-        # Déterminer direction
+        # Déterminer direction avec RÈGLES ULTRA-STRICTES
         trends = analysis["trends"]
+        rsi = analysis["rsi"]
+        
+        # Compter les tendances
         bullish = sum(1 for t in trends.values() if "UPTREND" in t["direction"])
         bearish = sum(1 for t in trends.values() if "DOWNTREND" in t["direction"])
         
-        if bullish > bearish:
-            direction = "LONG"
-        elif bearish > bullish:
+        # Force des tendances
+        strength_1d = trends.get("1d", {}).get("strength", 50)
+        strength_4h = trends.get("4h", {}).get("strength", 50)
+        trend_1d = trends.get("1d", {}).get("direction", "NEUTRAL")
+        trend_4h = trends.get("4h", {}).get("direction", "NEUTRAL")
+        
+        # Calculer le momentum récent (éviter de shorter un marché qui monte)
+        # Si RSI 1h > RSI 4h = momentum haussier
+        momentum_bullish = rsi["1h"] > rsi["4h"] and rsi["4h"] > 45
+        momentum_bearish = rsi["1h"] < rsi["4h"] and rsi["4h"] < 55
+        
+        # === RÈGLES ULTRA-STRICTES POUR DIRECTION ===
+        direction = "WAIT"  # Par défaut = pas de trade
+        
+        # LONG: seulement si tendance 1D ET 4H haussières ET RSI pas en surachat
+        if ("UPTREND" in trend_1d and "UPTREND" in trend_4h and 
+            bullish >= 2 and strength_1d >= 55 and strength_4h >= 55):
+            # Vérifier que RSI n'est pas en surachat
+            if rsi["1d"] < 70 and rsi["4h"] < 70 and rsi["1h"] < 75:
+                direction = "LONG"
+            else:
+                direction = "WAIT"  # RSI trop haut
+        
+        # SHORT: ULTRA-STRICT - seulement si TOUTES les conditions extrêmes
+        elif ("DOWNTREND" in trend_1d and "DOWNTREND" in trend_4h and
+              bearish == 3 and  # TOUTES les tendances baissières
+              strength_1d >= 70 and  # Tendance très forte
+              rsi["1d"] > 50 and  # Pas déjà survendu
+              rsi["4h"] > 50 and
+              momentum_bearish):  # Momentum confirme
             direction = "SHORT"
-        else:
-            direction = "WAIT"
         
         # Qualité du trade
         quality, confidence, signals, warnings = self._determine_trade_quality(analysis)
         
+        # === FORCER WAIT SI QUALITÉ INSUFFISANTE ===
+        if quality not in [TradeQuality.A_PLUS, TradeQuality.A]:
+            direction = "WAIT"
+            warnings.insert(0, "🚫 QUALITÉ INSUFFISANTE - NE PAS TRADER")
+            warnings.insert(1, "⚠️ Attendre un setup de qualité A+ ou A minimum")
+        
+        # === FORCER WAIT SI SHORT ET PAS CONDITIONS EXTRÊMES ===
+        if direction == "SHORT":
+            if bearish < 3 or strength_1d < 70 or not momentum_bearish:
+                direction = "WAIT"
+                warnings.insert(0, "🚫 CONDITIONS INSUFFISANTES POUR SHORT")
+                warnings.insert(1, "⚠️ Le SHORT nécessite 3/3 tendances baissières + momentum")
+        
         # Niveaux
         levels = self._calculate_entry_stop_tp(
             analysis["current_price"],
-            direction,
+            direction if direction != "WAIT" else "LONG",  # Calculs par défaut
             analysis["levels"]["support"],
             analysis["levels"]["resistance"]
         )
         
         # Urgence
-        if quality in [TradeQuality.A_PLUS, TradeQuality.A]:
+        if quality in [TradeQuality.A_PLUS, TradeQuality.A] and direction != "WAIT":
             if analysis["rsi"]["1h"] < 35 or analysis["rsi"]["1h"] > 65:
                 urgency = "IMMEDIATE"
             else:
                 urgency = "WAIT_PULLBACK"
         else:
-            urgency = "WAIT_CONFIRMATION"
+            urgency = "NO_TRADE"
         
         # Timeframes alignés
         aligned = [tf for tf, data in trends.items() 
@@ -564,6 +611,11 @@ class ProTraderAI:
         
         # Plan d'action
         action_plan = self._generate_action_plan(direction, quality, levels, urgency)
+        
+        # Ajouter avertissement si SHORT recommandé
+        if direction == "SHORT":
+            warnings.append("⚠️ SHORT = Plus risqué que LONG en crypto")
+            warnings.append("⚠️ Utilisez un stop loss serré")
         
         return {
             "symbol": symbol,
@@ -635,11 +687,34 @@ class ProTraderAI:
                               levels: Dict, urgency: str) -> str:
         """Génère le plan d'action détaillé"""
         
+        # SI WAIT = NE PAS TRADER
+        if direction == "WAIT":
+            return """
+🚫 **NE PAS TRADER MAINTENANT**
+
+Les conditions ne sont pas réunies pour un trade rentable.
+
+**Pourquoi attendre ?**
+• Les tendances ne sont pas suffisamment alignées
+• La qualité du setup n'est pas A+ ou A
+• Le risque de perte est trop élevé
+
+**Que faire ?**
+• Surveiller le marché
+• Attendre un pullback vers un support/résistance clé
+• Revérifier dans 1-4 heures
+
+⚠️ Trader sans setup de qualité = perdre de l'argent
+"""
+        
         if quality == TradeQuality.D:
             return "❌ **NE PAS TRADER** - Conditions non favorables. Attendez un meilleur setup."
         
         if quality == TradeQuality.C:
-            return "⚠️ **PRUDENCE** - Setup moyen. Si vous tradez, réduisez la taille de position de 50%."
+            return "⚠️ **NE PAS TRADER** - Setup de qualité C = trop risqué."
+        
+        if quality == TradeQuality.B:
+            return "⚠️ **NE PAS TRADER** - Setup de qualité B = pas assez fiable."
         
         action = "ACHETER" if direction == "LONG" else "VENDRE" if direction == "SHORT" else "ATTENDRE"
         emoji = "🟢" if direction == "LONG" else "🔴" if direction == "SHORT" else "🟡"
