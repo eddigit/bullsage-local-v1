@@ -236,6 +236,148 @@ class TrendAnalyzer:
             return MarketPhase.RANGING
 
 
+class CandlestickAnalyzer:
+    """Analyse des patterns de bougies pour timing d'entrée"""
+    
+    def analyze_candles(self, opens: List[float], highs: List[float], 
+                        lows: List[float], closes: List[float]) -> Dict:
+        """Analyse les dernières bougies pour détecter des patterns"""
+        if len(closes) < 10:
+            return {"pattern": None, "signal": "NEUTRAL", "strength": 0}
+        
+        patterns = []
+        
+        # Dernières bougies
+        o, h, l, c = opens[-1], highs[-1], lows[-1], closes[-1]
+        o2, h2, l2, c2 = opens[-2], highs[-2], lows[-2], closes[-2]
+        o3, h3, l3, c3 = opens[-3], highs[-3], lows[-3], closes[-3]
+        
+        body = abs(c - o)
+        upper_wick = h - max(o, c)
+        lower_wick = min(o, c) - l
+        candle_range = h - l
+        
+        body2 = abs(c2 - o2)
+        
+        # === PATTERNS BULLISH ===
+        
+        # Hammer (marteau) - corps petit en haut, longue mèche basse
+        if lower_wick > body * 2 and upper_wick < body * 0.5 and c > o:
+            patterns.append({"name": "HAMMER", "signal": "BULLISH", "strength": 75})
+        
+        # Bullish Engulfing - bougie verte englobe la rouge précédente
+        if c2 < o2 and c > o and c > o2 and o < c2:
+            patterns.append({"name": "BULLISH_ENGULFING", "signal": "BULLISH", "strength": 80})
+        
+        # Morning Star (3 bougies)
+        if c3 < o3 and body2 < body3 * 0.3 and c > o and c > (o3 + c3) / 2:
+            patterns.append({"name": "MORNING_STAR", "signal": "BULLISH", "strength": 85})
+        
+        # Pin Bar Bullish - très longue mèche basse
+        if lower_wick > candle_range * 0.66 and body < candle_range * 0.2:
+            patterns.append({"name": "PIN_BAR_BULLISH", "signal": "BULLISH", "strength": 80})
+        
+        # === PATTERNS BEARISH ===
+        
+        # Shooting Star - corps petit en bas, longue mèche haute
+        if upper_wick > body * 2 and lower_wick < body * 0.5 and c < o:
+            patterns.append({"name": "SHOOTING_STAR", "signal": "BEARISH", "strength": 75})
+        
+        # Bearish Engulfing
+        if c2 > o2 and c < o and c < o2 and o > c2:
+            patterns.append({"name": "BEARISH_ENGULFING", "signal": "BEARISH", "strength": 80})
+        
+        # Evening Star (3 bougies)
+        body3 = abs(c3 - o3)
+        if c3 > o3 and body2 < body3 * 0.3 and c < o and c < (o3 + c3) / 2:
+            patterns.append({"name": "EVENING_STAR", "signal": "BEARISH", "strength": 85})
+        
+        # Pin Bar Bearish
+        if upper_wick > candle_range * 0.66 and body < candle_range * 0.2:
+            patterns.append({"name": "PIN_BAR_BEARISH", "signal": "BEARISH", "strength": 80})
+        
+        # === PATTERNS NEUTRES ===
+        
+        # Doji - indécision
+        if body < candle_range * 0.1:
+            patterns.append({"name": "DOJI", "signal": "NEUTRAL", "strength": 50})
+        
+        # Résultat
+        if not patterns:
+            return {"pattern": None, "signal": "NEUTRAL", "strength": 0, "patterns": []}
+        
+        # Prendre le pattern le plus fort
+        best = max(patterns, key=lambda x: x["strength"])
+        return {
+            "pattern": best["name"],
+            "signal": best["signal"],
+            "strength": best["strength"],
+            "patterns": patterns
+        }
+    
+    def find_entry_trigger(self, opens: List[float], highs: List[float],
+                           lows: List[float], closes: List[float],
+                           direction: str, current_price: float) -> Dict:
+        """
+        Trouve le prix d'entrée optimal basé sur les bougies
+        Retourne un ordre LIMIT conditionnel
+        """
+        if len(closes) < 20:
+            return {"type": "MARKET", "price": current_price}
+        
+        # Calculer les niveaux clés récents
+        recent_highs = highs[-10:]
+        recent_lows = lows[-10:]
+        
+        # Support/Résistance court terme
+        short_support = min(recent_lows)
+        short_resistance = max(recent_highs)
+        
+        # Moyenne des clôtures récentes
+        avg_close = sum(closes[-5:]) / 5
+        
+        if direction == "LONG":
+            # Pour un LONG, on veut acheter sur un pullback vers le support
+            # ou légèrement sous le prix actuel
+            pullback_target = max(short_support, current_price * 0.995)
+            
+            # Niveau d'invalidation = sous le support
+            invalidation = short_support * 0.98
+            
+            return {
+                "type": "LIMIT",
+                "price": round(pullback_target, 2),
+                "trigger_condition": f"Entrer si le prix descend à ${pullback_target:,.2f}",
+                "invalidation": round(invalidation, 2),
+                "invalidation_msg": f"Annuler si le prix casse sous ${invalidation:,.2f}",
+                "valid_for": "4 heures",
+                "alternative": {
+                    "type": "MARKET",
+                    "condition": f"Ou entrer maintenant si la bougie 1H clôture au-dessus de ${avg_close:,.2f}"
+                }
+            }
+        
+        elif direction == "SHORT":
+            # Pour un SHORT, on veut vendre sur un rebond vers la résistance
+            pullback_target = min(short_resistance, current_price * 1.005)
+            invalidation = short_resistance * 1.02
+            
+            return {
+                "type": "LIMIT",
+                "price": round(pullback_target, 2),
+                "trigger_condition": f"Entrer si le prix monte à ${pullback_target:,.2f}",
+                "invalidation": round(invalidation, 2),
+                "invalidation_msg": f"Annuler si le prix casse au-dessus de ${invalidation:,.2f}",
+                "valid_for": "4 heures",
+                "alternative": {
+                    "type": "MARKET",
+                    "condition": f"Ou entrer maintenant si la bougie 1H clôture en-dessous de ${avg_close:,.2f}"
+                }
+            }
+        
+        return {"type": "WAIT", "reason": "Direction non déterminée"}
+
+
 class ProTraderAI:
     """
     🧠 Intelligence de Trading Professionnelle
@@ -247,6 +389,7 @@ class ProTraderAI:
     def __init__(self):
         self.trend_analyzer = TrendAnalyzer()
         self.smart_money = SmartMoneyAnalyzer()
+        self.candle_analyzer = CandlestickAnalyzer()
         self.min_rr_ratio = 2.0  # Ratio risque/récompense minimum
         self.max_risk_per_trade = 2.0  # % max du portefeuille par trade
     
@@ -321,7 +464,7 @@ class ProTraderAI:
                 }
     
     async def analyze_asset(self, symbol: str) -> Dict:
-        """Analyse complète d'un actif"""
+        """Analyse complète d'un actif avec patterns de bougies"""
         
         # Récupérer données multi-timeframe
         data_1h = await self.trend_analyzer.fetch_data(symbol, 60)
@@ -356,6 +499,16 @@ class ProTraderAI:
         # Support / Résistance
         support, resistance = self._find_key_levels(data_1d)
         
+        # 🕯️ ANALYSE DES BOUGIES (4H pour signal + 1D pour confirmation)
+        candles_4h = self.candle_analyzer.analyze_candles(
+            data_4h["opens"], data_4h["highs"], 
+            data_4h["lows"], data_4h["closes"]
+        )
+        candles_1d = self.candle_analyzer.analyze_candles(
+            data_1d["opens"], data_1d["highs"], 
+            data_1d["lows"], data_1d["closes"]
+        )
+        
         return {
             "symbol": symbol,
             "current_price": current_price,
@@ -367,7 +520,14 @@ class ProTraderAI:
             "rsi": {"1h": rsi_1h, "4h": rsi_4h, "1d": rsi_1d},
             "market_phase": market_phase.value,
             "smart_money": smart_money_analysis,
-            "levels": {"support": support, "resistance": resistance}
+            "levels": {"support": support, "resistance": resistance},
+            "candles": {
+                "4h": candles_4h,
+                "1d": candles_1d
+            },
+            # Garder les données pour entry trigger
+            "_data_4h": data_4h,
+            "_data_1d": data_1d
         }
     
     def _find_key_levels(self, data: Dict) -> Tuple[float, float]:
@@ -589,6 +749,31 @@ class ProTraderAI:
             analysis["levels"]["resistance"]
         )
         
+        # 🕯️ ANALYSE DES BOUGIES - Déterminer condition d'entrée
+        candle_info = analysis.get("candles", {}).get("4h", {})
+        candle_patterns = candle_info.get("patterns", [])
+        candle_signal = candle_info.get("signal", "NEUTRAL")
+        
+        # Trouver condition d'entrée avec ordre LIMIT
+        entry_trigger = None
+        if direction != "WAIT" and "_data_4h" in analysis:
+            data_4h = analysis["_data_4h"]
+            entry_trigger = self.candle_analyzer.find_entry_trigger(
+                data_4h["opens"], data_4h["highs"], 
+                data_4h["lows"], data_4h["closes"],
+                direction
+            )
+        elif direction == "WAIT":
+            # Même si WAIT, donner les conditions pour entrer plus tard
+            if "_data_4h" in analysis:
+                data_4h = analysis["_data_4h"]
+                # Chercher un trigger LONG potentiel (plus prudent)
+                entry_trigger = self.candle_analyzer.find_entry_trigger(
+                    data_4h["opens"], data_4h["highs"], 
+                    data_4h["lows"], data_4h["closes"],
+                    "LONG"  # Chercher condition LONG par défaut
+                )
+        
         # Urgence
         if quality in [TradeQuality.A_PLUS, TradeQuality.A] and direction != "WAIT":
             if analysis["rsi"]["1h"] < 35 or analysis["rsi"]["1h"] > 65:
@@ -606,16 +791,20 @@ class ProTraderAI:
         # Déterminer le timeframe principal et la durée estimée
         timeframe_info = self._determine_timeframe(aligned, analysis["trends"])
         
-        # Raisonnement
-        reasoning = self._generate_reasoning(analysis, direction, quality, signals)
+        # Raisonnement (avec info bougies)
+        reasoning = self._generate_reasoning(analysis, direction, quality, signals, candle_patterns)
         
-        # Plan d'action
-        action_plan = self._generate_action_plan(direction, quality, levels, urgency)
+        # Plan d'action (avec condition d'entrée)
+        action_plan = self._generate_action_plan(direction, quality, levels, urgency, entry_trigger)
         
         # Ajouter avertissement si SHORT recommandé
         if direction == "SHORT":
             warnings.append("⚠️ SHORT = Plus risqué que LONG en crypto")
             warnings.append("⚠️ Utilisez un stop loss serré")
+        
+        # Ajouter info patterns de bougies aux signaux
+        for pattern in candle_patterns[:2]:  # Max 2 patterns
+            signals.append(f"🕯️ Pattern: {pattern}")
         
         return {
             "symbol": symbol,
@@ -634,6 +823,15 @@ class ProTraderAI:
             },
             
             "levels": levels,
+            
+            # 🎯 CONDITIONS D'ENTRÉE
+            "entry_trigger": entry_trigger,
+            
+            # 🕯️ ANALYSE BOUGIES
+            "candle_analysis": {
+                "patterns": candle_patterns,
+                "signal": candle_signal
+            },
             
             "analysis": {
                 "market_phase": analysis["market_phase"],
@@ -655,11 +853,20 @@ class ProTraderAI:
         }
     
     def _generate_reasoning(self, analysis: Dict, direction: str, 
-                            quality: TradeQuality, signals: List[str]) -> str:
-        """Génère l'explication du raisonnement"""
+                            quality: TradeQuality, signals: List[str],
+                            candle_patterns: List[str] = None) -> str:
+        """Génère l'explication du raisonnement avec patterns de bougies"""
         
         phase = analysis["market_phase"]
         price = analysis["current_price"]
+        
+        # Info bougies
+        candle_section = ""
+        if candle_patterns:
+            candle_section = f"""
+**🕯️ Patterns de Bougies (4H)**:
+{chr(10).join('• ' + p for p in candle_patterns[:3])}
+"""
         
         reasoning = f"""
 📊 **ANALYSE {analysis['symbol']}** @ ${price:,.2f}
@@ -675,7 +882,7 @@ class ProTraderAI:
 • 1H: {analysis['rsi']['1h']:.1f}
 • 4H: {analysis['rsi']['4h']:.1f}
 • 1D: {analysis['rsi']['1d']:.1f}
-
+{candle_section}
 **Signaux clés**:
 {chr(10).join('• ' + s for s in signals)}
 
@@ -684,12 +891,13 @@ class ProTraderAI:
         return reasoning.strip()
     
     def _generate_action_plan(self, direction: str, quality: TradeQuality,
-                              levels: Dict, urgency: str) -> str:
-        """Génère le plan d'action détaillé"""
+                              levels: Dict, urgency: str, 
+                              entry_trigger: Dict = None) -> str:
+        """Génère le plan d'action détaillé avec conditions d'entrée"""
         
-        # SI WAIT = NE PAS TRADER
+        # SI WAIT = DONNER LES CONDITIONS POUR ENTRER
         if direction == "WAIT":
-            return """
+            wait_plan = """
 🚫 **NE PAS TRADER MAINTENANT**
 
 Les conditions ne sont pas réunies pour un trade rentable.
@@ -698,14 +906,34 @@ Les conditions ne sont pas réunies pour un trade rentable.
 • Les tendances ne sont pas suffisamment alignées
 • La qualité du setup n'est pas A+ ou A
 • Le risque de perte est trop élevé
+"""
+            # Ajouter les conditions d'entrée future
+            if entry_trigger and entry_trigger.get("order_type") == "LIMIT":
+                wait_plan += f"""
+**🎯 CONDITION D'ENTRÉE FUTURE (si le setup s'améliore):**
 
+📌 **ORDRE LIMIT**: {entry_trigger.get('direction', 'LONG')} @ ${entry_trigger.get('price', 0):,.2f}
+   • Condition: "{entry_trigger.get('condition', 'Attendre pullback')}"
+   • Pattern détecté: {entry_trigger.get('pattern', 'Aucun')}
+   
+❌ **INVALIDE SI**: Prix casse ${entry_trigger.get('invalidation', 0):,.2f}
+   • → Annuler l'ordre si ce niveau est cassé
+
+⏰ **VALIDITÉ**: {entry_trigger.get('validity', '24h')}
+"""
+            else:
+                wait_plan += """
 **Que faire ?**
 • Surveiller le marché
 • Attendre un pullback vers un support/résistance clé
 • Revérifier dans 1-4 heures
 
+💡 **Conseil**: Mettre une alerte de prix sur le support/résistance le plus proche
+"""
+            wait_plan += """
 ⚠️ Trader sans setup de qualité = perdre de l'argent
 """
+            return wait_plan
         
         if quality == TradeQuality.D:
             return "❌ **NE PAS TRADER** - Conditions non favorables. Attendez un meilleur setup."
@@ -719,11 +947,24 @@ Les conditions ne sont pas réunies pour un trade rentable.
         action = "ACHETER" if direction == "LONG" else "VENDRE" if direction == "SHORT" else "ATTENDRE"
         emoji = "🟢" if direction == "LONG" else "🔴" if direction == "SHORT" else "🟡"
         
+        # Déterminer le type d'ordre
+        order_type = "MARKET"
+        entry_condition = "→ Entrée possible maintenant"
+        
+        if entry_trigger and entry_trigger.get("order_type") == "LIMIT":
+            order_type = "LIMIT"
+            entry_condition = f"""→ **ORDRE LIMIT RECOMMANDÉ**
+   • Pattern: {entry_trigger.get('pattern', 'Signal technique')}
+   • Condition: "{entry_trigger.get('condition', 'Attendre confirmation')}"
+   • ❌ Invalide si: ${entry_trigger.get('invalidation', 0):,.2f}"""
+        elif urgency == "WAIT_PULLBACK":
+            entry_condition = "→ Attendre un pullback vers ce niveau"
+        
         plan = f"""
 {emoji} **PLAN D'ACTION - {action}**
 
-📍 **ENTRÉE**: ${levels['entry']:,.2f}
-{"   → Attendre un pullback vers ce niveau" if urgency == "WAIT_PULLBACK" else "   → Entrée possible maintenant"}
+📍 **ENTRÉE**: ${levels['entry']:,.2f} ({order_type})
+   {entry_condition}
 
 🛡️ **STOP LOSS**: ${levels['stop']:,.2f}
    → Risque: {levels['risk_percent']:.1f}%
@@ -738,6 +979,15 @@ Les conditions ne sont pas réunies pour un trade rentable.
 📊 **GAIN POTENTIEL**: +{levels['potential_gain']:.1f}%
 
 ⏰ **TIMING**: {urgency.replace('_', ' ')}
+"""
+        
+        # Ajouter info ordre LIMIT si applicable
+        if order_type == "LIMIT" and entry_trigger:
+            plan += f"""
+🎯 **CONSEIL ORDRE LIMIT**:
+   • Placer l'ordre à ${entry_trigger.get('price', levels['entry']):,.2f}
+   • Validité: {entry_trigger.get('validity', '24h')}
+   • Si le prix n'atteint pas ce niveau → pas de trade
 """
         
         if quality == TradeQuality.A_PLUS:
