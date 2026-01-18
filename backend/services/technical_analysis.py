@@ -233,27 +233,43 @@ class TechnicalAnalysisService:
         take_profit_1 = current_price * 1.08
         take_profit_2 = min(resistance * 0.98, current_price * 1.15)
         
-        # Determine action
-        if score >= 5:
+        # Determine action (seuils ajustés pour plus de prévisions)
+        if score >= 4:
+            action = "STRONG_BUY"
+            confidence = "high"
+            message = "🟢🟢 ACHAT FORT - Excellente opportunité!"
+        elif score >= 2.5:
             action = "BUY"
             confidence = "high"
             message = "🟢 ACHAT recommandé - Signal fort"
-        elif score >= 3:
+        elif score >= 1.5:
             action = "BUY"
             confidence = "medium"
             message = "🟢 ACHAT suggéré - Signal modéré"
+        elif score >= 0.5:
+            action = "BUY"
+            confidence = "low"
+            message = "🟢 Légère tendance haussière"
         elif score <= -4:
+            action = "STRONG_SELL"
+            confidence = "high"
+            message = "🔴🔴 VENTE FORTE - Signal de sortie!"
+        elif score <= -2.5:
             action = "SELL"
             confidence = "high"
             message = "🔴 VENTE recommandée - Signal baissier fort"
-        elif score <= -2:
+        elif score <= -1.5:
             action = "SELL"
             confidence = "medium"
             message = "🔴 VENTE suggérée - Signal baissier"
+        elif score <= -0.5:
+            action = "SELL"
+            confidence = "low"
+            message = "🔴 Légère tendance baissière"
         else:
             action = "WAIT"
             confidence = "low"
-            message = "🟡 ATTENDRE - Pas de signal clair"
+            message = "🟡 ATTENDRE - Marché neutre"
         
         return {
             "action": action,

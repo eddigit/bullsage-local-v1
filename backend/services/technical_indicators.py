@@ -277,22 +277,28 @@ class SignalGenerator:
         
         global_score = (total_score / max_score) * 100 if max_score > 0 else 0
         
-        # Recommandation finale
-        if global_score > 50:
+        # Recommandation finale (seuils ajustés pour plus de prévisions)
+        if global_score > 35:
             recommendation = "STRONG_BUY"
-            action = "🟢 Acheter maintenant"
-        elif global_score > 20:
+            action = "🟢🟢 Acheter maintenant"
+        elif global_score > 15:
             recommendation = "BUY"
-            action = "🟡 Envisager l'achat"
-        elif global_score < -50:
+            action = "🟢 Envisager l'achat"
+        elif global_score > 5:
+            recommendation = "LIGHT_BUY"
+            action = "🟡 Légère tendance haussière"
+        elif global_score < -35:
             recommendation = "STRONG_SELL"
-            action = "🔴 Vendre maintenant"
-        elif global_score < -20:
+            action = "🔴🔴 Vendre maintenant"
+        elif global_score < -15:
             recommendation = "SELL"
-            action = "🟠 Envisager la vente"
+            action = "🔴 Envisager la vente"
+        elif global_score < -5:
+            recommendation = "LIGHT_SELL"
+            action = "🟠 Légère tendance baissière"
         else:
             recommendation = "HOLD"
-            action = "⚪ Attendre"
+            action = "⚪ Marché neutre"
         
         return {
             "current_price": current_price,

@@ -2688,35 +2688,43 @@ def generate_trading_recommendation(indicators: Dict, current_price: float = Non
     else:
         risk_reward = 0
     
-    # Generate final recommendation
-    if score >= 5:
+    # Generate final recommendation (seuils ajustés pour plus de prévisions)
+    if score >= 4:
         action = "STRONG_BUY"
         confidence = "high"
         message = "🟢🟢 ACHAT FORT - Excellente opportunité!"
-    elif score >= 3:
+    elif score >= 2.5:
         action = "BUY"
         confidence = "high"
         message = "🟢 ACHAT recommandé - Signal fort"
-    elif score >= 2:
+    elif score >= 1.5:
         action = "BUY"
         confidence = "medium"
         message = "🟢 ACHAT possible - Signal modéré"
-    elif score <= -5:
+    elif score >= 0.5:
+        action = "BUY"
+        confidence = "low"
+        message = "🟢 Légère tendance haussière"
+    elif score <= -4:
         action = "STRONG_SELL"
         confidence = "high"
         message = "🔴🔴 VENTE FORTE - Signal de sortie!"
-    elif score <= -3:
+    elif score <= -2.5:
         action = "SELL"
         confidence = "high"
         message = "🔴 VENTE recommandée - Signal fort"
-    elif score <= -2:
+    elif score <= -1.5:
         action = "SELL"
         confidence = "medium"
         message = "🔴 VENTE possible - Signal modéré"
+    elif score <= -0.5:
+        action = "SELL"
+        confidence = "low"
+        message = "🔴 Légère tendance baissière"
     else:
         action = "WAIT"
         confidence = "low"
-        message = "🟡 ATTENDRE - Pas de signal clair"
+        message = "🟡 ATTENDRE - Marché neutre"
     
     return {
         "action": action,
@@ -3000,16 +3008,20 @@ async def scan_trading_opportunities(current_user: dict = Depends(get_current_us
                 rsi = calculate_rsi(prices)
                 bb = calculate_bollinger_bands(prices)
                 
-                # Check for alert conditions
+                # Check for alert conditions (seuils ajustés pour plus de détections)
                 alert_type = None
                 if rsi < 30 and bb["position"] == "oversold":
                     alert_type = "STRONG_BUY"
                 elif rsi < 35:
                     alert_type = "BUY"
+                elif rsi < 45 and bb["position"] in ["oversold", "lower_half"]:
+                    alert_type = "BUY"  # Opportunité modérée
                 elif rsi > 70 and bb["position"] == "overbought":
                     alert_type = "STRONG_SELL"
                 elif rsi > 65:
                     alert_type = "SELL"
+                elif rsi > 55 and bb["position"] in ["overbought", "upper_half"]:
+                    alert_type = "SELL"  # Prudence recommandée
                 
                 if alert_type:
                     alerts.append({

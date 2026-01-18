@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { useAuth, API } from "../App";
 import axios from "axios";
 import { toast } from "sonner";
+import { BUILD_INFO } from "../buildInfo";
 import {
   User,
   Shield,
@@ -401,7 +402,17 @@ export default function SettingsPage() {
         <CardContent className="space-y-3">
           <div className="flex items-center justify-between py-2">
             <span className="text-muted-foreground">Version</span>
-            <span className="font-mono">1.0.0</span>
+            <span className="font-mono">{BUILD_INFO.version}</span>
+          </div>
+          <Separator className="bg-white/5" />
+          <div className="flex items-center justify-between py-2">
+            <span className="text-muted-foreground">Commit</span>
+            <span className="font-mono text-xs bg-white/5 px-2 py-1 rounded">{BUILD_INFO.commitHash}</span>
+          </div>
+          <Separator className="bg-white/5" />
+          <div className="flex items-center justify-between py-2">
+            <span className="text-muted-foreground">Dernière mise à jour</span>
+            <span className="text-sm">{BUILD_INFO.commitDate} à {BUILD_INFO.commitTime}</span>
           </div>
           <Separator className="bg-white/5" />
           <div className="flex items-center justify-between py-2">

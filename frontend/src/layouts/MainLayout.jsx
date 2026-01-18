@@ -1,6 +1,7 @@
 import { Outlet, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../App";
 import { useState, useEffect } from "react";
+import { BUILD_INFO } from "../buildInfo";
 import {
   LayoutDashboard,
   TrendingUp,
@@ -432,7 +433,11 @@ export default function MainLayout() {
         {/* Footer - Desktop only */}
         <footer className="hidden md:block py-4 px-6 border-t border-white/5">
           <div className="flex flex-col md:flex-row items-center justify-center gap-2 text-xs text-muted-foreground">
-            <span>© {new Date().getFullYear()} BULL SAGE v1.0.0</span>
+            <span>© {new Date().getFullYear()} BULL SAGE v{BUILD_INFO.version}</span>
+            <span className="hidden md:inline">•</span>
+            <span className="font-mono bg-white/5 px-2 py-0.5 rounded">
+              Commit: {BUILD_INFO.commitHash} | {BUILD_INFO.commitDate} {BUILD_INFO.commitTime}
+            </span>
             <span className="hidden md:inline">•</span>
             <span>
               Propulsé par{" "}

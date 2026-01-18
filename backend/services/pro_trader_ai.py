@@ -673,11 +673,11 @@ class ProTraderAI:
         🎯 Génère une recommandation de trade complète
         Comme un trader pro vous conseillerait
         
-        RÈGLES ULTRA-STRICTES (après les pertes SOL/XRP):
-        - Ne recommande un trade que si TOUTES les conditions sont alignées
-        - En cas de doute → TOUJOURS WAIT
-        - SHORT = INTERDIT sauf conditions extrêmes (3/3 bearish + RSI > 80)
-        - Minimum qualité A pour trader
+        RÈGLES ÉQUILIBRÉES (ajustées pour générer plus de signaux):
+        - Recommande un trade si les tendances principales sont alignées
+        - WAIT si vraiment aucune direction claire
+        - SHORT = autorisé si conditions baissières confirmées
+        - Minimum qualité B pour trader (plus accessible)
         """
         
         analysis = await self.analyze_asset(symbol)
@@ -685,7 +685,7 @@ class ProTraderAI:
         if "error" in analysis:
             return analysis
         
-        # Déterminer direction avec RÈGLES ULTRA-STRICTES
+        # Déterminer direction avec RÈGLES ÉQUILIBRÉES
         trends = analysis["trends"]
         rsi = analysis["rsi"]
         
@@ -699,47 +699,36 @@ class ProTraderAI:
         trend_1d = trends.get("1d", {}).get("direction", "NEUTRAL")
         trend_4h = trends.get("4h", {}).get("direction", "NEUTRAL")
         
-        # Calculer le momentum récent (éviter de shorter un marché qui monte)
-        # Si RSI 1h > RSI 4h = momentum haussier
+        # Calculer le momentum récent
         momentum_bullish = rsi["1h"] > rsi["4h"] and rsi["4h"] > 45
         momentum_bearish = rsi["1h"] < rsi["4h"] and rsi["4h"] < 55
         
-        # === RÈGLES ULTRA-STRICTES POUR DIRECTION ===
+        # === RÈGLES ÉQUILIBRÉES POUR DIRECTION ===
         direction = "WAIT"  # Par défaut = pas de trade
         
-        # LONG: seulement si tendance 1D ET 4H haussières ET RSI pas en surachat
-        if ("UPTREND" in trend_1d and "UPTREND" in trend_4h and 
-            bullish >= 2 and strength_1d >= 55 and strength_4h >= 55):
-            # Vérifier que RSI n'est pas en surachat
-            if rsi["1d"] < 70 and rsi["4h"] < 70 and rsi["1h"] < 75:
+        # LONG: si tendance majoritairement haussière ET RSI pas en surachat extrême
+        if bullish >= 2 and (strength_1d >= 50 or strength_4h >= 50):
+            # Vérifier que RSI n'est pas en surachat extrême
+            if rsi["1d"] < 75 and rsi["4h"] < 75:
                 direction = "LONG"
             else:
                 direction = "WAIT"  # RSI trop haut
         
-        # SHORT: ULTRA-STRICT - seulement si TOUTES les conditions extrêmes
-        elif ("DOWNTREND" in trend_1d and "DOWNTREND" in trend_4h and
-              bearish == 3 and  # TOUTES les tendances baissières
-              strength_1d >= 70 and  # Tendance très forte
-              rsi["1d"] > 50 and  # Pas déjà survendu
-              rsi["4h"] > 50 and
-              momentum_bearish):  # Momentum confirme
-            direction = "SHORT"
+        # SHORT: si tendance majoritairement baissière
+        elif bearish >= 2 and (strength_1d >= 50 or strength_4h >= 50):
+            # Vérifier que RSI n'est pas en survente extrême
+            if rsi["1d"] > 25 and rsi["4h"] > 25:
+                direction = "SHORT"
+            else:
+                direction = "WAIT"  # RSI trop bas
         
         # Qualité du trade
         quality, confidence, signals, warnings = self._determine_trade_quality(analysis)
         
-        # === FORCER WAIT SI QUALITÉ INSUFFISANTE ===
-        if quality not in [TradeQuality.A_PLUS, TradeQuality.A]:
+        # === FORCER WAIT SI QUALITÉ INSUFFISANTE (qualité C ou D) ===
+        if quality in [TradeQuality.C, TradeQuality.D]:
             direction = "WAIT"
-            warnings.insert(0, "🚫 QUALITÉ INSUFFISANTE - NE PAS TRADER")
-            warnings.insert(1, "⚠️ Attendre un setup de qualité A+ ou A minimum")
-        
-        # === FORCER WAIT SI SHORT ET PAS CONDITIONS EXTRÊMES ===
-        if direction == "SHORT":
-            if bearish < 3 or strength_1d < 70 or not momentum_bearish:
-                direction = "WAIT"
-                warnings.insert(0, "🚫 CONDITIONS INSUFFISANTES POUR SHORT")
-                warnings.insert(1, "⚠️ Le SHORT nécessite 3/3 tendances baissières + momentum")
+            warnings.insert(0, "⚠️ QUALITÉ FAIBLE - Attendre un meilleur setup")
         
         # Niveaux
         levels = self._calculate_entry_stop_tp(
