@@ -25,6 +25,7 @@ import {
   GraduationCap,
   Home,
   User,
+  Users,
   MoreHorizontal,
   Bot,
   Search,
@@ -330,6 +331,19 @@ export default function MainLayout() {
           >
             <Zap className="w-4 h-4" />
             <span>Smart Invest</span>
+          </NavLink>
+          
+          <NavLink
+            to="/dashboard/council"
+            className={`
+              flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
+              bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500
+              text-white transition-all duration-200 shadow-lg shadow-orange-600/20
+              ${location.pathname === '/dashboard/council' ? 'ring-2 ring-white/30' : ''}
+            `}
+          >
+            <Users className="w-4 h-4" />
+            <span>Council AI</span>
           </NavLink>
           
           <NavLink

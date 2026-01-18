@@ -13,7 +13,9 @@ from ..core.config import (
     MARKETAUX_API_KEY,
     COINGECKO_API_URL,
     XAI_API_KEY,
-    EMERGENT_LLM_KEY,
+    ANTHROPIC_API_KEY,
+    OPENROUTER_API_KEY,
+    LLM_PROVIDER,
     logger
 )
 from ..core.auth import get_current_user, get_admin_user
@@ -102,6 +104,24 @@ async def get_api_keys_status(current_user: dict = Depends(get_admin_user)):
             "configured": True,
             "key_preview": "Public API",
             "usage": "Cryptocurrency data (free tier)"
+        },
+        "xai": {
+            "configured": bool(XAI_API_KEY),
+            "key_preview": f"{XAI_API_KEY[:4]}..." if XAI_API_KEY else None,
+            "usage": "Grok AI - Provider LLM principal",
+            "active": LLM_PROVIDER == "xai"
+        },
+        "anthropic": {
+            "configured": bool(ANTHROPIC_API_KEY),
+            "key_preview": f"{ANTHROPIC_API_KEY[:4]}..." if ANTHROPIC_API_KEY else None,
+            "usage": "Claude AI - Analyses avancées",
+            "active": LLM_PROVIDER == "anthropic"
+        },
+        "openrouter": {
+            "configured": bool(OPENROUTER_API_KEY),
+            "key_preview": f"{OPENROUTER_API_KEY[:4]}..." if OPENROUTER_API_KEY else None,
+            "usage": "Multi-modèles (Claude, GPT, etc.)",
+            "active": LLM_PROVIDER == "openrouter"
         }
     }
 

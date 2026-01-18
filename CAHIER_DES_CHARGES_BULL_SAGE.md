@@ -376,7 +376,7 @@ Interface d'administration pour les gestionnaires de la plateforme.
 | **UI Components** | Shadcn/UI + TailwindCSS | Latest |
 | **Backend** | FastAPI (Python) | 0.100+ |
 | **Base de Données** | MongoDB | 6.x |
-| **IA/LLM** | GPT-4o via Emergent | Latest |
+| **IA/LLM** | xAI Grok / Anthropic Claude | Latest |
 | **Graphiques** | Lightweight Charts | 4.x |
 | **Authentification** | JWT | - |
 
@@ -388,7 +388,8 @@ Interface d'administration pour les gestionnaires de la plateforme.
 | **Alpha Vantage** | Actions, Indices | Gratuit, 25 req/jour |
 | **Finnhub** | News financières | Gratuit, 60 req/min |
 | **Marketaux** | News supplémentaires | Gratuit, 100 req/jour |
-| **Emergent LLM** | Analyses IA (GPT-4o) | Selon balance |
+| **xAI Grok** | Analyses IA | Selon abonnement |
+| **Anthropic Claude** | Analyses IA avancées | Selon abonnement |
 
 ## 3.3 Schéma d'Architecture
 

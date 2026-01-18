@@ -8,7 +8,7 @@ BULL SAGE est un assistant de trading intelligent, conçu pour éduquer et outil
 ### Backend (FastAPI)
 - **Authentication**: JWT-based auth with bcrypt password hashing
 - **Market Data**: CoinGecko API integration for real-time crypto prices
-- **AI Assistant**: OpenAI GPT-5.1 via Emergent LLM key for intelligent trading guidance
+- **AI Assistant**: xAI Grok / Anthropic Claude pour l'assistance trading intelligente
 - **Paper Trading**: Virtual portfolio with buy/sell functionality
 - **Strategies**: CRUD operations for trading strategies
 - **Alerts**: Price alert system
@@ -25,7 +25,7 @@ BULL SAGE est un assistant de trading intelligent, conçu pour éduquer et outil
 
 ## Credentials
 - **Admin Account**: coachdigitalparis@gmail.com / $$Reussite888!!
-- **API Keys**: Emergent LLM Key (sk-emergent-64180C8Be52B58e044)
+- **API Keys**: Configurer XAI_API_KEY, ANTHROPIC_API_KEY, ou OPENROUTER_API_KEY dans .env
 
 ## Features Implemented ✅
 1. User Authentication (Register/Login/JWT)

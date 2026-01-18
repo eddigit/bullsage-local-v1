@@ -7,7 +7,7 @@ from typing import Optional, List
 from datetime import datetime, timezone
 import httpx
 
-from core.config import db, logger, EMERGENT_LLM_KEY, CRYPTOCOMPARE_API_URL, ALPHA_VANTAGE_API_KEY
+from core.config import db, logger, XAI_API_KEY, CRYPTOCOMPARE_API_URL, ALPHA_VANTAGE_API_KEY
 from core.auth import get_current_user
 from services.market_data import market_data_service, CRYPTO_MAPPING, SMART_INVEST_STOCKS
 from services.technical_analysis import technical_analysis_service

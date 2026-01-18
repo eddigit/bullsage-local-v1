@@ -6,7 +6,7 @@ from datetime import datetime, timezone, timedelta
 import httpx
 import asyncio
 
-from ..core.config import db, logger, EMERGENT_LLM_KEY
+from ..core.config import db, logger, XAI_API_KEY
 from ..core.auth import get_current_user
 
 router = APIRouter(prefix="/defi-scanner", tags=["DeFi Scanner"])

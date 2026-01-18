@@ -34,6 +34,7 @@ import MarketNewsPage from "./pages/MarketNewsPage";
 import OpportunityScannerPage from "./pages/OpportunityScannerPage";
 import ProTraderPage from "./pages/ProTraderPage";
 import DydxPositionsPage from "./pages/DydxPositionsPage";
+import CouncilPage from "./pages/CouncilPage";
 
 // Layout
 import MainLayout from "./layouts/MainLayout";
@@ -228,6 +229,7 @@ function App() {
               <Route path="opportunity-scanner" element={<OpportunityScannerPage />} />
               <Route path="pro-trader" element={<ProTraderPage />} />
               <Route path="dydx-positions" element={<DydxPositionsPage />} />
+              <Route path="council" element={<CouncilPage />} />
             </Route>
           </Routes>
         </BrowserRouter>

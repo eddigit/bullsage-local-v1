@@ -17,10 +17,14 @@ JWT_SECRET = os.environ.get('JWT_SECRET', 'bullsage_secret_key')
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
 
-# API Keys & URLs
+# LLM Configuration
+LLM_PROVIDER = os.environ.get('LLM_PROVIDER', 'xai')  # xai, anthropic, openrouter
 XAI_API_KEY = os.environ.get('XAI_API_KEY') or os.environ.get('OPENAI_API_KEY')
 XAI_BASE_URL = "https://api.x.ai/v1"
-EMERGENT_LLM_KEY = XAI_API_KEY  # Backward compatibility
+ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY')
+OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY')
+
+# API Keys & URLs
 COINGECKO_API_URL = os.environ.get('COINGECKO_API_URL', 'https://api.coingecko.com/api/v3')
 CRYPTOCOMPARE_API_URL = "https://min-api.cryptocompare.com/data"
 BINANCE_API_URL = "https://api.binance.com/api/v3"

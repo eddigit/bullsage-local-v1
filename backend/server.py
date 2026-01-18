@@ -56,7 +56,6 @@ JWT_EXPIRATION_HOURS = 24
 # API Keys
 XAI_API_KEY = os.environ.get('XAI_API_KEY') or os.environ.get('OPENAI_API_KEY')
 XAI_BASE_URL = "https://api.x.ai/v1"
-EMERGENT_LLM_KEY = XAI_API_KEY  # Backward compatibility
 COINGECKO_API_URL = os.environ.get('COINGECKO_API_URL', 'https://api.coingecko.com/api/v3')
 BINANCE_API_URL = "https://api.binance.com/api/v3"
 CRYPTOCOMPARE_API_URL = "https://min-api.cryptocompare.com/data"
@@ -970,7 +969,7 @@ async def get_news_impact_summary(current_user: dict = Depends(get_current_user)
     # Use AI to summarize and translate
     try:
         chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
+            api_key=XAI_API_KEY,
             session_id=f"news_summary_{datetime.now().strftime('%Y%m%d%H')}",
             system_message="""Tu es un analyste financier expert. Ta tâche est de résumer les actualités crypto importantes en français.
 
@@ -2074,7 +2073,7 @@ Format JSON:
 
     try:
         chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
+            api_key=XAI_API_KEY,
             session_id=f"briefing_{current_user['id']}_{datetime.now().strftime('%Y%m%d')}",
             system_message="Tu es BULL, un trader expert qui donne des briefings matinaux concis et actionnables."
         )
@@ -2928,7 +2927,7 @@ Explique pourquoi en 3-4 points clés maximum.
     # Get AI analysis
     try:
         chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
+            api_key=XAI_API_KEY,
             session_id=f"trading_analysis_{current_user['id']}_{datetime.now().strftime('%Y%m%d%H%M')}",
             system_message=f"""Tu es BULL, un trader professionnel expert avec 20 ans d'expérience.
 Tu analyses les marchés crypto avec précision et donnes des conseils actionnables.
@@ -3406,7 +3405,7 @@ async def chat_with_bull(request: ChatRequest, current_user: dict = Depends(get_
 🗣️ Réponds TOUJOURS en français, de manière directe et actionnable."""
 
         chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
+            api_key=XAI_API_KEY,
             session_id=f"bullsage_{current_user['id']}_{datetime.now().strftime('%Y%m%d%H')}",
             system_message=system_message
         )
@@ -5169,7 +5168,7 @@ async def unified_opportunity_scanner(
     
     # ============== 4. AI ANALYSIS ==============
     ai_recommendation = None
-    if top_opportunities and EMERGENT_LLM_KEY:
+    if top_opportunities and XAI_API_KEY:
         try:
             # Prepare data for AI
             opp_summary = "\n".join([
@@ -5177,7 +5176,7 @@ async def unified_opportunity_scanner(
                 for o in top_opportunities[:5]
             ])
             
-            chat = LlmChat(api_key=EMERGENT_LLM_KEY)
+            chat = LlmChat(api_key=XAI_API_KEY)
             ai_response = await asyncio.to_thread(
                 chat.generate_response,
                 f"""Tu es un expert trader. Analyse ces opportunités de trading du jour et donne ta recommandation:
@@ -7845,6 +7844,16 @@ try:
     logger.info("✅ Routes Webhook chargées pour automatisation Claude")
 except Exception as e:
     logger.warning(f"⚠️ Routes Webhook non disponibles: {e}")
+    import traceback
+    traceback.print_exc()
+
+# Inclure les routes Council (Multi-Agent Trading AI)
+try:
+    from routes.council import router as council_router
+    app.include_router(council_router, prefix="/api")
+    logger.info("✅ Routes Bull Sage Council chargées (7 agents + orchestrateur)")
+except Exception as e:
+    logger.warning(f"⚠️ Routes Council non disponibles: {e}")
     import traceback
     traceback.print_exc()
 

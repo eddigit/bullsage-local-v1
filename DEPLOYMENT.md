@@ -33,7 +33,8 @@ Render offre un hébergement gratuit avec des URLs de type `votre-app.onrender.c
      MONGO_URL=mongodb+srv://...
      DB_NAME=bullsage
      JWT_SECRET=votre_secret_securise
-     EMERGENT_LLM_KEY=votre_cle
+     XAI_API_KEY=votre_cle_xai
+     LLM_PROVIDER=xai
      ```
    - Cliquez sur "Create Web Service"
 
@@ -164,7 +165,10 @@ L'application sera accessible sur l'IP de votre serveur.
 | `MONGO_URL` | URL de connexion MongoDB | ✅ |
 | `DB_NAME` | Nom de la base de données | ✅ |
 | `JWT_SECRET` | Clé secrète pour les tokens | ✅ |
-| `EMERGENT_LLM_KEY` | Clé API pour le LLM | ✅ |
+| `XAI_API_KEY` | Clé API xAI (Grok) | ✅ |
+| `ANTHROPIC_API_KEY` | Clé API Anthropic (Claude) | ❌ |
+| `OPENROUTER_API_KEY` | Clé API OpenRouter | ❌ |
+| `LLM_PROVIDER` | Provider actif (xai/anthropic/openrouter) | ❌ |
 | `REACT_APP_BACKEND_URL` | URL du backend (frontend) | ✅ |
 | `COINGECKO_API_URL` | URL API CoinGecko | ❌ |
 | `ALPHA_VANTAGE_API_KEY` | Clé Alpha Vantage | ❌ |

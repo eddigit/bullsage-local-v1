@@ -1,0 +1,15 @@
+{
+  "name": "bullsage-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP Server for Bull Sage Trading Platform - Allows Claude to execute trades",
+  "main": "bullsage-mcp-server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node bullsage-mcp-server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "author": "Bull Sage",
+  "license": "MIT"
+}

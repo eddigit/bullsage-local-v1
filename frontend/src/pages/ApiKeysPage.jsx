@@ -28,7 +28,9 @@ const ICON_MAP = {
   "finnhub": Newspaper,
   "fred": BarChart3,
   "marketaux": Newspaper,
-  "emergent_llm": Brain
+  "xai": Brain,
+  "anthropic": Brain,
+  "openrouter": Brain
 };
 
 const COLOR_MAP = {
@@ -37,7 +39,9 @@ const COLOR_MAP = {
   "finnhub": "text-orange-500",
   "fred": "text-violet-500",
   "marketaux": "text-pink-500",
-  "emergent_llm": "text-cyan-500"
+  "xai": "text-cyan-500",
+  "anthropic": "text-purple-500",
+  "openrouter": "text-amber-500"
 };
 
 export default function ApiKeysPage() {
