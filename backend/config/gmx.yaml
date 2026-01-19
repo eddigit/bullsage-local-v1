@@ -1,0 +1,49 @@
+# GMX V2 Configuration for BullSage
+# SDK: gmx-python-sdk (https://github.com/snipermonke01/gmx_python_sdk)
+
+# Network Configuration
+network:
+  arbitrum_mainnet: true
+  avalanche_mainnet: false
+
+# RPC Configuration
+rpcs:
+  arbitrum: "https://arb1.arbitrum.io/rpc"
+  avalanche: "https://api.avax.network/ext/bc/C/rpc"
+
+# Chain IDs (reference)
+chain_ids:
+  arbitrum: 42161
+  avalanche: 43114
+
+# Trading Configuration
+trading:
+  use_paper_trading: true
+  default_leverage: 10
+  max_slippage: 0.03
+  debug_mode: true  # Set to false for production
+
+# Wallet Configuration (à configurer via variables d'environnement)
+# IMPORTANT: Ne jamais stocker de clés privées en clair dans ce fichier
+# Utiliser les variables d'environnement:
+#   - GMX_PRIVATE_KEY
+#   - GMX_WALLET_ADDRESS
+wallet:
+  private_key: "${GMX_PRIVATE_KEY}"
+  user_wallet_address: "${GMX_WALLET_ADDRESS}"
+
+# Default Markets (Arbitrum)
+default_markets:
+  - symbol: "ETH"
+    index_token: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1"
+  - symbol: "BTC"
+    index_token: "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f"
+  - symbol: "ARB"
+    index_token: "0x912CE59144191C1204E64559FE8253a0e49E6548"
+
+# Risk Management
+risk_management:
+  max_position_size_usd: 10000
+  max_open_positions: 5
+  stop_loss_percent: 0.05
+  take_profit_percent: 0.10

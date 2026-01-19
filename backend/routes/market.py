@@ -17,6 +17,123 @@ from services.market_data import market_data_service, CRYPTO_MAPPING
 router = APIRouter(prefix="/market", tags=["market"])
 
 
+@router.get("/overview")
+async def get_market_overview(current_user: dict = Depends(get_current_user)):
+    """Get comprehensive market overview including top cryptos, fear/greed, and trends"""
+    try:
+        overview = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "top_cryptos": [],
+            "fear_greed": {"value": 50, "classification": "Neutral"},
+            "market_cap_change_24h": 0,
+            "btc_dominance": 0,
+        }
+        
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            # Get global market data
+            try:
+                resp = await client.get(f"{COINGECKO_API_URL}/global")
+                if resp.status_code == 200:
+                    data = resp.json().get("data", {})
+                    overview["market_cap_change_24h"] = data.get("market_cap_change_percentage_24h_usd", 0)
+                    overview["btc_dominance"] = data.get("market_cap_percentage", {}).get("btc", 0)
+            except:
+                pass
+            
+            # Get top cryptos
+            try:
+                crypto_list = await market_data_service.get_crypto_list()
+                if crypto_list:
+                    overview["top_cryptos"] = crypto_list[:10]
+            except:
+                pass
+            
+            # Get Fear & Greed
+            try:
+                resp = await client.get("https://api.alternative.me/fng/")
+                if resp.status_code == 200:
+                    fng_data = resp.json().get("data", [{}])[0]
+                    overview["fear_greed"] = {
+                        "value": int(fng_data.get("value", 50)),
+                        "classification": fng_data.get("value_classification", "Neutral")
+                    }
+            except:
+                pass
+        
+        return overview
+    except Exception as e:
+        logger.error(f"Market overview error: {e}")
+        return {"error": str(e)}
+
+
+@router.get("/bitcoin")
+async def get_bitcoin_data(current_user: dict = Depends(get_current_user)):
+    """Get comprehensive Bitcoin market data"""
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            # CoinGecko Bitcoin data
+            resp = await client.get(
+                f"{COINGECKO_API_URL}/coins/bitcoin",
+                params={"localization": "false", "tickers": "false", "community_data": "false", "developer_data": "false"}
+            )
+            
+            if resp.status_code == 200:
+                data = resp.json()
+                md = data.get("market_data", {})
+                
+                return {
+                    "id": "bitcoin",
+                    "symbol": "btc",
+                    "name": "Bitcoin",
+                    "current_price": md.get("current_price", {}).get("usd", 0),
+                    "market_cap": md.get("market_cap", {}).get("usd", 0),
+                    "total_volume": md.get("total_volume", {}).get("usd", 0),
+                    "price_change_24h": md.get("price_change_percentage_24h", 0),
+                    "price_change_7d": md.get("price_change_percentage_7d", 0),
+                    "price_change_30d": md.get("price_change_percentage_30d", 0),
+                    "ath": md.get("ath", {}).get("usd", 0),
+                    "ath_date": md.get("ath_date", {}).get("usd", ""),
+                    "circulating_supply": md.get("circulating_supply", 0),
+                    "max_supply": md.get("max_supply", 21000000),
+                }
+            
+            raise HTTPException(status_code=503, detail="Bitcoin data unavailable")
+    except Exception as e:
+        logger.error(f"Bitcoin data error: {e}")
+        raise HTTPException(status_code=503, detail=str(e))
+
+
+@router.get("/trending")
+async def get_trending_cryptos(current_user: dict = Depends(get_current_user)):
+    """Get trending cryptocurrencies"""
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(f"{COINGECKO_API_URL}/search/trending")
+            
+            if resp.status_code == 200:
+                data = resp.json()
+                coins = data.get("coins", [])
+                
+                trending = []
+                for item in coins[:10]:
+                    coin = item.get("item", {})
+                    trending.append({
+                        "id": coin.get("id"),
+                        "name": coin.get("name"),
+                        "symbol": coin.get("symbol"),
+                        "market_cap_rank": coin.get("market_cap_rank"),
+                        "thumb": coin.get("thumb"),
+                        "score": coin.get("score"),
+                    })
+                
+                return {"trending": trending}
+            
+            return {"trending": []}
+    except Exception as e:
+        logger.error(f"Trending error: {e}")
+        return {"trending": []}
+
+
 @router.get("/crypto")
 async def get_crypto_markets(current_user: dict = Depends(get_current_user)):
     """Get top cryptocurrencies with current prices"""

@@ -4,9 +4,9 @@
  */
 
 export const BUILD_INFO = {
-  commitHash: "04be2b6",
+  commitHash: "5d2ad3f",
   commitDate: "2026-01-18",
-  commitTime: "14:50:00",
-  version: "1.2.0",
-  lastUpdate: "18 janvier 2026 à 14:50"
+  commitTime: "20:30:00",
+  version: "2.0.0",
+  lastUpdate: "18 janvier 2026 à 20:30 - Bull Sage Council v2"
 };

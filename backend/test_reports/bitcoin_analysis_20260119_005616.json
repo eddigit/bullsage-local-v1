@@ -1,0 +1,90 @@
+{
+  "timestamp": "2026-01-18T23:56:16.835354+00:00",
+  "consistency_score": 99.34920838134255,
+  "summary": "💰 Bitcoin: $93,732.00 (-1.44% 24h) ↘️\n  📈 Tendance: BEARISH 🔴\n  📊 RSI: 64.3 (Neutre)\n  😰 Sentiment: 49 (Neutral)\n  💼 Deribit: 100.0 BTC | 0 positions",
+  "prices": {
+    "coingecko_usd": 93732,
+    "coingecko_eur": 80651,
+    "coingecko_24h_change": -1.4379866865895865,
+    "deribit_perpetual": 93671.0,
+    "deribit_index": 93683.04,
+    "deribit_funding": 0,
+    "price_divergence": 0.06507916186574489
+  },
+  "market_data": {
+    "market_cap": 1874976961281,
+    "total_volume": 23281430528,
+    "circulating_supply": 19977671.0,
+    "ath": 126080,
+    "ath_date": "2025-10-06T18:57:42.558Z",
+    "atl": 67.81,
+    "price_change_7d": 3.69124,
+    "price_change_30d": 6.80815,
+    "fear_greed_index": 49,
+    "fear_greed_label": "Neutral"
+  },
+  "news": [
+    {
+      "title": "Bitcoin Accumulation Skyrockets: Mid-to-Large Investors Amass 110K BTC in 30 Days—Largest Surge Since FTX Collapse",
+      "source": "bitcoinworld",
+      "url": "https://bitcoinworld.co.in/bitcoin-accumulation-investors-110k-btc/",
+      "published": "2026-01-19 00:45"
+    },
+    {
+      "title": "Bitcoin Whales on Mute — Binance Inflows Drop Below Half as Selling Pressure Slips",
+      "source": "zycrypto",
+      "url": "https://zycrypto.com/bitcoin-whales-on-mute-binance-inflows-drop-below-half-as-selling-pressure-slips/",
+      "published": "2026-01-19 00:11"
+    },
+    {
+      "title": "Altcoins gain momentum as Ethereum leads – Is broader adoption next?",
+      "source": "ambcrypto",
+      "url": "https://ambcrypto.com/altcoins-gain-momentum-as-ethereum-leads-is-broader-adoption-next/",
+      "published": "2026-01-19 00:00"
+    },
+    {
+      "title": "Crypto Market Transition: The Definitive End of the ‘Trump Moment’ Sparks New Era",
+      "source": "bitcoinworld",
+      "url": "https://bitcoinworld.co.in/crypto-market-transition-trump-moment/",
+      "published": "2026-01-18 23:30"
+    },
+    {
+      "title": "A 12-year Bitcoin OG is selling – But the market isn’t panicking",
+      "source": "ambcrypto",
+      "url": "https://ambcrypto.com/a-12-year-bitcoin-og-is-selling-but-the-market-isnt-panicking/",
+      "published": "2026-01-18 23:00"
+    }
+  ],
+  "technical": {
+    "last_open": 95078.0,
+    "last_high": 95463.0,
+    "last_low": 95046.0,
+    "last_close": 95326.0,
+    "sma_7": 95143.57142857143,
+    "sma_14": 95153.14285714286,
+    "trend": "BEARISH",
+    "rsi_14": 64.25828970331588,
+    "volatility": 0.25651973916882564
+  },
+  "predictions": {
+    "available_agents": [
+      "Claude (Anthropic)",
+      "Groq",
+      "Grok (xAI)",
+      "OpenRouter",
+      "DeepSeek",
+      "Perplexity"
+    ]
+  },
+  "deribit": {
+    "equity": 100.0,
+    "balance": 100.0,
+    "available_funds": 100.0,
+    "positions": [],
+    "positions_count": 0,
+    "open_interest": 10704818160,
+    "funding_rate": 0,
+    "best_bid": 0,
+    "best_ask": 0
+  }
+}

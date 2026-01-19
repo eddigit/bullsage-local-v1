@@ -4,34 +4,20 @@ import { useState, useEffect } from "react";
 import { BUILD_INFO } from "../buildInfo";
 import {
   LayoutDashboard,
-  TrendingUp,
-  MessageCircle,
-  Wallet,
-  Target,
-  Bell,
   Settings,
   LogOut,
-  Menu,
-  X,
   ChevronRight,
   Zap,
   Shield,
   Key,
   Brain,
-  Signal,
-  Crosshair,
   BookOpen,
-  Sun,
   GraduationCap,
   Home,
   User,
-  Users,
   MoreHorizontal,
-  Bot,
-  Search,
   CandlestickChart,
   Mail,
-  Newspaper,
   ChevronDown,
   Activity
 } from "lucide-react";
@@ -58,15 +44,14 @@ import {
   SheetTrigger,
 } from "../components/ui/sheet";
 
-// Main navigation items - SIMPLIFIÉ
+// Main navigation items - ULTRA SIMPLIFIÉ pour Trading Deribit
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Cockpit Trading", href: "/dashboard/cockpit", icon: Sun, highlight: true },
+  { name: "Pro Trader AI", href: "/dashboard/pro-trader", icon: Brain, highlight: true },
+  { name: "Trading Deribit", href: "/dashboard/deribit-trading", icon: Activity, highlight: true },
   { name: "Graphique", href: "/dashboard/chart", icon: CandlestickChart },
-  { name: "Paper Trading", href: "/dashboard/paper-trading", icon: Wallet },
   { name: "Journal", href: "/dashboard/journal", icon: BookOpen },
-  { name: "Assistant IA", href: "/dashboard/assistant", icon: MessageCircle },
-  { name: "Académie", href: "/dashboard/academy", icon: GraduationCap, highlight: true },
+  { name: "Académie", href: "/dashboard/academy", icon: GraduationCap },
   { name: "Paramètres", href: "/dashboard/settings", icon: Settings },
 ];
 
@@ -80,8 +65,8 @@ const adminNavigation = [
 // Bottom bar items (mobile) - 5 main items - SIMPLIFIÉ
 const bottomNavItems = [
   { name: "Accueil", href: "/dashboard", icon: Home },
-  { name: "Cockpit", href: "/dashboard/cockpit", icon: Sun },
-  { name: "Graphique", href: "/dashboard/chart", icon: CandlestickChart },
+  { name: "Pro Trader", href: "/dashboard/pro-trader", icon: Brain },
+  { name: "Deribit", href: "/dashboard/deribit-trading", icon: Activity },
   { name: "Académie", href: "/dashboard/academy", icon: GraduationCap },
   { name: "Plus", href: null, icon: MoreHorizontal, isMore: true },
 ];
@@ -279,85 +264,18 @@ export default function MainLayout() {
 
       {/* ===================== DESKTOP TOP HEADER ===================== */}
       <header className="hidden md:flex fixed top-0 left-64 right-0 h-16 glass-heavy z-40 items-center justify-between px-6 border-b border-white/5">
-        {/* Quick Action Buttons - Left side */}
-        <div className="flex items-center gap-2">
-          <NavLink
-            to="/dashboard/pro-trader"
-            className={`
-              flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
-              bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500
-              text-white transition-all duration-200 shadow-lg shadow-blue-600/20
-              ${location.pathname === '/dashboard/pro-trader' ? 'ring-2 ring-white/30' : ''}
-            `}
-          >
-            <Brain className="w-4 h-4" />
-            <span>Pro Trader AI</span>
-          </NavLink>
-
-          <NavLink
-            to="/dashboard/dydx-positions"
-            className={`
-              flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
-              bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500
-              text-white transition-all duration-200 shadow-lg shadow-purple-600/20
-              ${location.pathname === '/dashboard/dydx-positions' ? 'ring-2 ring-white/30' : ''}
-            `}
-          >
-            <Activity className="w-4 h-4" />
-            <span>Positions dYdX</span>
-          </NavLink>
-          
-          <NavLink
-            to="/dashboard/opportunity-scanner"
-            className={`
-              flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
-              bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400
-              text-white transition-all duration-200 shadow-lg shadow-amber-600/20
-              ${location.pathname === '/dashboard/opportunity-scanner' ? 'ring-2 ring-white/30' : ''}
-            `}
-          >
-            <Search className="w-4 h-4" />
-            <span>Scanner IA</span>
-          </NavLink>
-          
-          <NavLink
-            to="/dashboard/smart-invest"
-            className={`
-              flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
-              bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500
-              text-white transition-all duration-200 shadow-lg shadow-violet-600/20
-              ${location.pathname === '/dashboard/smart-invest' ? 'ring-2 ring-white/30' : ''}
-            `}
-          >
-            <Zap className="w-4 h-4" />
-            <span>Smart Invest</span>
-          </NavLink>
-          
-          <NavLink
-            to="/dashboard/council"
-            className={`
-              flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
-              bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500
-              text-white transition-all duration-200 shadow-lg shadow-orange-600/20
-              ${location.pathname === '/dashboard/council' ? 'ring-2 ring-white/30' : ''}
-            `}
-          >
-            <Users className="w-4 h-4" />
-            <span>Council AI</span>
-          </NavLink>
-          
-          <NavLink
-            to="/dashboard/auto-trading"
-            className={`
-              flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
-              bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500
-              text-white transition-all duration-200 shadow-lg shadow-emerald-600/20
-              ${location.pathname === '/dashboard/auto-trading' ? 'ring-2 ring-white/30' : ''}
-            `}
-          >
-            <Bot className="w-4 h-4" />
-            <span>Auto Trading</span>
-          </NavLink>
+        {/* Page Title - Left side */}
+        <div className="flex items-center gap-4">
+          <h2 className="text-lg font-semibold text-foreground">
+            {location.pathname === '/dashboard' && 'Dashboard'}
+            {location.pathname === '/dashboard/pro-trader' && '🧠 Pro Trader AI'}
+            {location.pathname === '/dashboard/deribit-trading' && '📈 Trading Deribit'}
+            {location.pathname === '/dashboard/chart' && '📊 Graphique'}
+            {location.pathname === '/dashboard/journal' && '📓 Journal de Trading'}
+            {location.pathname === '/dashboard/academy' && '🎓 Académie Bull Sage'}
+            {location.pathname === '/dashboard/settings' && '⚙️ Paramètres'}
+            {location.pathname.includes('/dashboard/admin') && '🛡️ Administration'}
+          </h2>
         </div>
 
         {/* User Menu - Right side */}

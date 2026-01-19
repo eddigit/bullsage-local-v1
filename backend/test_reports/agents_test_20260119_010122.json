@@ -1,0 +1,105 @@
+{
+  "timestamp": "2026-01-19T00:01:22.036681+00:00",
+  "summary": {
+    "total": 28,
+    "passed": 13,
+    "failed": 15,
+    "score": 46.42857142857143
+  },
+  "results": {
+    "api_keys": {
+      "Anthropic (Claude)": true,
+      "Groq": true,
+      "xAI (Grok)": true,
+      "OpenRouter": true,
+      "DeepSeek": true,
+      "Perplexity": true,
+      "OpenAI": false,
+      "Alpha Vantage": true,
+      "Finnhub": true,
+      "Deribit Client ID": true,
+      "Deribit Secret": true
+    },
+    "council": {
+      "agents": [],
+      "modes": []
+    },
+    "market_routes": {
+      "/market/overview": {
+        "status": 404,
+        "success": false
+      },
+      "/market/bitcoin": {
+        "status": 404,
+        "success": false
+      },
+      "/market/fear-greed": {
+        "status": 403,
+        "success": false
+      },
+      "/market/trending": {
+        "status": 403,
+        "success": false
+      },
+      "/market/crypto/BTC": {
+        "status": 403,
+        "success": false
+      }
+    },
+    "signals_routes": {
+      "/signals": {
+        "status": 403,
+        "success": false
+      },
+      "/signals/active": {
+        "status": 405,
+        "success": false
+      },
+      "/signals/history": {
+        "status": 403,
+        "success": false
+      },
+      "/signals/stats": {
+        "status": 403,
+        "success": false
+      }
+    },
+    "deribit": {
+      "account": {
+        "balance": 100.0,
+        "success": true
+      },
+      "ticker": {
+        "price": 93206.5,
+        "success": true
+      },
+      "positions": {
+        "count": 0,
+        "success": true
+      }
+    },
+    "assistant": {
+      "chat": {
+        "success": false,
+        "auth_required": true
+      }
+    },
+    "paper_trading": {
+      "/paper-trading/account": {
+        "status": 404,
+        "success": false
+      },
+      "/paper-trading/positions": {
+        "status": 404,
+        "success": false
+      },
+      "/paper-trading/history": {
+        "status": 404,
+        "success": false
+      }
+    },
+    "watchlist": {
+      "success": false
+    }
+  }
+}

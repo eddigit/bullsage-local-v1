@@ -175,7 +175,7 @@ const TradeTypeBadge = ({ tradeType, timeframe, estimatedDuration }) => {
 };
 
 // Composant pour une opportunité de trade
-const TradeOpportunity = ({ opportunity, onSelect, onApplyTrade, applying, onExecuteDydx, executingDydx, executedDydx }) => {
+const TradeOpportunity = ({ opportunity, onSelect, onApplyTrade, applying, onExecuteDeribit, executingDeribit, executedDeribit }) => {
   const isHot = opportunity.quality === "A+" || (opportunity.quality === "A" && opportunity.urgency === "IMMEDIATE");
   
   return (
@@ -392,7 +392,7 @@ const TradeOpportunity = ({ opportunity, onSelect, onApplyTrade, applying, onExe
             </div>
           )}
 
-          {/* Bouton Exécuter sur dYdX */}
+          {/* Bouton Exécuter sur Deribit */}
           <div className="mt-2 flex gap-2">
             <Tooltip>
               <TooltipTrigger asChild>
@@ -402,28 +402,28 @@ const TradeOpportunity = ({ opportunity, onSelect, onApplyTrade, applying, onExe
                     opportunity.urgency === "WAIT_PULLBACK" 
                       ? 'border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/20' 
                       : 'border-purple-500/50 text-purple-400 hover:bg-purple-500/20'
-                  } ${executedDydx ? 'bg-purple-500/20' : ''}`}
+                  } ${executedDeribit ? 'bg-purple-500/20' : ''}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     if (opportunity.urgency === "WAIT_PULLBACK") {
                       if (window.confirm(`⚠️ Ce trade recommande d'attendre un PULLBACK vers ${opportunity.entry_price?.toLocaleString()}.\n\nVoulez-vous quand même exécuter MAINTENANT au prix du marché ?`)) {
-                        onExecuteDydx(opportunity);
+                        onExecuteDeribit(opportunity);
                       }
                     } else {
-                      onExecuteDydx(opportunity);
+                      onExecuteDeribit(opportunity);
                     }
                   }}
-                  disabled={executingDydx || executedDydx}
+                  disabled={executingDeribit || executedDeribit}
                 >
-                  {executingDydx ? (
+                  {executingDeribit ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      Exécution dYdX...
+                      Exécution Deribit...
                     </>
-                  ) : executedDydx ? (
+                  ) : executedDeribit ? (
                     <>
                       <CheckCircle2 className="w-4 h-4 text-green-400" />
-                      Exécuté sur dYdX !
+                      Exécuté sur Deribit !
                     </>
                   ) : opportunity.urgency === "WAIT_PULLBACK" ? (
                     <>
@@ -433,21 +433,21 @@ const TradeOpportunity = ({ opportunity, onSelect, onApplyTrade, applying, onExe
                   ) : (
                     <>
                       <Zap className="w-4 h-4" />
-                      🚀 Exécuter sur dYdX Testnet
+                      🚀 Exécuter sur Deribit Testnet
                     </>
                   )}
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="max-w-sm bg-slate-900 text-white p-3">
-                <p className="font-bold text-purple-400 mb-2">⚡ Exécution RÉELLE sur dYdX</p>
-                <p className="text-sm">Ce trade sera exécuté directement sur dYdX Testnet.</p>
+                <p className="font-bold text-purple-400 mb-2">⚡ Exécution RÉELLE sur Deribit</p>
+                <p className="text-sm">Ce trade sera exécuté directement sur Deribit Testnet.</p>
                 <p className="text-sm mt-1">• Entry automatique au prix marché</p>
-                <p className="text-sm">• Stop Loss placé automatiquement</p>
-                <p className="text-sm">• Take Profit placé automatiquement</p>
+                <p className="text-sm">• Instrument: BTC-PERPETUAL ou ETH-PERPETUAL</p>
+                <p className="text-sm">• Futures perpétuels avec levier</p>
                 {opportunity.urgency === "WAIT_PULLBACK" && (
                   <p className="text-sm text-yellow-400 mt-2">⚠️ ATTENTION: Un pullback est recommandé avant d'entrer !</p>
                 )}
-                <p className="text-sm text-yellow-400 mt-2">⚠️ Fonds testnet requis sur votre wallet dYdX</p>
+                <p className="text-sm text-yellow-400 mt-2">⚠️ Fonds testnet requis sur votre compte Deribit</p>
               </TooltipContent>
             </Tooltip>
 
@@ -459,14 +459,14 @@ const TradeOpportunity = ({ opportunity, onSelect, onApplyTrade, applying, onExe
                   className="border border-purple-500/30 hover:bg-purple-500/20"
                   onClick={(e) => {
                     e.stopPropagation();
-                    window.open('https://v4.testnet.dydx.exchange/portfolio/positions', '_blank');
+                    window.open('/dashboard/deribit-trading', '_self');
                   }}
                 >
                   <ExternalLink className="w-4 h-4 text-purple-400" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                <p>Voir mes positions sur dYdX</p>
+                <p>Voir mes positions Deribit</p>
               </TooltipContent>
             </Tooltip>
           </div>
@@ -601,63 +601,47 @@ export default function ProTraderPage() {
   const [marketOverview, setMarketOverview] = useState([]);
   const [scanMessage, setScanMessage] = useState("");
   const [applyingSymbol, setApplyingSymbol] = useState(null);
-  const [executingDydx, setExecutingDydx] = useState({});
-  const [executedDydx, setExecutedDydx] = useState({});
+  const [executingDeribit, setExecutingDeribit] = useState({});
+  const [executedDeribit, setExecutedDeribit] = useState({});
   
-  // Configuration du montant à engager sur dYdX
-  const [dydxTradeConfig, setDydxTradeConfig] = useState({
+  // Configuration du montant à engager sur Deribit
+  const [deribitTradeConfig, setDeribitTradeConfig] = useState({
     mode: 'percentage', // 'percentage' ou 'fixed'
     percentage: 5, // % du portefeuille
-    fixedAmount: 100, // Montant fixe en USDC
+    fixedAmount: 100, // Montant fixe en USD
   });
 
-  // Exécuter sur dYdX Testnet
-  const executeDydx = async (opportunity) => {
+  // Exécuter sur Deribit Testnet
+  const executeDeribit = async (opportunity) => {
     const symbol = opportunity.symbol;
-    setExecutingDydx(prev => ({ ...prev, [symbol]: true }));
+    setExecutingDeribit(prev => ({ ...prev, [symbol]: true }));
     
     try {
+      // Préparer le signal pour Deribit
       const signal = {
-        market: `${symbol}-USD`,
-        direction: opportunity.direction,
-        // Nouveau: configuration du montant
-        sizeMode: dydxTradeConfig.mode,
-        percentageOfPortfolio: dydxTradeConfig.percentage,
-        fixedAmountUSDC: dydxTradeConfig.fixedAmount,
-        // Fallback si le serveur ne supporte pas encore le nouveau format
-        size: symbol === 'BTC' ? 0.001 : symbol === 'ETH' ? 0.01 : 0.1,
-        stop_loss_pct: opportunity.stop && opportunity.entry 
-          ? Math.abs((opportunity.entry - opportunity.stop) / opportunity.entry * 100)
-          : 2,
-        take_profit_pct: opportunity.tp1 && opportunity.entry
-          ? Math.abs((opportunity.tp1 - opportunity.entry) / opportunity.entry * 100)
-          : 4,
-        // Documentation du trade (pullback inclus)
+        signal_type: opportunity.direction === "LONG" ? "BUY" : "SELL",
+        instrument: `${symbol}-PERPETUAL`,
+        amount_usd: deribitTradeConfig.mode === 'fixed' 
+          ? deribitTradeConfig.fixedAmount 
+          : 100, // Montant par défaut, sera ajusté par le backend selon le %
+        source: "pro_trader",
         metadata: {
           urgency: opportunity.urgency || "IMMEDIATE",
           recommended_entry: opportunity.entry_price || opportunity.entry,
           wait_pullback: opportunity.urgency === "WAIT_PULLBACK",
-          pullback_target: opportunity.urgency === "WAIT_PULLBACK" ? (opportunity.entry_price || opportunity.entry) : null,
           confidence: opportunity.confidence,
           quality: opportunity.quality,
           rr_ratio: opportunity.rr_ratio,
-          signals: opportunity.signals,
-          trade_type: opportunity.trade_type,
-          timeframe: opportunity.timeframe,
-          estimated_duration: opportunity.estimated_duration,
-          executed_at: new Date().toISOString(),
-          trade_config: {
-            mode: dydxTradeConfig.mode,
-            percentage: dydxTradeConfig.percentage,
-            fixed_amount: dydxTradeConfig.fixedAmount
-          }
+          stop_loss: opportunity.stop,
+          take_profit: opportunity.tp1,
+          executed_at: new Date().toISOString()
         }
       };
 
-      const response = await axios.post(`${API}/dydx/signal/quick`, signal);
+      const response = await axios.post(`${API}/deribit/execute-signal`, signal);
       
-      if (response.data.success || response.data.signal) {
-        setExecutedDydx(prev => ({ ...prev, [symbol]: true }));
+      if (response.data.success) {
+        setExecutedDeribit(prev => ({ ...prev, [symbol]: true }));
         
         // Message adapté selon l'urgence
         const pullbackWarning = opportunity.urgency === "WAIT_PULLBACK" 
@@ -665,18 +649,18 @@ export default function ProTraderPage() {
           : '';
         
         toast.success(
-          `🚀 Trade ${opportunity.direction} ${symbol} exécuté sur dYdX!\n` +
-          `Mode: ${response.data.mode || 'live'}${pullbackWarning}`,
+          `🚀 Trade ${opportunity.direction} ${symbol} exécuté sur Deribit!\n` +
+          `Order ID: ${response.data.order?.order_id || 'N/A'}${pullbackWarning}`,
           { duration: 5000 }
         );
       } else {
         throw new Error(response.data.error || 'Erreur inconnue');
       }
     } catch (error) {
-      console.error("Erreur dYdX:", error);
-      toast.error(`Erreur dYdX: ${error.response?.data?.detail || error.message}`);
+      console.error("Erreur Deribit:", error);
+      toast.error(`Erreur Deribit: ${error.response?.data?.detail || error.message}`);
     } finally {
-      setExecutingDydx(prev => ({ ...prev, [symbol]: false }));
+      setExecutingDeribit(prev => ({ ...prev, [symbol]: false }));
     }
   };
 
@@ -892,9 +876,9 @@ export default function ProTraderPage() {
                           onSelect={loadQuickAnalysis}
                           onApplyTrade={applyTrade}
                           applying={applyingSymbol === opp.symbol}
-                          onExecuteDydx={executeDydx}
-                          executingDydx={executingDydx[opp.symbol]}
-                          executedDydx={executedDydx[opp.symbol]}
+                          onExecuteDeribit={executeDeribit}
+                          executingDeribit={executingDeribit[opp.symbol]}
+                          executedDeribit={executedDeribit[opp.symbol]}
                         />
                     ))}
                   </div>
@@ -905,16 +889,16 @@ export default function ProTraderPage() {
         </div>
       </div>
       
-      {/* Configuration dYdX */}
+      {/* Configuration Deribit */}
       <Card className="border-purple-500/30 bg-purple-500/5">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-lg">
             <Zap className="w-5 h-5 text-purple-400" />
-            Configuration Exécution dYdX
+            Configuration Exécution Deribit
             <Badge variant="outline" className="text-purple-400 border-purple-500/50">Testnet</Badge>
           </CardTitle>
           <CardDescription>
-            Définissez le montant à engager pour chaque trade exécuté sur dYdX
+            Définissez le montant à engager pour chaque trade exécuté sur Deribit
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -926,29 +910,29 @@ export default function ProTraderPage() {
                 Mode de calcul
               </label>
               <Select 
-                value={dydxTradeConfig.mode} 
-                onValueChange={(v) => setDydxTradeConfig(prev => ({ ...prev, mode: v }))}
+                value={deribitTradeConfig.mode} 
+                onValueChange={(v) => setDeribitTradeConfig(prev => ({ ...prev, mode: v }))}
               >
                 <SelectTrigger className="border-purple-500/30">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="percentage">📊 % du portefeuille</SelectItem>
-                  <SelectItem value="fixed">💵 Montant fixe (USDC)</SelectItem>
+                  <SelectItem value="fixed">💵 Montant fixe (USD)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {/* Pourcentage du portefeuille */}
-            {dydxTradeConfig.mode === 'percentage' && (
+            {deribitTradeConfig.mode === 'percentage' && (
               <div className="space-y-2">
                 <label className="text-sm font-medium flex items-center gap-2">
                   <BarChart3 className="w-4 h-4 text-muted-foreground" />
                   % du portefeuille
                 </label>
                 <Select 
-                  value={String(dydxTradeConfig.percentage)} 
-                  onValueChange={(v) => setDydxTradeConfig(prev => ({ ...prev, percentage: Number(v) }))}
+                  value={String(deribitTradeConfig.percentage)} 
+                  onValueChange={(v) => setDeribitTradeConfig(prev => ({ ...prev, percentage: Number(v) }))}
                 >
                   <SelectTrigger className="border-purple-500/30">
                     <SelectValue />
@@ -968,26 +952,26 @@ export default function ProTraderPage() {
             )}
 
             {/* Montant fixe */}
-            {dydxTradeConfig.mode === 'fixed' && (
+            {deribitTradeConfig.mode === 'fixed' && (
               <div className="space-y-2">
                 <label className="text-sm font-medium flex items-center gap-2">
                   <DollarSign className="w-4 h-4 text-muted-foreground" />
-                  Montant fixe (USDC)
+                  Montant fixe (USD)
                 </label>
                 <Select 
-                  value={String(dydxTradeConfig.fixedAmount)} 
-                  onValueChange={(v) => setDydxTradeConfig(prev => ({ ...prev, fixedAmount: Number(v) }))}
+                  value={String(deribitTradeConfig.fixedAmount)} 
+                  onValueChange={(v) => setDeribitTradeConfig(prev => ({ ...prev, fixedAmount: Number(v) }))}
                 >
                   <SelectTrigger className="border-purple-500/30">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="50">$50 USDC</SelectItem>
-                    <SelectItem value="100">$100 USDC</SelectItem>
-                    <SelectItem value="250">$250 USDC</SelectItem>
-                    <SelectItem value="500">$500 USDC</SelectItem>
-                    <SelectItem value="1000">$1,000 USDC</SelectItem>
-                    <SelectItem value="2500">$2,500 USDC</SelectItem>
+                    <SelectItem value="50">$50 USD</SelectItem>
+                    <SelectItem value="100">$100 USD</SelectItem>
+                    <SelectItem value="250">$250 USD</SelectItem>
+                    <SelectItem value="500">$500 USD</SelectItem>
+                    <SelectItem value="1000">$1,000 USD</SelectItem>
+                    <SelectItem value="2500">$2,500 USD</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -997,13 +981,13 @@ export default function ProTraderPage() {
             <div className="p-3 bg-purple-500/10 rounded-lg border border-purple-500/30">
               <div className="text-sm font-medium text-purple-400 mb-1">Configuration actuelle</div>
               <div className="text-lg font-bold">
-                {dydxTradeConfig.mode === 'percentage' 
-                  ? `${dydxTradeConfig.percentage}% du portefeuille`
-                  : `$${dydxTradeConfig.fixedAmount} USDC`
+                {deribitTradeConfig.mode === 'percentage' 
+                  ? `${deribitTradeConfig.percentage}% du portefeuille`
+                  : `$${deribitTradeConfig.fixedAmount} USD`
                 }
               </div>
               <div className="text-xs text-muted-foreground mt-1">
-                par trade exécuté sur dYdX
+                par trade exécuté sur Deribit
               </div>
             </div>
           </div>

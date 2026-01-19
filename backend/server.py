@@ -798,6 +798,106 @@ async def fetch_crypto_from_kraken():
         logger.error(f"Kraken API error: {e}")
         return None
 
+
+@api_router.get("/market/overview")
+async def get_market_overview(current_user: dict = Depends(get_current_user)):
+    """Get comprehensive market overview including top cryptos, fear/greed, and trends"""
+    try:
+        overview = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "top_cryptos": [],
+            "fear_greed": {"value": 50, "classification": "Neutral"},
+            "market_cap_change_24h": 0,
+            "btc_dominance": 0,
+        }
+        
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            # Get global market data from CoinGecko
+            try:
+                resp = await client.get(f"{COINGECKO_API_URL}/global")
+                if resp.status_code == 200:
+                    data = resp.json().get("data", {})
+                    overview["market_cap_change_24h"] = data.get("market_cap_change_percentage_24h_usd", 0)
+                    overview["btc_dominance"] = data.get("market_cap_percentage", {}).get("btc", 0)
+            except:
+                pass
+            
+            # Get top cryptos
+            try:
+                crypto_list = await get_crypto_from_binance()
+                if crypto_list:
+                    overview["top_cryptos"] = crypto_list[:10]
+            except:
+                pass
+            
+            # Get Fear & Greed Index
+            try:
+                resp = await client.get("https://api.alternative.me/fng/")
+                if resp.status_code == 200:
+                    fng_data = resp.json().get("data", [{}])[0]
+                    overview["fear_greed"] = {
+                        "value": int(fng_data.get("value", 50)),
+                        "classification": fng_data.get("value_classification", "Neutral")
+                    }
+            except:
+                pass
+        
+        return overview
+    except Exception as e:
+        logger.error(f"Market overview error: {e}")
+        return {"error": str(e), "timestamp": datetime.now(timezone.utc).isoformat()}
+
+
+@api_router.get("/market/bitcoin")
+async def get_bitcoin_data(current_user: dict = Depends(get_current_user)):
+    """Get comprehensive Bitcoin market data"""
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            # CoinGecko Bitcoin data
+            resp = await client.get(
+                f"{COINGECKO_API_URL}/coins/bitcoin",
+                params={"localization": "false", "tickers": "false", "community_data": "false", "developer_data": "false"}
+            )
+            
+            if resp.status_code == 200:
+                data = resp.json()
+                md = data.get("market_data", {})
+                
+                return {
+                    "id": "bitcoin",
+                    "symbol": "btc",
+                    "name": "Bitcoin",
+                    "current_price": md.get("current_price", {}).get("usd", 0),
+                    "market_cap": md.get("market_cap", {}).get("usd", 0),
+                    "total_volume": md.get("total_volume", {}).get("usd", 0),
+                    "price_change_24h": md.get("price_change_percentage_24h", 0),
+                    "price_change_7d": md.get("price_change_percentage_7d", 0),
+                    "price_change_30d": md.get("price_change_percentage_30d", 0),
+                    "ath": md.get("ath", {}).get("usd", 0),
+                    "ath_date": md.get("ath_date", {}).get("usd", ""),
+                    "circulating_supply": md.get("circulating_supply", 0),
+                    "max_supply": md.get("max_supply", 21000000),
+                }
+            
+            # Fallback to Binance
+            resp = await client.get("https://api.binance.com/api/v3/ticker/24hr", params={"symbol": "BTCUSDT"})
+            if resp.status_code == 200:
+                data = resp.json()
+                return {
+                    "id": "bitcoin",
+                    "symbol": "btc", 
+                    "name": "Bitcoin",
+                    "current_price": float(data.get("lastPrice", 0)),
+                    "price_change_24h": float(data.get("priceChangePercent", 0)),
+                    "total_volume": float(data.get("volume", 0)) * float(data.get("lastPrice", 0)),
+                }
+            
+            raise HTTPException(status_code=503, detail="Bitcoin data unavailable")
+    except Exception as e:
+        logger.error(f"Bitcoin data error: {e}")
+        raise HTTPException(status_code=503, detail=str(e))
+
+
 @api_router.get("/market/crypto")
 async def get_crypto_markets(current_user: dict = Depends(get_current_user)):
     """
@@ -1314,6 +1414,19 @@ async def get_signals(limit: int = 50, status: str = None, current_user: dict = 
     
     signals = await db.signals.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
     return signals
+
+
+@api_router.get("/signals/active")
+async def get_active_signals(current_user: dict = Depends(get_current_user)):
+    """Get currently active trading signals"""
+    query = {
+        "user_id": current_user["id"],
+        "status": {"$in": ["active", "pending", "open"]}
+    }
+    
+    signals = await db.signals.find(query, {"_id": 0}).sort("created_at", -1).limit(50).to_list(50)
+    return {"signals": signals, "count": len(signals)}
+
 
 @api_router.get("/signals/stats")
 async def get_signal_stats(current_user: dict = Depends(get_current_user)):
@@ -7814,7 +7927,7 @@ if PRO_TRADER_AVAILABLE:
     app.include_router(pro_trader_router)
     logger.info("Pro Trader AI charge")
 
-# Inclure les routes dYdX (import direct pour éviter routes/__init__.py)
+# Inclure les routes Deribit (Trading sur Deribit Testnet/Production)
 try:
     import importlib.util
     import sys
@@ -7825,22 +7938,25 @@ try:
     if backend_dir not in sys.path:
         sys.path.insert(0, backend_dir)
     
-    dydx_module_path = os.path.join(backend_dir, "routes", "dydx.py")
-    spec = importlib.util.spec_from_file_location("dydx_routes", dydx_module_path)
-    dydx_module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(dydx_module)
-    dydx_router = dydx_module.router
-    app.include_router(dydx_router, prefix="/api")
-    logger.info("✅ Routes dYdX chargées")
+    deribit_module_path = os.path.join(backend_dir, "routes", "deribit.py")
+    spec = importlib.util.spec_from_file_location("deribit_routes", deribit_module_path)
+    deribit_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(deribit_module)
+    deribit_router = deribit_module.router
+    app.include_router(deribit_router, prefix="/api")
+    logger.info("✅ Routes Deribit chargées")
 except Exception as e:
-    logger.error(f"❌ Erreur chargement routes dYdX: {type(e).__name__}: {e}")
+    logger.error(f"❌ Erreur chargement routes Deribit: {type(e).__name__}: {e}")
     import traceback
     traceback.print_exc()
 
 # Inclure les routes Webhook pour automatisation Claude
 try:
-    from routes.webhook import router as webhook_router
-    app.include_router(webhook_router, prefix="/api")
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("webhook", "routes/webhook.py")
+    webhook_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(webhook_module)
+    app.include_router(webhook_module.router, prefix="/api")
     logger.info("✅ Routes Webhook chargées pour automatisation Claude")
 except Exception as e:
     logger.warning(f"⚠️ Routes Webhook non disponibles: {e}")
@@ -7849,8 +7965,11 @@ except Exception as e:
 
 # Inclure les routes Council (Multi-Agent Trading AI)
 try:
-    from routes.council import router as council_router
-    app.include_router(council_router, prefix="/api")
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("council", "routes/council.py")
+    council_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(council_module)
+    app.include_router(council_module.router, prefix="/api")
     logger.info("✅ Routes Bull Sage Council chargées (7 agents + orchestrateur)")
 except Exception as e:
     logger.warning(f"⚠️ Routes Council non disponibles: {e}")

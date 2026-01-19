@@ -1,0 +1,151 @@
+{
+  "started_at": "2026-01-18T23:53:22.801966+00:00",
+  "completed_at": "2026-01-18T23:53:24.585240+00:00",
+  "duration_seconds": 1.4445197582244873,
+  "total_tests": 14,
+  "passed": 9,
+  "failed": 2,
+  "warnings": 3,
+  "skipped": 0,
+  "success_rate": "64.3%",
+  "results": [
+    {
+      "name": "Backend Health",
+      "category": "Health",
+      "status": "✅ PASSED",
+      "duration_ms": 276.28564834594727,
+      "message": "Backend en ligne: healthy",
+      "error": null
+    },
+    {
+      "name": "Database Connection",
+      "category": "Health",
+      "status": "⚠️ WARNING",
+      "duration_ms": 3.327608108520508,
+      "message": "DB status: unknown",
+      "error": null
+    },
+    {
+      "name": "Routes Availability",
+      "category": "Health",
+      "status": "⚠️ WARNING",
+      "duration_ms": 211.39883995056152,
+      "message": "2/3 routes disponibles",
+      "error": null
+    },
+    {
+      "name": "CoinGecko API",
+      "category": "External APIs",
+      "status": "✅ PASSED",
+      "duration_ms": 227.22411155700684,
+      "message": "CoinGecko API accessible",
+      "error": null
+    },
+    {
+      "name": "Alpha Vantage API",
+      "category": "External APIs",
+      "status": "✅ PASSED",
+      "duration_ms": 173.83909225463867,
+      "message": "Alpha Vantage fonctionnel",
+      "error": null
+    },
+    {
+      "name": "Finnhub API",
+      "category": "External APIs",
+      "status": "✅ PASSED",
+      "duration_ms": 209.8257541656494,
+      "message": "AAPL: $255.53",
+      "error": null
+    },
+    {
+      "name": "Deribit Connection",
+      "category": "Deribit",
+      "status": "✅ PASSED",
+      "duration_ms": 92.98872947692871,
+      "message": "Connecté et authentifié",
+      "error": null
+    },
+    {
+      "name": "Deribit Account",
+      "category": "Deribit",
+      "status": "✅ PASSED",
+      "duration_ms": 46.23723030090332,
+      "message": "Équité: 100.0 BTC",
+      "error": null
+    },
+    {
+      "name": "Deribit Positions",
+      "category": "Deribit",
+      "status": "✅ PASSED",
+      "duration_ms": 48.41113090515137,
+      "message": "0 positions ouvertes",
+      "error": null
+    },
+    {
+      "name": "Deribit Instruments",
+      "category": "Deribit",
+      "status": "⚠️ WARNING",
+      "duration_ms": 91.58921241760254,
+      "message": "Aucun instrument",
+      "error": null
+    },
+    {
+      "name": "Deribit Ticker",
+      "category": "Deribit",
+      "status": "✅ PASSED",
+      "duration_ms": 46.94175720214844,
+      "message": "BTC-PERPETUAL: $93,830.50",
+      "error": null
+    },
+    {
+      "name": "Council Availability",
+      "category": "Predictions",
+      "status": "✅ PASSED",
+      "duration_ms": 0.03314018249511719,
+      "message": "6/6 agents configurés",
+      "error": null
+    },
+    {
+      "name": "Market Data for Predictions",
+      "category": "Predictions",
+      "status": "❌ FAILED",
+      "duration_ms": 4.193782806396484,
+      "message": "Status: 404",
+      "error": null
+    },
+    {
+      "name": "Signals Endpoint",
+      "category": "Predictions",
+      "status": "❌ FAILED",
+      "duration_ms": 3.8378238677978516,
+      "message": "Status: 405",
+      "error": null
+    }
+  ],
+  "summary": {
+    "Health": {
+      "passed": 1,
+      "failed": 0,
+      "warnings": 2,
+      "skipped": 0
+    },
+    "External APIs": {
+      "passed": 3,
+      "failed": 0,
+      "warnings": 0,
+      "skipped": 0
+    },
+    "Deribit": {
+      "passed": 4,
+      "failed": 0,
+      "warnings": 1,
+      "skipped": 0
+    },
+    "Predictions": {
+      "passed": 1,
+      "failed": 2,
+      "warnings": 0,
+      "skipped": 0
+    }
+  }
+}

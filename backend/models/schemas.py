@@ -101,6 +101,10 @@ class TradingSignal(BaseModel):
     created_at: str
     status: str = "active"
     result_pnl: Optional[float] = None
+    # Support multi-plateforme (dYdX, GMX, paper)
+    platform: Optional[str] = "paper"  # "paper", "dydx", "gmx"
+    leverage: Optional[float] = None
+    collateral_token: Optional[str] = None  # Pour GMX: USDC, ETH, WBTC
 
 class SignalCreate(BaseModel):
     symbol: str
@@ -114,6 +118,11 @@ class SignalCreate(BaseModel):
     confidence: str
     reason: str
     price_at_signal: float
+    # Support multi-plateforme
+    platform: Optional[str] = "paper"  # "paper", "dydx", "gmx"
+    leverage: Optional[float] = None
+    collateral_token: Optional[str] = None  # Pour GMX: USDC, ETH, WBTC
+    auto_execute: Optional[bool] = False  # Exécution automatique sur la plateforme
 
 # ============== ALERT MODELS ==============
 

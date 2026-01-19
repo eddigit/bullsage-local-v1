@@ -11,8 +11,12 @@ router = APIRouter(prefix="/signals", tags=["Signals"])
 
 @router.post("", response_model=TradingSignal)
 async def create_signal(signal: SignalCreate, current_user: dict = Depends(get_current_user)):
-    """Create a new trading signal"""
+    """Create a new trading signal with multi-platform support (paper, dydx, gmx)"""
     signal_id = str(uuid.uuid4())
+    
+    # Déterminer la plateforme
+    platform = getattr(signal, 'platform', 'paper') or 'paper'
+    
     signal_doc = {
         "id": signal_id,
         "user_id": current_user["id"],
@@ -29,8 +33,50 @@ async def create_signal(signal: SignalCreate, current_user: dict = Depends(get_c
         "price_at_signal": signal.price_at_signal,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "status": "active",
-        "result_pnl": None
+        "result_pnl": None,
+        # Multi-platform support
+        "platform": platform,
+        "leverage": getattr(signal, 'leverage', None),
+        "collateral_token": getattr(signal, 'collateral_token', None),
     }
+    
+    # Si auto_execute et plateforme spécifiée, exécuter sur la plateforme
+    auto_execute = getattr(signal, 'auto_execute', False)
+    execution_result = None
+    
+    if auto_execute and platform == "gmx":
+        try:
+            # Créer automatiquement une position GMX
+            gmx_position = {
+                "id": f"gmx_auto_{signal_id[:8]}",
+                "user_id": current_user["id"],
+                "platform": "gmx_v2",
+                "mode": "paper",
+                "source": "signals_auto_execute",
+                "market": f"{signal.symbol}-USD",
+                "direction": signal.signal_type.upper(),
+                "is_long": signal.signal_type.upper() == "LONG",
+                "size_usd": signal.entry_price * 10,  # Size basée sur le prix
+                "collateral_token": signal.collateral_token or "USDC",
+                "leverage": signal.leverage or 10.0,
+                "entry_price": signal.price_at_signal,
+                "stop_loss": signal.stop_loss,
+                "take_profit": signal.take_profit_1,
+                "collateral_usd": (signal.entry_price * 10) / (signal.leverage or 10.0),
+                "status": "open",
+                "keeper_status": "executed",
+                "linked_signal_id": signal_id,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            await db.gmx_paper_trades.insert_one(gmx_position)
+            execution_result = {"success": True, "position_id": gmx_position["id"], "platform": "gmx"}
+            signal_doc["execution_result"] = execution_result
+            logger.info(f"✅ Signal auto-exécuté sur GMX: {gmx_position['id']}")
+        except Exception as e:
+            logger.error(f"❌ Erreur auto-execute GMX: {e}")
+            execution_result = {"success": False, "error": str(e)}
+            signal_doc["execution_result"] = execution_result
+    
     await db.signals.insert_one(signal_doc)
     return TradingSignal(**signal_doc)
 
@@ -43,6 +89,49 @@ async def get_signals(limit: int = 50, status: str = None, current_user: dict = 
     
     signals = await db.signals.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
     return signals
+
+
+@router.get("/active")
+async def get_active_signals(current_user: dict = Depends(get_current_user)):
+    """Get currently active trading signals"""
+    query = {
+        "user_id": current_user["id"],
+        "status": {"$in": ["active", "pending", "open"]}
+    }
+    
+    signals = await db.signals.find(query, {"_id": 0}).sort("created_at", -1).limit(50).to_list(50)
+    return {"signals": signals, "count": len(signals)}
+
+
+@router.get("/history")
+async def get_signal_history(
+    limit: int = 100,
+    days: int = 30,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get historical trading signals"""
+    from datetime import timedelta
+    
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    query = {
+        "user_id": current_user["id"],
+        "created_at": {"$gte": cutoff.isoformat()}
+    }
+    
+    signals = await db.signals.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    
+    # Calculer des stats
+    wins = sum(1 for s in signals if s.get("status") in ["hit_tp1", "hit_tp2", "profit"])
+    losses = sum(1 for s in signals if s.get("status") in ["hit_sl", "loss"])
+    
+    return {
+        "signals": signals,
+        "count": len(signals),
+        "wins": wins,
+        "losses": losses,
+        "win_rate": (wins / (wins + losses) * 100) if (wins + losses) > 0 else 0
+    }
+
 
 @router.get("/stats")
 async def get_signal_stats(current_user: dict = Depends(get_current_user)):

@@ -12,6 +12,10 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 import asyncio
 import os
+import sys
+
+# Ajouter le chemin pour les imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.config import db, logger
 from core.auth import get_current_user

@@ -3,38 +3,28 @@ import { useState, useEffect, createContext, useContext } from "react";
 import { Toaster } from "sonner";
 import axios from "axios";
 
-// Pages
+// Pages - SIMPLIFIÉ : Focus sur le trading Deribit
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import OnboardingPage from "./pages/OnboardingPage";
+
+// Core Trading Pages
 import DashboardPage from "./pages/DashboardPage";
-import MarketsPage from "./pages/MarketsPage";
-import AssistantPage from "./pages/AssistantPage";
-import PaperTradingPage from "./pages/PaperTradingPage";
-import StrategiesPage from "./pages/StrategiesPage";
-import AlertsPage from "./pages/AlertsPage";
-import SettingsPage from "./pages/SettingsPage";
-import AdminPage from "./pages/AdminPage";
-import ApiKeysPage from "./pages/ApiKeysPage";
-import MarketIntelligencePage from "./pages/MarketIntelligencePage";
-import SignalsPage from "./pages/SignalsPage";
-import TradingModePage from "./pages/TradingModePage";
-import JournalPage from "./pages/JournalPage";
-import CockpitPage from "./pages/CockpitPage";
+import ProTraderPage from "./pages/ProTraderPage";      // Signaux IA + Indicateurs + News
+import DeribitTradingPage from "./pages/DeribitTradingPage"; // Exécution trades Deribit
+import JournalPage from "./pages/JournalPage";          // Historique + Stats
+import ChartPage from "./pages/ChartPage";              // Graphiques
+
+// Learning & Settings
 import AcademyPage from "./pages/AcademyPage";
 import ModulePage from "./pages/ModulePage";
-import OnboardingPage from "./pages/OnboardingPage";
-import SmartInvestPage from "./pages/SmartInvestPage";
-import AutoTradingPage from "./pages/AutoTradingPage";
-import WalletPage from "./pages/WalletPage";
-import DeFiScannerPage from "./pages/DeFiScannerPage";
-import ChartPage from "./pages/ChartPage";
+import SettingsPage from "./pages/SettingsPage";
+
+// Admin
+import AdminPage from "./pages/AdminPage";
+import ApiKeysPage from "./pages/ApiKeysPage";
 import NewsletterAdminPage from "./pages/NewsletterAdminPage";
-import MarketNewsPage from "./pages/MarketNewsPage";
-import OpportunityScannerPage from "./pages/OpportunityScannerPage";
-import ProTraderPage from "./pages/ProTraderPage";
-import DydxPositionsPage from "./pages/DydxPositionsPage";
-import CouncilPage from "./pages/CouncilPage";
 
 // Layout
 import MainLayout from "./layouts/MainLayout";
@@ -203,33 +193,24 @@ function App() {
                 <MainLayout />
               </ProtectedRoute>
             }>
+              {/* Core Trading Flow */}
               <Route index element={<DashboardPage />} />
-              <Route path="markets" element={<MarketsPage />} />
-              <Route path="assistant" element={<AssistantPage />} />
-              <Route path="paper-trading" element={<PaperTradingPage />} />
-              <Route path="strategies" element={<StrategiesPage />} />
-              <Route path="alerts" element={<AlertsPage />} />
-              <Route path="settings" element={<SettingsPage />} />
-              <Route path="intelligence" element={<MarketIntelligencePage />} />
-              <Route path="signals" element={<SignalsPage />} />
-              <Route path="trading" element={<TradingModePage />} />
+              <Route path="pro-trader" element={<ProTraderPage />} />
+              <Route path="deribit-trading" element={<DeribitTradingPage />} />
+              <Route path="chart" element={<ChartPage />} />
               <Route path="journal" element={<JournalPage />} />
-              <Route path="cockpit" element={<CockpitPage />} />
+              
+              {/* Learning */}
               <Route path="academy" element={<AcademyPage />} />
               <Route path="academy/module/:moduleId" element={<ModulePage />} />
+              
+              {/* Settings */}
+              <Route path="settings" element={<SettingsPage />} />
+              
+              {/* Admin */}
               <Route path="admin" element={<AdminPage />} />
               <Route path="admin/api-keys" element={<ApiKeysPage />} />
-              <Route path="smart-invest" element={<SmartInvestPage />} />
-              <Route path="auto-trading" element={<AutoTradingPage />} />
-              <Route path="wallet" element={<WalletPage />} />
-              <Route path="defi-scanner" element={<DeFiScannerPage />} />
-              <Route path="chart" element={<ChartPage />} />
               <Route path="admin/newsletter" element={<NewsletterAdminPage />} />
-              <Route path="market-news" element={<MarketNewsPage />} />
-              <Route path="opportunity-scanner" element={<OpportunityScannerPage />} />
-              <Route path="pro-trader" element={<ProTraderPage />} />
-              <Route path="dydx-positions" element={<DydxPositionsPage />} />
-              <Route path="council" element={<CouncilPage />} />
             </Route>
           </Routes>
         </BrowserRouter>
