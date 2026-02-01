@@ -108,11 +108,21 @@ export default function DeribitTradingPage() {
   const checkConnection = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/deribit/status`);
-      setConnectionStatus(response.data);
-      return response.data.connected;
+      // Backend returns { success, deribit: { connected, authenticated, testnet, ... } }
+      const deribit = response.data?.deribit || response.data || {};
+      const status = {
+        connected: deribit.connected || false,
+        authenticated: deribit.authenticated || false,
+        is_testnet: deribit.testnet !== undefined ? deribit.testnet : true,
+        error: deribit.error || null,
+        api_url: deribit.api_url || "",
+        account: deribit.account || null
+      };
+      setConnectionStatus(status);
+      return status.connected;
     } catch (error) {
       console.error("Erreur connexion Deribit:", error);
-      setConnectionStatus({ connected: false, error: error.message });
+      setConnectionStatus({ connected: false, error: error.response?.data?.detail || error.message });
       return false;
     }
   }, []);
@@ -382,8 +392,11 @@ export default function DeribitTradingPage() {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Connexion Deribit non établie</AlertTitle>
             <AlertDescription>
-              Vérifiez vos clés API dans les paramètres. 
-              {connectionStatus?.error && ` Erreur: ${connectionStatus.error}`}
+              Vérifiez que les clés API Deribit (DERIBIT_CLIENT_ID et DERIBIT_CLIENT_SECRET) sont configurées
+              et correspondent à l&apos;environnement {connectionStatus?.is_testnet ? "Testnet" : "Production"}.
+              {connectionStatus?.error && (
+                <span className="block mt-1 text-xs opacity-80">Détail: {connectionStatus.error}</span>
+              )}
             </AlertDescription>
           </Alert>
         )}
