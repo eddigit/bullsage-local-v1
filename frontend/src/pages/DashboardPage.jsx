@@ -686,6 +686,15 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
               <div className="flex items-center justify-center py-4">
                 <Loader2 className="w-5 h-5 animate-spin text-primary" />
               </div>
+            ) : newsImpact?.error ? (
+              <div className="text-center py-4">
+                <AlertCircle className="w-6 h-6 mx-auto text-yellow-500 mb-2" />
+                <p className="text-sm text-yellow-400">
+                  {newsImpact.error === "no_api_key"
+                    ? "Clé API Finnhub non configurée. Ajoutez FINNHUB_API_KEY dans les paramètres."
+                    : "Erreur lors de la récupération des actualités. Réessayez."}
+                </p>
+              </div>
             ) : newsImpact?.summary?.length > 0 ? (
               <div className="space-y-2">
                 {newsImpact.summary.map((item, idx) => (

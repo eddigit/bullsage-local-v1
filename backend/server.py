@@ -1040,24 +1040,51 @@ async def get_news_impact_summary(current_user: dict = Depends(get_current_user)
         if age < _news_summary_cache["ttl"]:
             return _news_summary_cache["data"]
     
-    # Fetch recent news
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                "https://finnhub.io/api/v1/news",
-                params={"category": "crypto", "token": FINNHUB_API_KEY},
-                timeout=30.0
-            )
-            news_items = response.json()[:10] if response.status_code == 200 else []
-    except Exception as e:
-        logger.error(f"Error fetching news for summary: {e}")
-        news_items = []
-    
+    # Fetch recent news from multiple sources
+    news_items = []
+    news_source = "unknown"
+
+    # Source 1: Finnhub (requires API key)
+    if FINNHUB_API_KEY:
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    "https://finnhub.io/api/v1/news",
+                    params={"category": "crypto", "token": FINNHUB_API_KEY},
+                    timeout=15.0
+                )
+                if response.status_code == 200:
+                    news_items = response.json()[:10]
+                    news_source = "Finnhub"
+                else:
+                    logger.warning(f"Finnhub returned status {response.status_code}")
+        except Exception as e:
+            logger.error(f"Finnhub news fetch error: {e}")
+
+    # Source 2: CryptoCompare (free, no key needed) as fallback
+    if not news_items:
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    "https://min-api.cryptocompare.com/data/v2/news/?lang=EN",
+                    timeout=15.0
+                )
+                if response.status_code == 200:
+                    cc_data = response.json().get("Data", [])[:10]
+                    news_items = [
+                        {"headline": item.get("title", ""), "source": item.get("source", "CryptoCompare")}
+                        for item in cc_data
+                    ]
+                    news_source = "CryptoCompare"
+        except Exception as e:
+            logger.error(f"CryptoCompare news fetch error: {e}")
+
     if not news_items:
         return {
             "summary": [],
             "last_updated": now.isoformat(),
-            "source": "Finnhub"
+            "source": "none",
+            "error": "no_api_key" if not FINNHUB_API_KEY else "fetch_failed"
         }
     
     # Prepare news for AI analysis
@@ -1112,7 +1139,7 @@ Maximum 4-5 news les plus importantes. Sois TRÈS concis."""
         result = {
             "summary": summary_data[:5],  # Max 5 items
             "last_updated": now.isoformat(),
-            "source": "Finnhub + AI Analysis"
+            "source": f"{news_source} + AI Analysis"
         }
         
         # Update cache
