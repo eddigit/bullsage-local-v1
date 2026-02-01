@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useAuth, API } from "../App";
 import axios from "axios";
 import { toast } from "sonner";
@@ -16,7 +16,12 @@ import {
   AlertTriangle,
   Loader2,
   Settings2,
-  ExternalLink
+  ExternalLink,
+  Activity,
+  RefreshCw,
+  CheckCircle2,
+  XCircle,
+  AlertCircle
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
@@ -57,6 +62,91 @@ const TRADING_LEVELS = [
     color: "text-emerald-500"
   },
 ];
+
+const SERVICE_LABELS = {
+  mongodb: "Base de données (MongoDB)",
+  cryptocompare: "Données marché (CryptoCompare)",
+  kraken: "Données graphiques (Kraken)",
+  finnhub: "Actualités (Finnhub)",
+  deribit: "Exchange (Deribit)",
+  llm_xai: "Intelligence IA (xAI/Grok)"
+};
+
+function SystemHealthSection() {
+  const [health, setHealth] = useState(null);
+  const [checking, setChecking] = useState(false);
+
+  const checkHealth = useCallback(async () => {
+    setChecking(true);
+    try {
+      const res = await axios.get(`${API}/system/health`);
+      setHealth(res.data);
+    } catch (error) {
+      toast.error("Impossible de contacter le serveur");
+      setHealth({ status: "error", services: { backend: { status: "error", message: error.message } } });
+    } finally {
+      setChecking(false);
+    }
+  }, []);
+
+  const statusIcon = (status) => {
+    if (status === "ok") return <CheckCircle2 className="w-4 h-4 text-emerald-500" />;
+    if (status === "warning") return <AlertCircle className="w-4 h-4 text-yellow-500" />;
+    return <XCircle className="w-4 h-4 text-red-500" />;
+  };
+
+  return (
+    <Card className="glass border-white/5">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Activity className="w-5 h-5 text-primary" />
+              Santé du système
+            </CardTitle>
+            <CardDescription>Diagnostic de tous les services</CardDescription>
+          </div>
+          <Button variant="outline" size="sm" onClick={checkHealth} disabled={checking}>
+            {checking ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}
+            {checking ? "Test..." : "Tester"}
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {!health ? (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            Cliquez &quot;Tester&quot; pour vérifier l&apos;état des services
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {health.status && (
+              <div className="flex items-center gap-2 mb-3 pb-3 border-b border-white/5">
+                {statusIcon(health.status === "healthy" ? "ok" : "error")}
+                <span className="font-medium">
+                  {health.status === "healthy" ? "Tous les services fonctionnent" : "Certains services sont dégradés"}
+                </span>
+              </div>
+            )}
+            {Object.entries(health.services || {}).map(([key, svc]) => (
+              <div key={key} className="flex items-center justify-between py-2 px-3 rounded bg-white/5">
+                <div className="flex items-center gap-2">
+                  {statusIcon(svc.status)}
+                  <span className="text-sm">{SERVICE_LABELS[key] || key}</span>
+                </div>
+                <span className="text-xs text-muted-foreground max-w-[200px] truncate">{svc.message}</span>
+              </div>
+            ))}
+            {health.timestamp && (
+              <p className="text-xs text-muted-foreground text-right mt-2">
+                Dernière vérification: {new Date(health.timestamp).toLocaleString("fr-FR")}
+              </p>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function SettingsPage() {
   const { user, updateUser } = useAuth();
@@ -393,6 +483,9 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* System Health */}
+      <SystemHealthSection />
 
       {/* About */}
       <Card className="glass border-white/5">
