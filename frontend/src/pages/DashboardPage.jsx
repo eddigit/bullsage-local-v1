@@ -174,8 +174,15 @@ export default function DashboardPage() {
       // Fetch fear & greed
       try {
         const fgRes = await axios.get(`${API}/market/fear-greed`);
-        if (fgRes.data?.data?.[0]) {
-          fearGreedData = fgRes.data.data[0];
+        // Backend returns array directly [{ value, value_classification, ... }]
+        // or original API format { data: [{ ... }] }
+        const fgData = fgRes.data;
+        if (Array.isArray(fgData) && fgData.length > 0) {
+          fearGreedData = fgData[0];
+        } else if (fgData?.data?.[0]) {
+          fearGreedData = fgData.data[0];
+        }
+        if (fearGreedData) {
           console.log("Fear & Greed loaded:", fearGreedData.value);
         }
       } catch (e) {
@@ -488,10 +495,17 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
         {/* Fear & Greed */}
         <TooltipProvider>
           <Card className="glass border-white/5 relative">
-            <div className="absolute top-2 right-2 flex items-center gap-1">
-              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-              <span className="text-[10px] text-emerald-500 font-mono">LIVE</span>
-            </div>
+            {fearGreed?.value ? (
+              <div className="absolute top-2 right-2 flex items-center gap-1">
+                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                <span className="text-[10px] text-emerald-500 font-mono">LIVE</span>
+              </div>
+            ) : (
+              <div className="absolute top-2 right-2 flex items-center gap-1">
+                <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                <span className="text-[10px] text-yellow-500 font-mono">--</span>
+              </div>
+            )}
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -548,10 +562,17 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
         {/* BTC Quick */}
         <TooltipProvider>
           <Card className="glass border-white/5 relative">
-            <div className="absolute top-2 right-2 flex items-center gap-1">
-              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-              <span className="text-[10px] text-emerald-500 font-mono">LIVE</span>
-            </div>
+            {markets.find(c => c.id === "bitcoin")?.current_price ? (
+              <div className="absolute top-2 right-2 flex items-center gap-1">
+                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                <span className="text-[10px] text-emerald-500 font-mono">LIVE</span>
+              </div>
+            ) : (
+              <div className="absolute top-2 right-2 flex items-center gap-1">
+                <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                <span className="text-[10px] text-yellow-500 font-mono">--</span>
+              </div>
+            )}
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -585,7 +606,12 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
                     </TooltipContent>
                   </UITooltip>
                 </div>
-                <img src={markets.find(c => c.id === "bitcoin")?.image} alt="BTC" className="w-8 h-8" />
+                <img
+                  src={markets.find(c => c.id === "bitcoin")?.image || "https://coin-images.coingecko.com/coins/images/1/small/bitcoin.png"}
+                  alt="BTC"
+                  className="w-8 h-8"
+                  onError={(e) => { e.target.onerror = null; e.target.src = "https://coin-images.coingecko.com/coins/images/1/small/bitcoin.png"; }}
+                />
               </div>
             </CardContent>
           </Card>
@@ -773,7 +799,12 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
                           }}
                         >
                           <div className="flex items-center gap-3">
-                            <img src={coin.image} alt={coin.name} className="w-8 h-8 rounded-full" />
+                            <img
+                              src={coin.image || `https://ui-avatars.com/api/?name=${coin.symbol}&background=random&size=32`}
+                              alt={coin.name}
+                              className="w-8 h-8 rounded-full"
+                              onError={(e) => { e.target.onerror = null; e.target.src = `https://ui-avatars.com/api/?name=${coin.symbol}&background=6366f1&color=fff&size=32`; }}
+                            />
                             <div>
                               <p className="font-medium">{coin.name}</p>
                               <p className="text-xs text-muted-foreground uppercase">{coin.symbol}</p>
@@ -822,7 +853,12 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
                         <div className="flex items-center gap-3">
                           <UITooltip>
                             <TooltipTrigger>
-                              <img src={coin.image} alt={coin.name} className="w-10 h-10 rounded-full cursor-help hover:ring-2 hover:ring-primary/50 transition-all" />
+                              <img
+                                src={coin.image || `https://ui-avatars.com/api/?name=${coin.symbol}&background=random&size=40`}
+                                alt={coin.name}
+                                className="w-10 h-10 rounded-full cursor-help hover:ring-2 hover:ring-primary/50 transition-all"
+                                onError={(e) => { e.target.onerror = null; e.target.src = `https://ui-avatars.com/api/?name=${coin.symbol}&background=6366f1&color=fff&size=40`; }}
+                              />
                             </TooltipTrigger>
                             <TooltipContent className="max-w-xs">
                               <p className="font-semibold">{coin.name} ({coin.symbol.toUpperCase()})</p>
