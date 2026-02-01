@@ -106,20 +106,33 @@ export default function JournalPage() {
   });
 
   const fetchData = async () => {
-    try {
-      const [tradesRes, statsRes, marketsRes] = await Promise.all([
-        axios.get(`${API}/journal/trades`),
-        axios.get(`${API}/journal/stats`),
-        axios.get(`${API}/market/crypto`)
-      ]);
-      setTrades(Array.isArray(tradesRes.data) ? tradesRes.data : []);
-      setStats(statsRes.data || {});
-      setMarkets(Array.isArray(marketsRes.data) ? marketsRes.data : []);
-    } catch (error) {
-      console.error("Error fetching journal data:", error);
-    } finally {
-      setLoading(false);
+    // Fetch each resource independently so one failure doesn't block others
+    const results = await Promise.allSettled([
+      axios.get(`${API}/journal/trades`),
+      axios.get(`${API}/journal/stats`),
+      axios.get(`${API}/market/crypto`)
+    ]);
+
+    if (results[0].status === "fulfilled") {
+      setTrades(Array.isArray(results[0].value.data) ? results[0].value.data : []);
+    } else {
+      console.error("Error fetching trades:", results[0].reason);
     }
+
+    if (results[1].status === "fulfilled") {
+      setStats(results[1].value.data || {});
+    } else {
+      console.error("Error fetching stats:", results[1].reason);
+      setStats({ total_trades: 0, win_rate: 0, total_pnl: 0, profit_factor: 0, average_rr: 0, current_streak: 0 });
+    }
+
+    if (results[2].status === "fulfilled") {
+      setMarkets(Array.isArray(results[2].value.data) ? results[2].value.data : []);
+    } else {
+      console.error("Error fetching markets for journal:", results[2].reason);
+    }
+
+    setLoading(false);
   };
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useAuth, API } from "../App";
 import axios from "axios";
 import { toast } from "sonner";
@@ -16,7 +16,12 @@ import {
   AlertTriangle,
   Loader2,
   Settings2,
-  ExternalLink
+  ExternalLink,
+  Activity,
+  RefreshCw,
+  CheckCircle2,
+  XCircle,
+  AlertCircle
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
@@ -57,6 +62,180 @@ const TRADING_LEVELS = [
     color: "text-emerald-500"
   },
 ];
+
+function SettingsBackupSection() {
+  const [backups, setBackups] = useState([]);
+  const [loadingBackups, setLoadingBackups] = useState(false);
+  const [creating, setCreating] = useState(false);
+
+  const loadBackups = useCallback(async () => {
+    setLoadingBackups(true);
+    try {
+      const res = await axios.get(`${API}/settings/backups`);
+      setBackups(res.data?.backups || []);
+    } catch (error) {
+      console.error("Error loading backups:", error);
+    } finally {
+      setLoadingBackups(false);
+    }
+  }, []);
+
+  const createBackup = async () => {
+    setCreating(true);
+    try {
+      await axios.post(`${API}/settings/backup`, { description: "Sauvegarde manuelle" });
+      toast.success("Sauvegarde créée");
+      loadBackups();
+    } catch (error) {
+      toast.error("Erreur lors de la sauvegarde");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const restoreBackup = async (createdAt) => {
+    if (!window.confirm("Restaurer ces paramètres ? Vos paramètres actuels seront sauvegardés automatiquement.")) return;
+    try {
+      await axios.post(`${API}/settings/restore?created_at=${encodeURIComponent(createdAt)}`);
+      toast.success("Paramètres restaurés ! Rechargez la page.");
+    } catch (error) {
+      toast.error("Erreur lors de la restauration");
+    }
+  };
+
+  return (
+    <Card className="glass border-white/5">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Save className="w-5 h-5 text-primary" />
+              Sauvegarde des paramètres
+            </CardTitle>
+            <CardDescription>Sauvegardez et restaurez vos réglages</CardDescription>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={loadBackups} disabled={loadingBackups}>
+              {loadingBackups ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            </Button>
+            <Button size="sm" onClick={createBackup} disabled={creating}>
+              {creating ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Save className="w-4 h-4 mr-1" />}
+              Sauvegarder
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {backups.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-3">
+            Cliquez &quot;Sauvegarder&quot; pour créer votre premier backup, ou l&apos;icône de rafraichissement pour charger les backups existants.
+          </p>
+        ) : (
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {backups.map((b, i) => (
+              <div key={i} className="flex items-center justify-between py-2 px-3 rounded bg-white/5 text-sm">
+                <div>
+                  <span className="font-medium">{b.description || "Sauvegarde"}</span>
+                  <span className="text-xs text-muted-foreground ml-2">
+                    {new Date(b.created_at).toLocaleString("fr-FR")}
+                  </span>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => restoreBackup(b.created_at)}>
+                  Restaurer
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+const SERVICE_LABELS = {
+  mongodb: "Base de données (MongoDB)",
+  cryptocompare: "Données marché (CryptoCompare)",
+  kraken: "Données graphiques (Kraken)",
+  finnhub: "Actualités (Finnhub)",
+  deribit: "Exchange (Deribit)",
+  llm_xai: "Intelligence IA (xAI/Grok)"
+};
+
+function SystemHealthSection() {
+  const [health, setHealth] = useState(null);
+  const [checking, setChecking] = useState(false);
+
+  const checkHealth = useCallback(async () => {
+    setChecking(true);
+    try {
+      const res = await axios.get(`${API}/system/health`);
+      setHealth(res.data);
+    } catch (error) {
+      toast.error("Impossible de contacter le serveur");
+      setHealth({ status: "error", services: { backend: { status: "error", message: error.message } } });
+    } finally {
+      setChecking(false);
+    }
+  }, []);
+
+  const statusIcon = (status) => {
+    if (status === "ok") return <CheckCircle2 className="w-4 h-4 text-emerald-500" />;
+    if (status === "warning") return <AlertCircle className="w-4 h-4 text-yellow-500" />;
+    return <XCircle className="w-4 h-4 text-red-500" />;
+  };
+
+  return (
+    <Card className="glass border-white/5">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Activity className="w-5 h-5 text-primary" />
+              Santé du système
+            </CardTitle>
+            <CardDescription>Diagnostic de tous les services</CardDescription>
+          </div>
+          <Button variant="outline" size="sm" onClick={checkHealth} disabled={checking}>
+            {checking ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}
+            {checking ? "Test..." : "Tester"}
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {!health ? (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            Cliquez &quot;Tester&quot; pour vérifier l&apos;état des services
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {health.status && (
+              <div className="flex items-center gap-2 mb-3 pb-3 border-b border-white/5">
+                {statusIcon(health.status === "healthy" ? "ok" : "error")}
+                <span className="font-medium">
+                  {health.status === "healthy" ? "Tous les services fonctionnent" : "Certains services sont dégradés"}
+                </span>
+              </div>
+            )}
+            {Object.entries(health.services || {}).map(([key, svc]) => (
+              <div key={key} className="flex items-center justify-between py-2 px-3 rounded bg-white/5">
+                <div className="flex items-center gap-2">
+                  {statusIcon(svc.status)}
+                  <span className="text-sm">{SERVICE_LABELS[key] || key}</span>
+                </div>
+                <span className="text-xs text-muted-foreground max-w-[200px] truncate">{svc.message}</span>
+              </div>
+            ))}
+            {health.timestamp && (
+              <p className="text-xs text-muted-foreground text-right mt-2">
+                Dernière vérification: {new Date(health.timestamp).toLocaleString("fr-FR")}
+              </p>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function SettingsPage() {
   const { user, updateUser } = useAuth();
@@ -393,6 +572,12 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Backup & Restore */}
+      <SettingsBackupSection />
+
+      {/* System Health */}
+      <SystemHealthSection />
 
       {/* About */}
       <Card className="glass border-white/5">

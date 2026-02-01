@@ -148,7 +148,7 @@ function BottomNavItem({ item, currentPath, moreMenuOpen, onClick }) {
 }
 
 export default function MainLayout() {
-  const { user, logout } = useAuth();
+  const { user, logout, systemHealth } = useAuth();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
@@ -358,6 +358,18 @@ export default function MainLayout() {
 
       {/* ===================== MAIN CONTENT ===================== */}
       <main className="md:ml-64 min-h-screen pt-14 pb-24 md:pt-16 md:pb-0 flex flex-col">
+        {/* Health alert banner */}
+        {systemHealth && systemHealth.status !== "healthy" && (
+          <div className="bg-yellow-900/50 border-b border-yellow-600/30 px-4 py-2 flex items-center gap-2 text-sm text-yellow-300">
+            <Activity className="w-4 h-4 flex-shrink-0" />
+            <span>
+              {systemHealth.status === "error"
+                ? "Le serveur est injoignable. Certaines fonctionnalités peuvent ne pas fonctionner."
+                : `Services dégradés : ${Object.entries(systemHealth.services || {}).filter(([, s]) => s.status === "error").map(([k]) => k).join(", ")}`}
+            </span>
+            <NavLink to="/dashboard/settings" className="ml-auto text-xs underline text-yellow-400">Diagnostic</NavLink>
+          </div>
+        )}
         <div className="p-4 md:p-6 flex-1">
           <Outlet />
         </div>

@@ -198,7 +198,14 @@ export default function ChartPage() {
     } catch (error) {
       console.error("Failed to load chart data:", error);
       if (showLoading) {
-        toast.error("Erreur de chargement des données");
+        const status = error?.response?.status;
+        if (status === 503) {
+          toast.error("Sources de données temporairement indisponibles (Kraken/CryptoCompare)");
+        } else if (status === 401 || status === 403) {
+          toast.error("Erreur d'authentification — reconnectez-vous");
+        } else {
+          toast.error("Erreur de chargement des données du graphique");
+        }
       }
     } finally {
       if (showLoading) setLoading(false);

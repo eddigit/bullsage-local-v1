@@ -695,23 +695,31 @@ export default function ProTraderPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      // Charger le dashboard
-      const dashRes = await axios.get(`${API}/pro/dashboard`);
-      const dashData = dashRes.data || {};
-      setOpportunities(Array.isArray(dashData.best_opportunities) ? dashData.best_opportunities : []);
-      setMarketOverview(Array.isArray(dashData.market_overview) ? dashData.market_overview : []);
-      setScanMessage(dashRes.data.summary || "");
-      
-      // Charger les règles
-      const rulesRes = await axios.get(`${API}/pro/rules`);
-      setRules(rulesRes.data);
-      
+      // Charger le dashboard (peut être lent car scanne le marché)
+      try {
+        const dashRes = await axios.get(`${API}/pro/dashboard`);
+        const dashData = dashRes.data || {};
+        setOpportunities(Array.isArray(dashData.best_opportunities) ? dashData.best_opportunities : []);
+        setMarketOverview(Array.isArray(dashData.market_overview) ? dashData.market_overview : []);
+        setScanMessage(dashData.summary || "");
+      } catch (dashError) {
+        console.error("Erreur chargement dashboard:", dashError);
+        setScanMessage("Erreur de connexion au scanner. Les APIs de marché sont peut-être indisponibles.");
+      }
+
+      // Charger les règles (indépendant)
+      try {
+        const rulesRes = await axios.get(`${API}/pro/rules`);
+        setRules(rulesRes.data);
+      } catch (rulesError) {
+        console.error("Erreur chargement règles:", rulesError);
+      }
+
       // Analyse rapide du premier symbole
       await loadQuickAnalysis("BTC");
-      
+
     } catch (error) {
       console.error("Erreur chargement:", error);
-      toast.error("Erreur de chargement des données");
     } finally {
       setLoading(false);
     }
@@ -791,7 +799,7 @@ export default function ProTraderPage() {
             </Tooltip>
           </h1>
           <p className="text-muted-foreground">
-            Votre assistant de trading professionnel - Setups A+ et A uniquement
+            Votre assistant de trading professionnel - Setups A+, A et B
           </p>
         </div>
         <div className="flex gap-3">
@@ -863,8 +871,8 @@ export default function ProTraderPage() {
               {opportunities.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <AlertTriangle className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>Aucune opportunité A+ ou A pour le moment.</p>
-                  <p className="text-sm mt-2">La patience est la clé du trading gagnant!</p>
+                  <p>Aucune opportunité suffisante pour le moment.</p>
+                  <p className="text-sm mt-2">Cliquez &quot;Scanner le Marché&quot; ou revenez dans quelques heures.</p>
                 </div>
               ) : (
                 <ScrollArea className="h-[400px]">

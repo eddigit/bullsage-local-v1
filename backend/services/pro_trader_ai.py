@@ -652,16 +652,16 @@ class ProTraderAI:
                 score += 15
                 signals.append("🐋 Activité institutionnelle forte - VENTE")
         
-        # === QUALITÉ FINALE ===
+        # === QUALITÉ FINALE (seuils ajustés pour plus de signaux exploitables) ===
         confidence = min(95, max(10, score))
-        
-        if score >= 85:
+
+        if score >= 80:
             quality = TradeQuality.A_PLUS
-        elif score >= 70:
+        elif score >= 65:
             quality = TradeQuality.A
-        elif score >= 55:
+        elif score >= 50:
             quality = TradeQuality.B
-        elif score >= 40:
+        elif score >= 35:
             quality = TradeQuality.C
         else:
             quality = TradeQuality.D
@@ -725,10 +725,12 @@ class ProTraderAI:
         # Qualité du trade
         quality, confidence, signals, warnings = self._determine_trade_quality(analysis)
         
-        # === FORCER WAIT SI QUALITÉ INSUFFISANTE (qualité C ou D) ===
+        # === FORCER WAIT SI QUALITÉ INSUFFISANTE (qualité C ou D uniquement) ===
         if quality in [TradeQuality.C, TradeQuality.D]:
             direction = "WAIT"
             warnings.insert(0, "⚠️ QUALITÉ FAIBLE - Attendre un meilleur setup")
+        elif quality == TradeQuality.B and direction != "WAIT":
+            warnings.insert(0, "⚠️ Setup B - Réduisez votre taille de position")
         
         # Niveaux
         levels = self._calculate_entry_stop_tp(
@@ -931,7 +933,8 @@ Les conditions ne sont pas réunies pour un trade rentable.
             return "⚠️ **NE PAS TRADER** - Setup de qualité C = trop risqué."
         
         if quality == TradeQuality.B:
-            return "⚠️ **NE PAS TRADER** - Setup de qualité B = pas assez fiable."
+            # B setups are tradeable with reduced position size
+            pass  # Continue to generate a full action plan below
         
         action = "ACHETER" if direction == "LONG" else "VENDRE" if direction == "SHORT" else "ATTENDRE"
         emoji = "🟢" if direction == "LONG" else "🔴" if direction == "SHORT" else "🟡"
@@ -1008,8 +1011,8 @@ Les conditions ne sont pas réunies pour un trade rentable.
                 if "error" not in recommendation:
                     quality = recommendation["recommendation"]["quality"]
                     
-                    # Garder seulement A+ et A
-                    if quality in ["A+", "A"]:
+                    # Garder A+, A et B (B avec avertissement)
+                    if quality in ["A+", "A", "B"]:
                         opportunities.append({
                             "symbol": symbol,
                             "quality": quality,
@@ -1049,12 +1052,12 @@ Les conditions ne sont pas réunies pour un trade rentable.
     
     def _generate_scan_summary(self, opportunities: List[Dict]) -> str:
         """Génère un résumé du scan"""
-        
+
         if not opportunities:
             return """
-🔍 **SCAN TERMINÉ - AUCUN SETUP A+ ou A**
+🔍 **SCAN TERMINÉ - AUCUNE OPPORTUNITÉ**
 
-Le marché ne présente pas d'opportunités exceptionnelles en ce moment.
+Le marché ne présente pas d'opportunités suffisantes en ce moment.
 Recommandations:
 • Attendre patiemment de meilleures conditions
 • Ne forcez pas les trades
@@ -1062,32 +1065,40 @@ Recommandations:
 
 ⏳ Rescannez dans quelques heures.
 """
-        
+
         a_plus = [o for o in opportunities if o["quality"] == "A+"]
         a_grade = [o for o in opportunities if o["quality"] == "A"]
-        
+        b_grade = [o for o in opportunities if o["quality"] == "B"]
+
         summary = f"""
 🎯 **SCAN TERMINÉ - {len(opportunities)} OPPORTUNITÉ(S) TROUVÉE(S)**
 
 """
-        
+
         if a_plus:
             summary += f"💎 **SETUPS A+ ({len(a_plus)})** - EXCEPTIONNELS:\n"
             for o in a_plus:
                 emoji = "🟢" if o["direction"] == "LONG" else "🔴"
                 summary += f"   {emoji} **{o['symbol']}** - {o['direction']} @ ${o['entry']:,.2f} | TP: +{o['gain_potential']:.1f}% | R:R 1:{o['rr_ratio']}\n"
-        
+
         if a_grade:
             summary += f"\n✅ **SETUPS A ({len(a_grade)})** - EXCELLENTS:\n"
             for o in a_grade:
                 emoji = "🟢" if o["direction"] == "LONG" else "🔴"
                 summary += f"   {emoji} **{o['symbol']}** - {o['direction']} @ ${o['entry']:,.2f} | TP: +{o['gain_potential']:.1f}% | R:R 1:{o['rr_ratio']}\n"
-        
+
+        if b_grade:
+            summary += f"\n📊 **SETUPS B ({len(b_grade)})** - BONS (position réduite):\n"
+            for o in b_grade:
+                emoji = "🟢" if o["direction"] == "LONG" else "🔴"
+                summary += f"   {emoji} **{o['symbol']}** - {o['direction']} @ ${o['entry']:,.2f} | TP: +{o['gain_potential']:.1f}% | R:R 1:{o['rr_ratio']}\n"
+
+        best = opportunities[0]
         summary += f"""
-📌 **RECOMMANDATION**: Focalisez-vous sur le meilleur setup ({opportunities[0]['symbol']})
+📌 **RECOMMANDATION**: Focalisez-vous sur le meilleur setup ({best['symbol']})
    Ne tradez pas tous en même temps - qualité > quantité!
 """
-        
+
         return summary.strip()
 
 

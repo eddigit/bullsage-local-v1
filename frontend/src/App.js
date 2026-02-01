@@ -97,6 +97,7 @@ const ProtectedRoute = ({ children }) => {
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [systemHealth, setSystemHealth] = useState(null);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -117,6 +118,26 @@ function App() {
     };
 
     initAuth();
+
+    // Startup healthcheck — non-blocking
+    const runHealthCheck = async () => {
+      try {
+        const res = await axios.get(`${API}/system/health`);
+        setSystemHealth(res.data);
+        if (res.data?.status !== "healthy") {
+          const degraded = Object.entries(res.data?.services || {})
+            .filter(([, s]) => s.status === "error")
+            .map(([k]) => k);
+          if (degraded.length > 0) {
+            console.warn(`[Bull Sage] Services dégradés: ${degraded.join(", ")}`);
+          }
+        }
+      } catch (e) {
+        console.error("[Bull Sage] Healthcheck failed — backend unreachable:", e.message);
+        setSystemHealth({ status: "error", services: {} });
+      }
+    };
+    runHealthCheck();
   }, []);
 
   const login = async (email, password) => {
@@ -150,15 +171,17 @@ function App() {
   };
 
   const updateUser = (newUserData) => {
-    setUser(newUserData);
-    localStorage.setItem("user", JSON.stringify(newUserData));
+    // Merge with existing user data to avoid losing fields
+    const merged = user ? { ...user, ...newUserData } : newUserData;
+    setUser(merged);
+    localStorage.setItem("user", JSON.stringify(merged));
   };
 
   // Check if user needs onboarding
   const needsOnboarding = user && !user.onboarding_completed;
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, loading, updateUser }}>
+    <AuthContext.Provider value={{ user, login, register, logout, loading, updateUser, systemHealth }}>
       <div className="dark">
         <Toaster 
           position="top-right" 

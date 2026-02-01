@@ -139,13 +139,15 @@ class MarketDataService:
                     coin_id = symbol_to_id.get(symbol, symbol.lower())
                     
                     image = ""
+                    name = symbol
                     if coin_id in CRYPTO_MAPPING:
                         image = CRYPTO_MAPPING[coin_id]["image"]
-                    
+                        name = CRYPTO_MAPPING[coin_id]["name"]
+
                     crypto_list.append({
                         "id": coin_id,
                         "symbol": symbol.lower(),
-                        "name": usd_data.get("FROMSYMBOL", symbol),
+                        "name": name,
                         "image": image,
                         "current_price": usd_data.get("PRICE", 0),
                         "market_cap": usd_data.get("MKTCAP", 0),

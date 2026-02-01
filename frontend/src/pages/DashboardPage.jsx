@@ -53,6 +53,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "../components/ui/tooltip";
+import CryptoIcon from "../components/CryptoIcon";
 import {
   AreaChart,
   Area,
@@ -174,8 +175,15 @@ export default function DashboardPage() {
       // Fetch fear & greed
       try {
         const fgRes = await axios.get(`${API}/market/fear-greed`);
-        if (fgRes.data?.data?.[0]) {
-          fearGreedData = fgRes.data.data[0];
+        // Backend returns array directly [{ value, value_classification, ... }]
+        // or original API format { data: [{ ... }] }
+        const fgData = fgRes.data;
+        if (Array.isArray(fgData) && fgData.length > 0) {
+          fearGreedData = fgData[0];
+        } else if (fgData?.data?.[0]) {
+          fearGreedData = fgData.data[0];
+        }
+        if (fearGreedData) {
           console.log("Fear & Greed loaded:", fearGreedData.value);
         }
       } catch (e) {
@@ -488,10 +496,17 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
         {/* Fear & Greed */}
         <TooltipProvider>
           <Card className="glass border-white/5 relative">
-            <div className="absolute top-2 right-2 flex items-center gap-1">
-              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-              <span className="text-[10px] text-emerald-500 font-mono">LIVE</span>
-            </div>
+            {fearGreed?.value ? (
+              <div className="absolute top-2 right-2 flex items-center gap-1">
+                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                <span className="text-[10px] text-emerald-500 font-mono">LIVE</span>
+              </div>
+            ) : (
+              <div className="absolute top-2 right-2 flex items-center gap-1">
+                <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                <span className="text-[10px] text-yellow-500 font-mono">--</span>
+              </div>
+            )}
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -548,10 +563,17 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
         {/* BTC Quick */}
         <TooltipProvider>
           <Card className="glass border-white/5 relative">
-            <div className="absolute top-2 right-2 flex items-center gap-1">
-              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-              <span className="text-[10px] text-emerald-500 font-mono">LIVE</span>
-            </div>
+            {markets.find(c => c.id === "bitcoin")?.current_price ? (
+              <div className="absolute top-2 right-2 flex items-center gap-1">
+                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                <span className="text-[10px] text-emerald-500 font-mono">LIVE</span>
+              </div>
+            ) : (
+              <div className="absolute top-2 right-2 flex items-center gap-1">
+                <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                <span className="text-[10px] text-yellow-500 font-mono">--</span>
+              </div>
+            )}
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -585,7 +607,7 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
                     </TooltipContent>
                   </UITooltip>
                 </div>
-                <img src={markets.find(c => c.id === "bitcoin")?.image} alt="BTC" className="w-8 h-8" />
+                <CryptoIcon symbol="BTC" src={markets.find(c => c.id === "bitcoin")?.image} size={32} />
               </div>
             </CardContent>
           </Card>
@@ -659,6 +681,15 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
             {loadingNews && !newsImpact ? (
               <div className="flex items-center justify-center py-4">
                 <Loader2 className="w-5 h-5 animate-spin text-primary" />
+              </div>
+            ) : newsImpact?.error ? (
+              <div className="text-center py-4">
+                <AlertCircle className="w-6 h-6 mx-auto text-yellow-500 mb-2" />
+                <p className="text-sm text-yellow-400">
+                  {newsImpact.error === "no_api_key"
+                    ? "Clé API Finnhub non configurée. Ajoutez FINNHUB_API_KEY dans les paramètres."
+                    : "Erreur lors de la récupération des actualités. Réessayez."}
+                </p>
               </div>
             ) : newsImpact?.summary?.length > 0 ? (
               <div className="space-y-2">
@@ -773,7 +804,7 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
                           }}
                         >
                           <div className="flex items-center gap-3">
-                            <img src={coin.image} alt={coin.name} className="w-8 h-8 rounded-full" />
+                            <CryptoIcon symbol={coin.symbol} src={coin.image} size={32} />
                             <div>
                               <p className="font-medium">{coin.name}</p>
                               <p className="text-xs text-muted-foreground uppercase">{coin.symbol}</p>
@@ -822,7 +853,7 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
                         <div className="flex items-center gap-3">
                           <UITooltip>
                             <TooltipTrigger>
-                              <img src={coin.image} alt={coin.name} className="w-10 h-10 rounded-full cursor-help hover:ring-2 hover:ring-primary/50 transition-all" />
+                              <CryptoIcon symbol={coin.symbol} src={coin.image} size={40} className="cursor-help hover:ring-2 hover:ring-primary/50 transition-all" />
                             </TooltipTrigger>
                             <TooltipContent className="max-w-xs">
                               <p className="font-semibold">{coin.name} ({coin.symbol.toUpperCase()})</p>
