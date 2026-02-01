@@ -791,7 +791,7 @@ export default function ProTraderPage() {
             </Tooltip>
           </h1>
           <p className="text-muted-foreground">
-            Votre assistant de trading professionnel - Setups A+ et A uniquement
+            Votre assistant de trading professionnel - Setups A+, A et B
           </p>
         </div>
         <div className="flex gap-3">
@@ -863,8 +863,8 @@ export default function ProTraderPage() {
               {opportunities.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <AlertTriangle className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>Aucune opportunité A+ ou A pour le moment.</p>
-                  <p className="text-sm mt-2">La patience est la clé du trading gagnant!</p>
+                  <p>Aucune opportunité suffisante pour le moment.</p>
+                  <p className="text-sm mt-2">Cliquez &quot;Scanner le Marché&quot; ou revenez dans quelques heures.</p>
                 </div>
               ) : (
                 <ScrollArea className="h-[400px]">
