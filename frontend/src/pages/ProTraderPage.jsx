@@ -695,23 +695,31 @@ export default function ProTraderPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      // Charger le dashboard
-      const dashRes = await axios.get(`${API}/pro/dashboard`);
-      const dashData = dashRes.data || {};
-      setOpportunities(Array.isArray(dashData.best_opportunities) ? dashData.best_opportunities : []);
-      setMarketOverview(Array.isArray(dashData.market_overview) ? dashData.market_overview : []);
-      setScanMessage(dashRes.data.summary || "");
-      
-      // Charger les règles
-      const rulesRes = await axios.get(`${API}/pro/rules`);
-      setRules(rulesRes.data);
-      
+      // Charger le dashboard (peut être lent car scanne le marché)
+      try {
+        const dashRes = await axios.get(`${API}/pro/dashboard`);
+        const dashData = dashRes.data || {};
+        setOpportunities(Array.isArray(dashData.best_opportunities) ? dashData.best_opportunities : []);
+        setMarketOverview(Array.isArray(dashData.market_overview) ? dashData.market_overview : []);
+        setScanMessage(dashData.summary || "");
+      } catch (dashError) {
+        console.error("Erreur chargement dashboard:", dashError);
+        setScanMessage("Erreur de connexion au scanner. Les APIs de marché sont peut-être indisponibles.");
+      }
+
+      // Charger les règles (indépendant)
+      try {
+        const rulesRes = await axios.get(`${API}/pro/rules`);
+        setRules(rulesRes.data);
+      } catch (rulesError) {
+        console.error("Erreur chargement règles:", rulesError);
+      }
+
       // Analyse rapide du premier symbole
       await loadQuickAnalysis("BTC");
-      
+
     } catch (error) {
       console.error("Erreur chargement:", error);
-      toast.error("Erreur de chargement des données");
     } finally {
       setLoading(false);
     }
