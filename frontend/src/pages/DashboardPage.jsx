@@ -53,6 +53,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "../components/ui/tooltip";
+import CryptoIcon from "../components/CryptoIcon";
 import {
   AreaChart,
   Area,
@@ -606,12 +607,7 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
                     </TooltipContent>
                   </UITooltip>
                 </div>
-                <img
-                  src={markets.find(c => c.id === "bitcoin")?.image || "https://coin-images.coingecko.com/coins/images/1/small/bitcoin.png"}
-                  alt="BTC"
-                  className="w-8 h-8"
-                  onError={(e) => { e.target.onerror = null; e.target.src = "https://coin-images.coingecko.com/coins/images/1/small/bitcoin.png"; }}
-                />
+                <CryptoIcon symbol="BTC" src={markets.find(c => c.id === "bitcoin")?.image} size={32} />
               </div>
             </CardContent>
           </Card>
@@ -808,12 +804,7 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
                           }}
                         >
                           <div className="flex items-center gap-3">
-                            <img
-                              src={coin.image || `https://ui-avatars.com/api/?name=${coin.symbol}&background=random&size=32`}
-                              alt={coin.name}
-                              className="w-8 h-8 rounded-full"
-                              onError={(e) => { e.target.onerror = null; e.target.src = `https://ui-avatars.com/api/?name=${coin.symbol}&background=6366f1&color=fff&size=32`; }}
-                            />
+                            <CryptoIcon symbol={coin.symbol} src={coin.image} size={32} />
                             <div>
                               <p className="font-medium">{coin.name}</p>
                               <p className="text-xs text-muted-foreground uppercase">{coin.symbol}</p>
@@ -862,12 +853,7 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
                         <div className="flex items-center gap-3">
                           <UITooltip>
                             <TooltipTrigger>
-                              <img
-                                src={coin.image || `https://ui-avatars.com/api/?name=${coin.symbol}&background=random&size=40`}
-                                alt={coin.name}
-                                className="w-10 h-10 rounded-full cursor-help hover:ring-2 hover:ring-primary/50 transition-all"
-                                onError={(e) => { e.target.onerror = null; e.target.src = `https://ui-avatars.com/api/?name=${coin.symbol}&background=6366f1&color=fff&size=40`; }}
-                              />
+                              <CryptoIcon symbol={coin.symbol} src={coin.image} size={40} className="cursor-help hover:ring-2 hover:ring-primary/50 transition-all" />
                             </TooltipTrigger>
                             <TooltipContent className="max-w-xs">
                               <p className="font-semibold">{coin.name} ({coin.symbol.toUpperCase()})</p>
