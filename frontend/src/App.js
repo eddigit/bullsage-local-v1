@@ -150,8 +150,10 @@ function App() {
   };
 
   const updateUser = (newUserData) => {
-    setUser(newUserData);
-    localStorage.setItem("user", JSON.stringify(newUserData));
+    // Merge with existing user data to avoid losing fields
+    const merged = user ? { ...user, ...newUserData } : newUserData;
+    setUser(merged);
+    localStorage.setItem("user", JSON.stringify(merged));
   };
 
   // Check if user needs onboarding
