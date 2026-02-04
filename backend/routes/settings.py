@@ -5,6 +5,9 @@ from pydantic import BaseModel
 
 from ..core.config import db
 from ..core.auth import get_current_user
+from ..core.logging import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/settings", tags=["Settings"])
 

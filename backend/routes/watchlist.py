@@ -3,7 +3,10 @@ from datetime import datetime, timezone
 
 from ..core.config import db
 from ..core.auth import get_current_user
+from ..core.logging import get_logger
 from ..models.schemas import WatchlistUpdate
+
+logger = get_logger(__name__)
 
 router = APIRouter(tags=["Watchlist"])
 

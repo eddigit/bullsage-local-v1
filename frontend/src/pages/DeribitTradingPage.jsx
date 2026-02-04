@@ -13,6 +13,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth, API } from "../App";
 import axios from "axios";
 import { toast } from "sonner";
+import { logger } from "../lib/logger";
 import {
   TrendingUp,
   TrendingDown,
@@ -121,7 +122,7 @@ export default function DeribitTradingPage() {
       setConnectionStatus(status);
       return status.connected;
     } catch (error) {
-      console.error("Erreur connexion Deribit:", error);
+      logger.error("Erreur connexion Deribit", { error: error.message });
       setConnectionStatus({ connected: false, error: error.response?.data?.detail || error.message });
       return false;
     }
@@ -133,7 +134,7 @@ export default function DeribitTradingPage() {
       const response = await axios.get(`${API}/deribit/account?currency=BTC`);
       setAccount(response.data.account);
     } catch (error) {
-      console.error("Erreur chargement compte:", error);
+      logger.error("Erreur chargement compte Deribit", { error: error.message });
     }
   }, []);
 
@@ -143,7 +144,7 @@ export default function DeribitTradingPage() {
       const response = await axios.get(`${API}/deribit/positions?currency=BTC`);
       setPositions(response.data.positions || []);
     } catch (error) {
-      console.error("Erreur chargement positions:", error);
+      logger.error("Erreur chargement positions Deribit", { error: error.message });
     }
   }, []);
 
@@ -154,7 +155,7 @@ export default function DeribitTradingPage() {
       setOpenOrders(response.data.open_orders || []);
       setOrderHistory(response.data.order_history || []);
     } catch (error) {
-      console.error("Erreur chargement ordres:", error);
+      logger.error("Erreur chargement ordres Deribit", { error: error.message });
     }
   }, []);
 
@@ -164,7 +165,7 @@ export default function DeribitTradingPage() {
       const response = await axios.get(`${API}/deribit/instruments?currency=BTC&kind=future`);
       setInstruments(response.data.instruments || []);
     } catch (error) {
-      console.error("Erreur chargement instruments:", error);
+      logger.error("Erreur chargement instruments Deribit", { error: error.message });
     }
   }, []);
 
@@ -184,7 +185,7 @@ export default function DeribitTradingPage() {
       }
       setLastUpdate(new Date());
     } catch (error) {
-      console.error("Erreur chargement données:", error);
+      logger.error("Erreur chargement données Deribit", { error: error.message });
       if (!silent) {
         toast.error("Erreur de chargement des données Deribit");
       }
@@ -225,7 +226,7 @@ export default function DeribitTradingPage() {
         toast.error(response.data.error || "Erreur lors du passage de l'ordre");
       }
     } catch (error) {
-      console.error("Erreur ordre:", error);
+      logger.error("Erreur ordre Deribit", { error: error.message });
       toast.error(error.response?.data?.detail || "Erreur lors du passage de l'ordre");
     } finally {
       setPlacingOrder(false);
@@ -251,7 +252,7 @@ export default function DeribitTradingPage() {
         toast.error(response.data.error || "Erreur lors de la fermeture");
       }
     } catch (error) {
-      console.error("Erreur fermeture:", error);
+      logger.error("Erreur fermeture position Deribit", { error: error.message });
       toast.error("Erreur lors de la fermeture de la position");
     } finally {
       setClosingPosition(null);
@@ -273,7 +274,7 @@ export default function DeribitTradingPage() {
         toast.error(response.data.error || "Erreur lors de l'annulation");
       }
     } catch (error) {
-      console.error("Erreur annulation:", error);
+      logger.error("Erreur annulation ordre Deribit", { error: error.message });
       toast.error("Erreur lors de l'annulation de l'ordre");
     } finally {
       setCancellingOrder(null);
@@ -294,7 +295,7 @@ export default function DeribitTradingPage() {
         loadAllData(true);
       }
     } catch (error) {
-      console.error("Erreur annulation:", error);
+      logger.error("Erreur annulation ordre Deribit", { error: error.message });
       toast.error("Erreur lors de l'annulation des ordres");
     }
   };

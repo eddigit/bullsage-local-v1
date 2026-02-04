@@ -6,13 +6,17 @@ import uuid
 
 from ..core.config import db
 from ..core.auth import get_current_user
+from ..core.logging import get_logger
 from ..models.schemas import TradeJournalCreate, TradeJournalClose
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/journal", tags=["Trading Journal"])
 
 @router.post("/trades")
 async def create_journal_entry(entry: TradeJournalCreate, current_user: dict = Depends(get_current_user)):
     """Create a new trade journal entry"""
+    logger.info(f"[journal_create] User {current_user['id']} creating entry for {entry.symbol}")
     if entry.trade_type == "BUY":
         risk = entry.entry_price - entry.stop_loss
         reward = entry.take_profit - entry.entry_price

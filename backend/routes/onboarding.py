@@ -3,14 +3,18 @@ from datetime import datetime, timezone
 
 from ..core.config import db
 from ..core.auth import get_current_user
+from ..core.logging import get_logger
 from ..models.schemas import OnboardingData
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/onboarding", tags=["Onboarding"])
 
 @router.post("/complete")
 async def complete_onboarding(data: OnboardingData, current_user: dict = Depends(get_current_user)):
     """Complete the onboarding process and save user preferences"""
-    
+    logger.info(f"[onboarding] User {current_user['id']} completing onboarding: {data.experience_level}")
+
     level_map = {
         "beginner": "beginner",
         "intermediate": "intermediate",

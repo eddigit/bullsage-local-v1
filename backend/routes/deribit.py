@@ -27,12 +27,15 @@ from pydantic import BaseModel, Field
 
 # Import du client Deribit
 from services.deribit_client import (
-    get_deribit_client, 
-    DeribitClient, 
+    get_deribit_client,
+    DeribitClient,
     DeribitAPIError,
     DeribitPosition,
     DeribitOrder
 )
+from core.logging import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/deribit", tags=["Deribit Trading"])
 
@@ -134,14 +137,15 @@ def order_to_dict(order: DeribitOrder) -> Dict[str, Any]:
 async def get_deribit_status():
     """
     Vérifier le statut de la connexion Deribit.
-    
+
     Retourne l'état de la connexion, si authentifié, et les infos de base du compte.
     """
     client = get_deribit_client()
-    
+
     try:
         result = await client.test_connection()
-        
+        logger.info(f"[deribit_status] Connected: {result.get('connected')}, Auth: {result.get('authenticated')}")
+
         return {
             "success": True,
             "deribit": {
@@ -155,6 +159,7 @@ async def get_deribit_status():
             }
         }
     except Exception as e:
+        logger.error(f"[deribit_status] Connection failed: {e}")
         return {
             "success": False,
             "error": str(e),
@@ -336,11 +341,12 @@ async def get_ticker(instrument: str):
 async def place_buy_order(request: OrderRequest):
     """
     Placer un ordre d'achat (LONG).
-    
+
     Ouvre ou augmente une position longue sur l'instrument spécifié.
     """
     client = get_deribit_client()
-    
+    logger.info(f"[deribit_buy] Order request: {request.instrument} ${request.amount} {request.order_type}")
+
     try:
         order = await client.buy(
             instrument_name=request.instrument,
@@ -350,7 +356,8 @@ async def place_buy_order(request: OrderRequest):
             reduce_only=request.reduce_only,
             label=request.label or "bullsage_buy"
         )
-        
+        logger.info(f"[deribit_buy] Order placed successfully: {order.order_id}")
+
         return {
             "success": True,
             "action": "buy",
@@ -359,10 +366,13 @@ async def place_buy_order(request: OrderRequest):
             "testnet": client.config.testnet
         }
     except DeribitAPIError as e:
+        logger.error(f"[deribit_buy] API error: {e.message}")
         raise HTTPException(status_code=e.code if e.code >= 400 else 500, detail=e.message)
     except ValueError as e:
+        logger.error(f"[deribit_buy] Validation error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        logger.error(f"[deribit_buy] Unexpected error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -370,11 +380,12 @@ async def place_buy_order(request: OrderRequest):
 async def place_sell_order(request: OrderRequest):
     """
     Placer un ordre de vente (SHORT).
-    
+
     Ouvre ou augmente une position short sur l'instrument spécifié.
     """
     client = get_deribit_client()
-    
+    logger.info(f"[deribit_sell] Order request: {request.instrument} ${request.amount} {request.order_type}")
+
     try:
         order = await client.sell(
             instrument_name=request.instrument,
@@ -384,7 +395,8 @@ async def place_sell_order(request: OrderRequest):
             reduce_only=request.reduce_only,
             label=request.label or "bullsage_sell"
         )
-        
+        logger.info(f"[deribit_sell] Order placed successfully: {order.order_id}")
+
         return {
             "success": True,
             "action": "sell",
@@ -393,10 +405,13 @@ async def place_sell_order(request: OrderRequest):
             "testnet": client.config.testnet
         }
     except DeribitAPIError as e:
+        logger.error(f"[deribit_sell] API error: {e.message}")
         raise HTTPException(status_code=e.code if e.code >= 400 else 500, detail=e.message)
     except ValueError as e:
+        logger.error(f"[deribit_sell] Validation error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        logger.error(f"[deribit_sell] Unexpected error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

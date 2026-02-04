@@ -6,7 +6,10 @@ import bcrypt
 
 from ..core.config import db, JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRATION_HOURS
 from ..core.auth import get_current_user
+from ..core.logging import get_logger
 from ..models.schemas import UserCreate, UserLogin, UserResponse, TokenResponse
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -28,10 +31,12 @@ def create_token(user_id: str, email: str) -> str:
 
 @router.post("/register", response_model=TokenResponse)
 async def register(user_data: UserCreate):
+    logger.info(f"[register] Attempt for email: {user_data.email}")
     existing = await db.users.find_one({"email": user_data.email})
     if existing:
+        logger.warning(f"[register] Email already registered: {user_data.email}")
         raise HTTPException(status_code=400, detail="Email already registered")
-    
+
     user_id = str(uuid.uuid4())
     user_doc = {
         "id": user_id,
@@ -47,7 +52,8 @@ async def register(user_data: UserCreate):
     
     await db.users.insert_one(user_doc)
     token = create_token(user_id, user_data.email)
-    
+    logger.info(f"[register] User created successfully: {user_data.email} (id: {user_id})")
+
     user_response = UserResponse(
         id=user_id,
         email=user_data.email,
@@ -63,11 +69,14 @@ async def register(user_data: UserCreate):
 
 @router.post("/login", response_model=TokenResponse)
 async def login(credentials: UserLogin):
+    logger.info(f"[login] Attempt for email: {credentials.email}")
     user = await db.users.find_one({"email": credentials.email})
     if not user or not verify_password(credentials.password, user["password"]):
+        logger.warning(f"[login] Failed attempt for email: {credentials.email}")
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    
+
     token = create_token(user["id"], user["email"])
+    logger.info(f"[login] Successful login: {credentials.email}")
     
     user_response = UserResponse(
         id=user["id"],

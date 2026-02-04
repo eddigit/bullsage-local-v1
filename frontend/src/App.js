@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useState, useEffect, createContext, useContext } from "react";
 import { Toaster } from "sonner";
 import axios from "axios";
+import { logger } from "./lib/logger";
 
 // Pages - SIMPLIFIÉ : Focus sur le trading Deribit
 import LandingPage from "./pages/LandingPage";
@@ -129,11 +130,13 @@ function App() {
             .filter(([, s]) => s.status === "error")
             .map(([k]) => k);
           if (degraded.length > 0) {
-            console.warn(`[Bull Sage] Services dégradés: ${degraded.join(", ")}`);
+            logger.warn(`Services dégradés: ${degraded.join(", ")}`, { services: degraded });
           }
+        } else {
+          logger.info("System health check passed");
         }
       } catch (e) {
-        console.error("[Bull Sage] Healthcheck failed — backend unreachable:", e.message);
+        logger.error("Healthcheck failed — backend unreachable", { error: e.message });
         setSystemHealth({ status: "error", services: {} });
       }
     };
