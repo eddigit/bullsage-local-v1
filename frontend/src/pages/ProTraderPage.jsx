@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth, API } from "../App";
 import axios from "axios";
 import { toast } from "sonner";
+import { logger } from "../lib/logger";
 import {
   TrendingUp,
   TrendingDown,
@@ -657,7 +658,7 @@ export default function ProTraderPage() {
         throw new Error(response.data.error || 'Erreur inconnue');
       }
     } catch (error) {
-      console.error("Erreur Deribit:", error);
+      logger.error("Erreur Deribit", { error: error.message, response: error.response?.data });
       toast.error(`Erreur Deribit: ${error.response?.data?.detail || error.message}`);
     } finally {
       setExecutingDeribit(prev => ({ ...prev, [symbol]: false }));
@@ -684,7 +685,7 @@ export default function ProTraderPage() {
         { duration: 5000 }
       );
     } catch (error) {
-      console.error("Erreur application trade:", error);
+      logger.error("Erreur application trade", { error: error.message });
       toast.error("Erreur lors de l'application du trade");
     } finally {
       setApplyingSymbol(null);
@@ -703,7 +704,7 @@ export default function ProTraderPage() {
         setMarketOverview(Array.isArray(dashData.market_overview) ? dashData.market_overview : []);
         setScanMessage(dashData.summary || "");
       } catch (dashError) {
-        console.error("Erreur chargement dashboard:", dashError);
+        logger.error("Erreur chargement dashboard", { error: dashError.message });
         setScanMessage("Erreur de connexion au scanner. Les APIs de marché sont peut-être indisponibles.");
       }
 
@@ -712,14 +713,14 @@ export default function ProTraderPage() {
         const rulesRes = await axios.get(`${API}/pro/rules`);
         setRules(rulesRes.data);
       } catch (rulesError) {
-        console.error("Erreur chargement règles:", rulesError);
+        logger.error("Erreur chargement règles", { error: rulesError.message });
       }
 
       // Analyse rapide du premier symbole
       await loadQuickAnalysis("BTC");
 
     } catch (error) {
-      console.error("Erreur chargement:", error);
+      logger.error("Erreur chargement ProTrader", { error: error.message });
     } finally {
       setLoading(false);
     }

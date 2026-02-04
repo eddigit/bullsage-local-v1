@@ -3,6 +3,7 @@ import { useAuth, API } from "../App";
 import { Link } from "react-router-dom";
 import axios from "axios";
 import { toast } from "sonner";
+import { logger } from "../lib/logger";
 import {
   TrendingUp,
   TrendingDown,
@@ -131,7 +132,7 @@ export default function DashboardPage() {
       const response = await axios.get(`${API}/market/news-impact`);
       setNewsImpact(response.data);
     } catch (error) {
-      console.error("Error fetching news impact:", error);
+      logger.error("Error fetching news impact", { error: error.message });
     } finally {
       setLoadingNews(false);
     }
@@ -149,7 +150,7 @@ export default function DashboardPage() {
         toast.info("Aucune opportunité détectée pour le moment");
       }
     } catch (error) {
-      console.error("Error scanning opportunities:", error);
+      logger.error("Error scanning opportunities", { error: error.message });
       toast.error("Erreur lors du scan - réessayez dans 1 minute");
     } finally {
       setScanning(false);
@@ -167,9 +168,9 @@ export default function DashboardPage() {
       try {
         const marketsRes = await axios.get(`${API}/market/crypto`);
         marketsData = Array.isArray(marketsRes.data) ? marketsRes.data : [];
-        console.log("Markets loaded:", marketsData.length, "coins");
+        logger.debug("Markets loaded", { count: marketsData.length });
       } catch (e) {
-        console.error("Error fetching markets:", e.message);
+        logger.error("Error fetching markets", { error: e.message });
       }
 
       // Fetch fear & greed
@@ -184,26 +185,26 @@ export default function DashboardPage() {
           fearGreedData = fgData.data[0];
         }
         if (fearGreedData) {
-          console.log("Fear & Greed loaded:", fearGreedData.value);
+          logger.debug("Fear & Greed loaded", { value: fearGreedData.value });
         }
       } catch (e) {
-        console.error("Error fetching fear-greed:", e.message);
+        logger.error("Error fetching fear-greed", { error: e.message });
       }
 
       // Fetch portfolio
       try {
         const portfolioRes = await axios.get(`${API}/paper-trading/portfolio`);
         portfolioData = portfolioRes.data;
-        console.log("Portfolio loaded:", portfolioData);
+        logger.debug("Portfolio loaded", { balance: portfolioData?.paper_balance });
       } catch (e) {
-        console.error("Error fetching portfolio:", e.message);
+        logger.error("Error fetching portfolio", { error: e.message });
       }
 
       setMarkets(marketsData);
       setFearGreed(fearGreedData);
       setPortfolio(portfolioData);
     } catch (error) {
-      console.error("Error fetching data:", error);
+      logger.error("Error fetching dashboard data", { error: error.message });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -216,7 +217,7 @@ export default function DashboardPage() {
     
     // Setup auto-refresh every 30 seconds for real-time data
     refreshIntervalRef.current = setInterval(() => {
-      console.log("Auto-refreshing market data...");
+      logger.debug("Auto-refreshing market data");
       fetchData();
     }, AUTO_REFRESH_INTERVAL);
     
@@ -347,7 +348,7 @@ Sois PRÉCIS avec des prix exacts basés sur les données actuelles.`
         
         toast.success("Signal sauvegardé dans l'historique");
       } catch (parseError) {
-        console.log("Could not auto-save signal:", parseError);
+        logger.warn("Could not auto-save signal", { error: parseError.message });
       }
     } catch (error) {
       toast.error("Erreur lors de l'analyse");

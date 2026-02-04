@@ -37,17 +37,17 @@ async def get_market_overview(current_user: dict = Depends(get_current_user)):
                     data = resp.json().get("data", {})
                     overview["market_cap_change_24h"] = data.get("market_cap_change_percentage_24h_usd", 0)
                     overview["btc_dominance"] = data.get("market_cap_percentage", {}).get("btc", 0)
-            except:
-                pass
-            
+            except Exception as e:
+                logger.warning(f"[market_overview] CoinGecko global fetch error: {e}")
+
             # Get top cryptos
             try:
                 crypto_list = await market_data_service.get_crypto_list()
                 if crypto_list:
                     overview["top_cryptos"] = crypto_list[:10]
-            except:
-                pass
-            
+            except Exception as e:
+                logger.warning(f"[market_overview] Crypto list fetch error: {e}")
+
             # Get Fear & Greed
             try:
                 resp = await client.get("https://api.alternative.me/fng/")
@@ -57,8 +57,8 @@ async def get_market_overview(current_user: dict = Depends(get_current_user)):
                         "value": int(fng_data.get("value", 50)),
                         "classification": fng_data.get("value_classification", "Neutral")
                     }
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"[market_overview] Fear & Greed fetch error: {e}")
         
         return overview
     except Exception as e:
