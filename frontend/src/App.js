@@ -48,8 +48,8 @@ export const useAuth = () => {
   return context;
 };
 
-// DEV MODE - Désactiver la redirection sur 401
-const DEV_MODE = true;
+// DEV MODE - Contrôlé via variable d'environnement (désactivé en production)
+const DEV_MODE = process.env.REACT_APP_DEV_MODE === 'true';
 
 // Axios interceptor for auth
 axios.interceptors.request.use((config) => {
@@ -63,7 +63,7 @@ axios.interceptors.request.use((config) => {
 axios.interceptors.response.use(
   (response) => response,
   (error) => {
-    // DEV MODE: Ne pas rediriger sur 401
+    // Token expiré ou invalide : déconnecter et rediriger vers login
     if (!DEV_MODE && error.response?.status === 401) {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
@@ -216,7 +216,7 @@ function App() {
             
             <Route path="/dashboard" element={
               <ProtectedRoute>
-                <MainLayout />
+                {needsOnboarding ? <Navigate to="/onboarding" replace /> : <MainLayout />}
               </ProtectedRoute>
             }>
               {/* Core Trading Flow */}
