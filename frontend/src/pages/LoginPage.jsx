@@ -25,12 +25,14 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      const user = await login(email, password);
+      const userData = await login(email, password);
       toast.success("Connexion réussie !");
-      // Attendre un tick pour que le state React soit propagé
-      setTimeout(() => {
-        window.location.href = "/dashboard";
-      }, 100);
+      // Redirect to onboarding if not completed, otherwise dashboard
+      if (!userData.onboarding_completed) {
+        navigate("/onboarding");
+      } else {
+        navigate("/dashboard");
+      }
     } catch (error) {
       toast.error(error.response?.data?.detail || "Erreur de connexion");
       setLoading(false);

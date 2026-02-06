@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { useAuth } from "../App";
+import { useAuth, API } from "../App";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
 import { Progress } from "../components/ui/progress";
@@ -14,8 +14,6 @@ import {
   Sparkles,
   Rocket
 } from "lucide-react";
-
-const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 // Step indicator component
 function StepIndicator({ currentStep, totalSteps }) {
@@ -339,7 +337,7 @@ export default function OnboardingPage() {
 
   const fetchOptions = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/onboarding/options`);
+      const response = await axios.get(`${API}/onboarding/options`);
       setOptions(response.data);
     } catch (error) {
       console.error("Error fetching onboarding options:", error);
@@ -386,7 +384,7 @@ export default function OnboardingPage() {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.post(
-        `${API_URL}/api/onboarding/complete`,
+        `${API}/onboarding/complete`,
         {
           experience_level: experienceLevel,
           preferred_markets: preferredMarkets,
