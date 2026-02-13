@@ -475,9 +475,13 @@ async def login(credentials: UserLogin):
         paper_balance=user.get("paper_balance", 10000.0),
         watchlist=user.get("watchlist", []),
         is_admin=user.get("is_admin", False),
-        avatar=user.get("avatar")
+        onboarding_completed=user.get("onboarding_completed", False),
+        preferences=user.get("preferences"),
+        avatar=user.get("avatar"),
+        points=user.get("points", 0),
+        portfolio=user.get("portfolio", {})
     )
-    
+
     return TokenResponse(access_token=token, user=user_response)
 
 @api_router.get("/auth/me", response_model=UserResponse)
@@ -491,7 +495,11 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         paper_balance=current_user.get("paper_balance", 10000.0),
         watchlist=current_user.get("watchlist", []),
         is_admin=current_user.get("is_admin", False),
-        avatar=current_user.get("avatar")
+        onboarding_completed=current_user.get("onboarding_completed", False),
+        preferences=current_user.get("preferences"),
+        avatar=current_user.get("avatar"),
+        points=current_user.get("points", 0),
+        portfolio=current_user.get("portfolio", {})
     )
 
 # ============== MARKET DATA ROUTES ==============

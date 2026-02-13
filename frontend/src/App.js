@@ -111,8 +111,20 @@ function App() {
           setUser(response.data);
           localStorage.setItem("user", JSON.stringify(response.data));
         } catch (error) {
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
+          // Only logout on 401 (invalid/expired token)
+          // For other errors (network, 404, 500), fall back to localStorage data
+          if (error.response?.status === 401) {
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+          } else {
+            try {
+              const parsed = JSON.parse(savedUser);
+              setUser(parsed);
+            } catch {
+              localStorage.removeItem("token");
+              localStorage.removeItem("user");
+            }
+          }
         }
       }
       setLoading(false);
@@ -181,7 +193,8 @@ function App() {
   };
 
   // Check if user needs onboarding
-  const needsOnboarding = user && !user.onboarding_completed;
+  // Guard: if user has preferences or a non-default trading_level, onboarding was already done
+  const needsOnboarding = user && !user.onboarding_completed && !user.preferences;
 
   return (
     <AuthContext.Provider value={{ user, login, register, logout, loading, updateUser, systemHealth }}>
